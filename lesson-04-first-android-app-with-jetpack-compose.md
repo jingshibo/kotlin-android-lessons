@@ -374,7 +374,7 @@ fun ResearchScreen() {
 ```
 
 This displays a brief notification at the bottom of the screen, giving the user immediate feedback that their action was registered.
-```
+
 
 means:
 
@@ -399,7 +399,7 @@ This creates a value remembered by the UI.
 
 When you change:
 
-```text
+```kotlin
 measurementValue = 2.43
 ```
 

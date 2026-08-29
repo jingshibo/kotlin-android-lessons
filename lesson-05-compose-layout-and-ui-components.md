@@ -19,21 +19,23 @@ In Lesson 5, we improve the layout so it becomes closer to a usable tablet resea
 
 We will cover:
 
-```text
-Column
-Row
-Spacer
-Modifier
-padding
-fillMaxWidth
-Arrangement
-Alignment
-font size
-Card
-OutlinedTextField
-Button layout
-basic styling
-```
+- `Column`
+- `Row`
+- `Spacer`
+- `Modifier`
+- padding
+- `fillMaxWidth`
+- `Arrangement`
+- `Alignment`
+- `Box`
+- `Surface`
+- `Card`
+- `Scaffold`
+- resources (images, strings, drawables)
+- font size
+- `OutlinedTextField`
+- Button layout
+- basic styling
 
 ## 1. Why layout matters
 
@@ -307,9 +309,8 @@ Device status: Connected
 
 A common use is putting buttons side by side:
 
-Row {
-
 ```kotlin
+Row {
     Button(
         onClick = {
             // start
@@ -332,9 +333,8 @@ However, without spacing, the buttons may be too close together.
 
 Add a Spacer:
 
-Row {
-
 ```kotlin
+Row {
     Button(
         onClick = {
             // start
@@ -363,7 +363,7 @@ import androidx.compose.foundation.layout.width
 
 ## 7. Arrangement
 
-Arrangement controls **spacing** (how much space between children) inside a Column or Row. It affects **all children as a group**.
+Arrangement controls **spacing** (how much space between children) inside a Column or Row. It affects **all children components within the container**.
 
 For example:
 
@@ -653,20 +653,49 @@ This makes your app structure easier to understand: "The Scaffold handles system
 
 ## 13. Resources: Images, Strings, and Drawables
 
-Android organizes non-code resources in the `res/` folder. The `R` class automatically contains IDs for all resources.
+Android organizes non-code resources in the `res/` folder. The `R` class automatically contains IDs for all resources, generated at build time from the filenames and XML entries you add.
+
+Typical structure:
+
+```text
+res/
+├── drawable/       (images, icons, vector art)
+├── mipmap/         (launcher icons)
+└── values/
+    ├── strings.xml
+    ├── colors.xml
+    └── themes.xml
+```
 
 **Using images:**
+
+Place an image file (e.g., `androidparty.png`) in `res/drawable/`, then load and display it:
 
 ```kotlin
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 
-val image = painterResource(R.drawable.androidparty)
+Image(
+    painter = painterResource(R.drawable.androidparty),
+    contentDescription = "Android party illustration",
+    modifier = Modifier.fillMaxWidth()
+)
 ```
+
+- `painterResource` loads the drawable as a `Painter` that `Image` can render.
+- `contentDescription` is required for accessibility (screen readers). Pass `null` only for purely decorative images.
 
 **Using strings:**
 
-Define in `res/values/strings.xml`, then reference:
+Define the text once in `res/values/strings.xml`:
+
+```xml
+<resources>
+    <string name="app_name">Research Measurement App</string>
+</resources>
+```
+
+Then reference it from Compose instead of hardcoding the text:
 
 ```kotlin
 import androidx.compose.ui.res.stringResource
@@ -674,7 +703,12 @@ import androidx.compose.ui.res.stringResource
 Text(text = stringResource(R.string.app_name))
 ```
 
-**Benefits**: Easy translation, no hardcoding, centralized updates.
+**Key concepts**:
+
+- Resource IDs (`R.drawable.xxx`, `R.string.xxx`) are generated automatically — you never write them by hand.
+- Keeping text in `strings.xml` makes translation to other languages possible without touching Kotlin code.
+- Centralizing images/strings means one update (e.g., renaming a label) applies everywhere it's used.
+
 ## 14. Font size
 
 You can change text size using:
@@ -838,27 +872,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/*
- * IMPORTANT: Jetpack Compose Modifier Rules
- *
- * 1. Modifiers are "Private" to the Component:
- *    When you write Card(modifier = Modifier.fillMaxWidth()), that instruction belongs only to the Card.
- *    The Row or Column inside the Card cannot "see" or inherit that specific Modifier object.
- *
- * 2. Constraints vs. Modifiers:
- *    Children don't inherit modifiers, but they DO inherit layout constraints.
- *    - The parent (e.g., Card) uses its modifier to decide its own size.
- *    - Because the parent is full-width, the child is placed in a full-width container.
- *    - The child doesn't need the parent's fillMaxWidth() modifier, but still receives
- *      the constraint that space is available. It can use its own fillMaxWidth() to fill that space.
- *
- * 3. The "Function Modifier" is the only Bridge:
- *    The only way to pass instructions to a child composable is via function parameters.
- *    - Modifier (capital M): The Singleton object. Starts a fresh list of instructions.
- *      Use this for internal layouts (Column inside a function, padding inside a Row, etc.).
- *    - modifier (lowercase): The function parameter variable. Contains instructions passed from parent function.
- *      Use this as the "base" for your top-level component inside a composable function.
- */
 
 @Composable
 fun ResearchScreen() {
@@ -987,40 +1000,30 @@ you display:
 
 This part:
 
+```kotlin
 measurementValue?.let {
-
-```text
     "%.3f".format(it)
 } ?: "--"
 ```
 
 means:
 
-If measurementValue is not null:
+- If `measurementValue` is not null, format it to 3 decimal places.
+- Otherwise, show `"--"`.
 
-```text
-    format it to 3 decimal places
-```
-
-Otherwise:
-
-```text
-    show "--"
-```
-
-This is equivalent to the longer version:
+This looks roughly equivalent to:
 
 ```kotlin
-val displayText = if (measurementValue != null) {
+if (measurementValue != null) {
     "%.3f".format(measurementValue)
 } else {
     "--"
 }
 ```
 
-However, the let version works nicely with nullable values.
+**Why `let` is actually needed here (not just a style choice):** `measurementValue` is declared as `var measurementValue by remember { mutableStateOf<Double?>(null) }`. Delegated properties like this have a custom getter, so Kotlin cannot smart-cast them from `Double?` to `Double` even after a `!= null` check — the `if` version above will fail to compile with "Smart cast to 'Double' is impossible". `measurementValue?.let { ... }` avoids this problem because `it` is captured once as a local, non-nullable `Double` parameter inside the lambda.
 
-You do not need to use let immediately, but you should start recognising it.
+You do not need to use `let` immediately, but you should start recognising it — it's the idiomatic way to safely unwrap nullable Compose state.
 
 ## 20. A simpler version without let
 
