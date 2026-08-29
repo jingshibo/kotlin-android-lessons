@@ -186,7 +186,10 @@ This means:
 Result: Yellow background with 16dp padding around the text inside it.
 
 ```text
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹? (yellow)                    鈹?鈹?   (16dp padding)            鈹?鈹?   Research Measurement App  鈹?鈹?   (16dp padding)            鈹?鈹? (yellow)                    鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
++-------------------------------------------+
+| Simple box diagram                        |
++-------------------------------------------+
+```
 
 **Example 2: Padding first, then background**
 
@@ -207,36 +210,31 @@ Result: Padding space with no background, then yellow background only behind the
 
 ```text
 (16dp spacing with no color)
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?   (yellow background)       鈹?鈹?   Research Measurement App  鈹?鈹?   (yellow background)       鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?(16dp spacing with no color)
+   (yellow background)          Research Measurement App     (yellow background)       (16dp spacing with no color)
 ```
 
 **Key takeaway**: Modifier order matters for visual appearance. Test different orders to get the look you want.
 
 ## 3.5 IMPORTANT: Jetpack Compose Modifier Rules
 
-```kotlin
-/*
- * IMPORTANT: Jetpack Compose Modifier Rules
- *
- * 1. Modifiers are "Private" to the Component:
- *    When you write parent container like Surface/Card (modifier = Modifier.fillMaxWidth()), that instruction belongs only to the Surface/Card container.
- *    The Row or Column inside the Surface/Card container cannot "see" or inherit that specific Modifier object.
- *
- * 2. Constraints vs. Modifiers:
- *    Children don't inherit modifiers, but they DO inherit layout constraints.
- *    - The parent (e.g., Surface, Card) uses its modifier to decide its own size.
- *    - Because the parent is full-width, the child is placed in a full-width container.
- *    - The child doesn't need the parent's fillMaxWidth() modifier, but still receives
- *      the constraint that space is available. It can use its own fillMaxWidth() to fill that space.
- *
- * 3. The "Function Modifier" is the only Bridge:
- *    The only way to pass instructions to a child composable is via function parameters.
- *    - Modifier (capital M): The Singleton object. Starts a fresh list of instructions.
- *      Use this for internal layouts (Column inside a function, padding inside a Row, etc.).
- *    - modifier (lowercase): The function parameter variable. Contains instructions passed from parent function.
- *      Use this as the "base" for your top-level component inside a composable function.
- */
-```
+**1. Modifiers are "private" to the component:**
+
+When you write a parent container like Surface/Card with `modifier = Modifier.fillMaxWidth()`, that instruction belongs only to the Surface/Card container. The Row or Column inside the Surface/Card container cannot "see" or inherit that specific Modifier object.
+
+**2. Constraints vs. modifiers:**
+
+Children don't inherit modifiers, but they DO inherit layout constraints.
+
+- The parent (e.g., Surface, Card) uses its modifier to decide its own size.
+- Because the parent is full-width, the child is placed in a full-width container.
+- The child doesn't need the parent's `fillMaxWidth()` modifier, but still receives the constraint that space is available. It can use its own `fillMaxWidth()` to fill that space.
+
+**3. The "function modifier" is the only bridge:**
+
+The only way to pass instructions to a child composable is via function parameters.
+
+- `Modifier` (capital M): The singleton object. Starts a fresh list of instructions. Use this for internal layouts (Column inside a function, padding inside a Row, etc.).
+- `modifier` (lowercase): The function parameter variable. Contains instructions passed from the parent function. Use this as the "base" for your top-level component inside a composable function.
 
 These rules explain why:
 
@@ -526,8 +524,12 @@ Surface(
 **Conceptually:**
 
 ```text
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹? 鈫?Surface (cyan background)
-鈹?(24dp padding)           鈹?鈹? Hello Android           鈹?鈹?(24dp padding)           鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
++------ Surface (cyan background) ------+
+|  (24dp padding)                      |
+|  +-- Hello Android --+               |
+|  (24dp padding)      |               |
++------------------------------------+
+```
 
 Surface is commonly used with other composables to provide visual separation and background colors.
 
@@ -556,7 +558,13 @@ Card(
 Conceptually:
 
 ```text
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹? (16dp padding)             鈹?鈹? Current value              鈹?鈹? 2.43                       鈹?鈹? (16dp padding)             鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
++---------- Card ----------+
+| (16dp padding)          |
+| Current value           |
+| 2.43                    |
+| (16dp padding)          |
++------------------------+
+```
 
 This is useful for research apps because it visually separates:
 
@@ -620,8 +628,8 @@ Do NOT apply `innerPadding` separately to each child. For example, avoid:
 ```kotlin
 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
     Column {
-        Greeting(modifier = Modifier.padding(innerPadding))  // 鉂?Don't do this separately
-        ResearchScreen(modifier = Modifier.padding(innerPadding))  // 鉂?Don't do this separately
+        Greeting(modifier = Modifier.padding(innerPadding))  // [X]Don't do this separately
+        ResearchScreen(modifier = Modifier.padding(innerPadding))  // [X]Don't do this separately
     }
 }
 ```
@@ -632,7 +640,7 @@ Instead, apply it once to the root layout container (the Column):
 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
     Column(
         modifier = Modifier
-            .padding(innerPadding)  // 鉁?Apply once to root
+            .padding(innerPadding)  // [✓]Apply once to root
             .fillMaxSize()
     ) {
         Greeting()  // Inherits space from parent
@@ -692,9 +700,9 @@ import androidx.compose.ui.unit.sp
 
 For a tablet-based research app, you might want:
 
-- Title: 24鈥?0 sp
-- Section label: 16鈥?8 sp
-- Main measurement value: 32鈥?8 sp
+- Title: 24-30 sp
+- Section label: 16-18 sp
+- Main measurement value: 32-38 sp
 - Button text: default or 18 sp
 
 Example:
@@ -763,7 +771,7 @@ For a research app, this is a good default for data entry fields.
 
 ## 16. Better research screen design
 
-Let鈥檚 design a simple screen:
+Let's design a simple screen:
 
 Research Measurement App
 
@@ -772,13 +780,19 @@ Research Measurement App
 Device status: Connected
 
 ```text
-鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?Current value                鈹?鈹?2.43                         鈹?鈹?Measurements: 3              鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
-
-[Start Measurement] [Reset]
++-------------------------------------------+
+| Research Measurement App                  |
+| Sample ID: S001                           |
+| Device status: Connected                  |
+| Current value: 2.43                      |
+| Measurements: 3                           |
+| [Start Measurement] [Reset]              |
++-------------------------------------------+
+```
 
 This is still simple, but much more usable than the previous version.
 
-## 17. Full code 鈥?improved layout
+## 17. Full code - improved layout
 
 Replace your MainActivity.kt with this version, adjusting the package name if needed:
 
@@ -1388,20 +1402,24 @@ This lesson is not just about making the app prettier.
 
 You learned several very important Android UI ideas:
 
-```kotlin
-Column = vertical layout
-Row = horizontal layout
-Spacer = manual space
-Arrangement.spacedBy = automatic space
-Modifier.padding = outside/inside spacing
-Modifier.fillMaxWidth = use full width
-Modifier.weight = share row/column space
-Card = group related content
-OutlinedTextField = form input
-```
-
-- Button enabled = prevent invalid action
-- if inside Compose = conditional UI
+- `Column` = vertical layout
+- `Row` = horizontal layout
+- `Spacer` = manual space
+- `Arrangement.spacedBy` = automatic space
+- `Alignment` = position children within a row/column
+- `Modifier.padding` = outside/inside spacing
+- `Modifier.fillMaxWidth` = use full width
+- `Modifier.weight` = share row/column space
+- Modifier order matters, and modifiers are private to each component
+- `Box` = stack items front to back
+- `Surface` = background layer for content
+- `Card` = group related content with a shadow/border
+- `Scaffold` = master layout container that handles system bar padding
+- Resources (`res/`, `R` class) = images, strings, and drawables
+- `OutlinedTextField` = form input
+- Font size and formatted numbers (`let`, `String.format`) = readable output
+- Button `enabled` = prevent invalid action
+- `if` inside Compose = conditional UI (e.g., connection status, warnings)
 
 These are enough to build many simple screens.
 
@@ -1455,7 +1473,7 @@ This is very close to real research-app logic.
 
 ## Lesson 6 preview
 
-Next, I suggest we move from 鈥渓atest value only鈥?to a list of measurements.
+Next, I suggest we move from "latest value only" to a list of measurements.
 
 Lesson 6 should cover:
 
@@ -1472,3 +1490,4 @@ calculating mean/min/max
 ```
 
 That will make the app feel much closer to an actual data-collection tool.
+
