@@ -166,7 +166,7 @@ means:
 
 Display this text with 16 dp padding.
 
-## 3.4 Important: Modifier Order Matters
+### Modifier order matters
 
 The order in which you chain modifiers can change the visual result.
 
@@ -217,7 +217,7 @@ Result: Padding space with no background, then yellow background only behind the
 
 **Key takeaway**: Modifier order matters for visual appearance. Test different orders to get the look you want.
 
-## 3.5 IMPORTANT: Jetpack Compose Modifier Rules
+### Jetpack Compose Modifier rules
 
 **1. Modifiers are "private" to the component:**
 

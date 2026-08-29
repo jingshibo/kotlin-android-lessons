@@ -236,6 +236,23 @@ Covered:
 
 The main goal is to make the app layout clearer and closer to a real research data-collection interface.
 
+### Lesson 5 note - Modifier in Jetpack Compose
+
+Short summary:
+This companion note explains `Modifier` as its own topic, using the examples introduced in Lessons 4 and 5. It focuses on why modifiers are attached to individual composables, why modifier order matters, and why reusable composables should accept a `modifier: Modifier = Modifier` parameter.
+
+Covered:
+
+- what `Modifier` means in Compose
+- common modifiers such as `padding`, `fillMaxWidth`, `height`, `width`, and `weight`
+- modifier chaining
+- why modifier order changes the visual result
+- the difference between capital `Modifier` and lowercase `modifier`
+- why parent modifiers do not automatically apply to children
+- the difference between layout constraints and modifiers
+- using `Spacer` versus `Arrangement.spacedBy`
+- applying a passed `modifier` to the top-level UI element of a reusable composable
+
 ### Lesson 6 - Measurement history with data class, MutableList, and LazyColumn
 
 Short summary:

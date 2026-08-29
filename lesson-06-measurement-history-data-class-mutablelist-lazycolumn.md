@@ -278,7 +278,7 @@ val maxText = values.maxOrNull()?.let {
 } ?: "--"
 ```
 
-This gives you text that can be displayed directly in the UI.
+This gives you text that can be displayed directly in the UI. Regarding why we use val instead of var to define these variables, please refer to lesson-06-notes-val-var-and-recomposition file. 
 
 ## 7. Display a list with LazyColumn
 
