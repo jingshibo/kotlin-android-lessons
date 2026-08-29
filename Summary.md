@@ -255,6 +255,21 @@ Covered:
 
 This lesson makes the app feel more like a real data-collection tool because it stores the full measurement history.
 
+### Lesson 6 note - val, var, remember, and recomposition
+
+Short summary:
+This companion note explains why calculated values such as `latestMeasurement`, `meanText`, `minText`, and `maxText` use `val`, while editable Compose state such as `sampleId`, `isConnected`, `measurementValue`, and `measurementCount` use `var`.
+
+Covered:
+
+- why changing over time does not automatically mean `var`
+- why local calculated values can be `val` during one recomposition
+- why Compose reruns composable functions when state changes
+- how `remember` prevents state from resetting during recomposition
+- why `var by remember { mutableStateOf(...) }` is used for reassigned UI state
+- why `val measurementList = remember { mutableStateListOf<Measurement>() }` can still allow list contents to change
+- when to use plain `val`, `val` with `remember`, and `var` with `remember`
+
 ### Lesson 7 - Saving and exporting measurements as CSV
 
 Short summary:

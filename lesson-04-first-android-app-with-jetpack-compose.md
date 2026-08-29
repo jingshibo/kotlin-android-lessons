@@ -1012,7 +1012,6 @@ Then the UI updates.
 
 These are the essential patterns:
 
-Column {
 
 ```kotlin
 class MainActivity : ComponentActivity() {
@@ -1029,6 +1028,7 @@ class MainActivity : ComponentActivity() {
 fun ResearchScreen() {
     Text("Hello")
 }
+Column {
     Text("Title")
     Text("Value")
 }

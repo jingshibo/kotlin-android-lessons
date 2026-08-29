@@ -28,7 +28,7 @@ app logic and state
 
 using a ViewModel.
 
-Android’s official architecture documentation describes a ViewModel as a business logic or screen-level state holder, and Compose architecture guidance describes the ViewModel as the place that handles UI events and updates state. Android Developers
+Android’s official architecture documentation describes a ViewModel as a business logic or screen-level state holder, and Compose architecture guidance describes the ViewModel as the place that handles UI events and updates state. 
 
 ## 1. Why use a ViewModel?
 
@@ -115,7 +115,7 @@ This is called unidirectional data flow:
 - State flows down to the UI
 - Events flow up to the ViewModel
 
-Google’s Compose architecture guide explains this pattern as UI events being passed upward to be handled by a state holder such as a ViewModel, which then updates the UI state. Android Developers
+Google’s Compose architecture guide explains this pattern as UI events being passed upward to be handled by a state holder such as a ViewModel, which then updates the UI state. 
 
 ## 3. Add the ViewModel dependency
 
