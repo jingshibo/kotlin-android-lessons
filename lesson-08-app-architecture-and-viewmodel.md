@@ -119,24 +119,79 @@ Google’s Compose architecture guide explains this pattern as UI events being p
 
 ## 3. Add the ViewModel dependency
 
-You may already have this if your template included it. In your app-level build.gradle.kts, check dependencies.
+You may already have this if your template included it.
 
-You need something like:
+Open your app-level Gradle file:
 
 ```text
-implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+app/build.gradle.kts
 ```
 
-The exact latest version may be different in your project, so it is also fine to use the version Android Studio suggests.
+Be careful: Android projects often have more than one Gradle file.
 
-After editing Gradle, click:
+You want the one inside the `app` module, not the project-level Gradle file.
 
+Inside `app/build.gradle.kts`, find the `dependencies` block:
+
+```kotlin
+dependencies {
+    ...
+}
+```
+
+Add the ViewModel Compose dependency inside that block:
+
+```kotlin
+dependencies {
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+}
+```
+
+If the block already has other dependencies, just add this as one more line:
+
+```kotlin
+dependencies {
+    implementation("androidx.core:core-ktx:...")
+    implementation("androidx.activity:activity-compose:...")
+    implementation("androidx.compose.material3:material3:...")
+
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+}
+```
+
+The exact version may be different in your project.
+
+That is okay. You can use the version Android Studio suggests.
+
+After editing the Gradle file, click:
+
+```text
 Sync Now
+```
+
+Android Studio needs to sync Gradle before your Kotlin file can import:
+
+```kotlin
+import androidx.lifecycle.viewmodel.compose.viewModel
+```
 
 You need this dependency so you can get a ViewModel inside Compose using:
 
-```text
+```kotlin
 viewModel()
+```
+
+If Android Studio shows an error for:
+
+```kotlin
+import androidx.lifecycle.viewmodel.compose.viewModel
+```
+
+then either:
+
+```text
+the dependency is missing
+or Gradle has not synced yet
 ```
 
 ## 4. Create a UI state data class
@@ -189,7 +244,7 @@ ResearchUiState represents the whole screen state.
 
 ## 6. Create ResearchViewModel
 
-Add this class outside your composable functions:
+Add this class outside your composable functions. It may reads a bit complex. We will explain them in detail in below sections:
 
 ```kotlin
 import androidx.lifecycle.ViewModel
@@ -198,14 +253,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlin.random.Random
 
-class ResearchViewModel : ViewModel() {
+class ResearchViewModel : ViewModel() { // ResearchViewModel inherits from ViewModel.
+    
+    // Create a ResearchUiState object. uiState is var, so the ViewModel can replace the whole ResearchUiState object.
+    // The properties inside ResearchUiState are val, so we use copy() to create a new object with one field changed.
+    // The by keyword lets us use uiState like a normal variable instead of writing uiState.value.
+    var uiState by mutableStateOf(ResearchUiState()) // There is no "by remember" here because this state lives inside the ViewModel, not inside a composable function. It does not need to remember the state and prevent reset during recomposition.
 
-    var uiState by mutableStateOf(ResearchUiState())
-        private set
+        // Protection: Everyone see uiState but only the ViewModel can modify uiState
+        // UI reads uiState, UI calls ViewModel functions, ViewModel updates uiState
+        private set 
 
     fun updateSampleId(newSampleId: String) {
-        uiState = uiState.copy(
-            sampleId = newSampleId,
+        uiState = uiState.copy(  // ResearchUiState properties are val, so we cannot mutate one property directly. However, since uiState itself is var, we can reassign it with a new uiState value. // Therefore, we reassign it by creating a new state object via copying, and replacing only the sampleId field.
+            sampleId = newSampleId, // Because uiState is created with mutableStateOf, assigning a new value tells Compose that state changed.
             exportMessage = ""
         )
     }
@@ -242,7 +303,7 @@ class ResearchViewModel : ViewModel() {
         )
 
         uiState = uiState.copy(
-            measurements = uiState.measurements + newMeasurement,
+            measurements = uiState.measurements + newMeasurement, // returns a brand-new list (original + one element appended) rather than mutating the existing list in place.
             exportMessage = ""
         )
     }
@@ -260,6 +321,8 @@ class ResearchViewModel : ViewModel() {
         )
     }
 
+    // This belongs in the ViewModel because it reads the current uiState.
+    // The actual CSV conversion is a pure helper function outside the ViewModel.
     fun getCsvText(): String {
         return measurementsToCsv(uiState.measurements)
     }
@@ -279,6 +342,8 @@ viewModel.addMeasurement()
 Look at this:
 
 ```kotlin
+// Protection: Everyone see uiState but only the ViewModel can modify uiState
+// UI reads uiState, UI calls ViewModel functions, ViewModel updates uiState
 var uiState by mutableStateOf(ResearchUiState())
     private set
 ```
@@ -310,7 +375,54 @@ This keeps the app logic controlled.
 
 ## 8. Why use copy()?
 
-When we update the screen state, we write:
+`ResearchUiState` represents the current screen state.
+
+You can think of it as one snapshot of the screen:
+
+```kotlin
+data class ResearchUiState(
+    val sampleId: String = "",
+    val isConnected: Boolean = false,
+    val measurements: List<Measurement> = emptyList(),
+    val exportMessage: String = ""
+)
+```
+
+Because these properties use `val`, an existing `ResearchUiState` object cannot be edited directly.
+
+So this is not allowed:
+
+```kotlin
+uiState.sampleId = "S001"
+```
+
+That is intentional.
+
+Instead of editing the old state object, we create a new state object.
+
+For example, when the user types a new sample ID, we want the next state to be:
+
+```text
+same as the old state,
+but with a different sampleId
+```
+
+One way to do that is to manually create a new `ResearchUiState`:
+
+```kotlin
+uiState = ResearchUiState(
+    sampleId = newSampleId,
+    isConnected = uiState.isConnected,
+    measurements = uiState.measurements,
+    exportMessage = uiState.exportMessage
+)
+```
+
+This works, but it is long and easy to get wrong.
+
+Because `ResearchUiState` is a data class, Kotlin gives it a `copy()` function.
+
+`copy()` lets us create a new object from the old object:
 
 ```kotlin
 uiState = uiState.copy(
@@ -321,10 +433,14 @@ uiState = uiState.copy(
 This means:
 
 ```text
-Create a new ResearchUiState
-same as the old one
-but with sampleId changed
+Start from the current uiState.
+Copy all its existing values.
+Change only sampleId.
+Return a new ResearchUiState object.
+Assign that new object back to uiState.
 ```
+
+So `copy()` is useful because it lets us update one field without rewriting every field.
 
 For example, if the old state is:
 
@@ -335,7 +451,7 @@ measurements = []
 exportMessage = ""
 ```
 
-After:
+After this:
 
 ```kotlin
 uiState = uiState.copy(sampleId = "S001")
@@ -350,9 +466,123 @@ measurements = []
 exportMessage = ""
 ```
 
-Only sampleId changed.
+Only `sampleId` changed.
 
-This is why data class is useful.
+The other values were copied from the old state.
+
+### Why is uiState var but its properties are val?
+
+This line can feel confusing. uiState itself is var type but its properties are val type. What does this mean:
+
+```kotlin
+var uiState by mutableStateOf(ResearchUiState())
+```
+
+The important detail is that there are two levels:
+
+```text
+uiState itself is var
+    -> the ViewModel can replace the whole ResearchUiState object
+
+properties inside ResearchUiState are val
+    -> the old ResearchUiState object cannot be edited directly
+```
+
+So this is allowed:
+
+```kotlin
+uiState = uiState.copy(sampleId = "S001")
+```
+
+because we are replacing the whole state object.
+
+This is not allowed:
+
+```kotlin
+uiState.sampleId = "S001"
+```
+
+because we are trying to edit a `val` property inside the existing state object.
+
+### Why not use var properties?
+
+You might ask:
+
+```text
+Why not declare the properties inside ResearchUiState as var?
+```
+
+For example:
+
+```kotlin
+data class ResearchUiState(
+    var sampleId: String = "",
+    var isConnected: Boolean = false
+)
+```
+
+Then this would look possible:
+
+```kotlin
+uiState.sampleId = "S001"
+```
+
+But this is not the pattern we want for Compose UI state.
+
+`mutableStateOf` makes Compose observe `uiState`. 
+
+**Because uiState is created with mutableStateOf, assigning a new value tells Compose that state changed.**
+
+Compose can clearly notice this:
+
+```kotlin
+uiState = uiState.copy(sampleId = "S001")
+```
+
+because `uiState` is assigned a new object.
+
+But if you only changed a property inside the same object:
+
+```kotlin
+uiState.sampleId = "S001"
+```
+
+then the `uiState` variable itself was not replaced.
+
+That makes the state change less clear, and it may not trigger the UI update you expect.
+
+So the preferred pattern is:
+
+```text
+Do not edit the old state snapshot.
+Create the next state snapshot.
+Assign the next snapshot back to uiState.
+```
+
+In code:
+
+```kotlin
+uiState = uiState.copy(sampleId = "S001")
+```
+
+This gives Compose a clear state change:
+
+```text
+old uiState -> new uiState
+```
+
+The short version:
+
+```text
+uiState is var
+    -> replace the whole state object
+
+ResearchUiState properties are val
+    -> each state object is a stable snapshot
+
+copy()
+    -> create the next snapshot while changing only the fields you name
+```
 
 ## 9. Get the ViewModel in Compose
 
@@ -367,6 +597,9 @@ Then in your MainActivity:
 ```kotlin
 setContent {
     MaterialTheme {
+        // Ask Compose for the ResearchViewModel that belongs to this screen.
+        // The left viewModel is a variable name.
+        // The right viewModel() is a function call from androidx.lifecycle.viewmodel.compose.viewModel.
         val viewModel: ResearchViewModel = viewModel()
 
         ResearchScreen(
@@ -374,6 +607,74 @@ setContent {
         )
     }
 }
+```
+
+Pause here, because this line looks strange when you first meet it:
+
+```kotlin
+val viewModel: ResearchViewModel = viewModel()
+```
+
+Read it like this:
+
+```text
+Create a variable named viewModel.
+The variable type is ResearchViewModel.
+Get the object by calling the Compose viewModel() function.
+```
+
+There are three names that look similar, but they are different:
+
+| Code | What it is |
+|---|---|
+| `ViewModel` | Android parent class |
+| `ResearchViewModel` | Your own class; it is a kind of `ViewModel` |
+| `viewModel()` | Compose helper function that gets the correct ViewModel object |
+
+Important: this line is not mainly a parent/child assignment example. It is mainly a function-call assignment example.
+
+```text
+Inheritance idea:
+ResearchViewModel is a kind of ViewModel.
+
+This line's main idea:
+viewModel() returns a ResearchViewModel object.
+```
+
+This is why we do not usually write this inside a composable:
+
+```kotlin
+val viewModel: ResearchViewModel = ResearchViewModel()
+```
+
+That would call the constructor directly and make a new object yourself.
+
+In Compose, the screen can re-run many times. The `viewModel()` function asks Android's ViewModel system for the existing `ResearchViewModel` for this screen, or creates one if needed, and keeps it tied to the screen lifecycle.
+
+So mentally translate:
+
+```kotlin
+val viewModel: ResearchViewModel = viewModel()
+```
+
+to:
+
+```kotlin
+val viewModel: ResearchViewModel = getTheResearchViewModelForThisScreen()
+```
+
+You may also see the generic form:
+
+```kotlin
+val viewModel = viewModel<ResearchViewModel>()
+```
+
+Both versions mean the same basic thing. The lesson uses the explicit variable type on the left side, so Kotlin can infer that `viewModel()` should return a `ResearchViewModel`.
+
+If the repeated name feels too confusing, this version is clearer:
+
+```kotlin
+val researchViewModel: ResearchViewModel = viewModel()
 ```
 
 Then:
@@ -424,8 +725,19 @@ So:
 @Composable
 fun ResearchScreen(
     viewModel: ResearchViewModel
-) {
-    ...
+) { // This function is just for connecting viewModel variable to UI drawing function.
+    // It separates the UI drawing process from viewModel inputs, so the code for drawing is independent
+    val uiState = viewModel.uiState // Getting viewModel state value
+    
+    ResearchScreenContent( // Plot UI using viewModel values and functions
+        uiState = uiState, // You can also direct use uiState = viewModel.uiState
+        onSampleIdChange = viewModel::updateSampleId,
+        onToggleConnection = viewModel::toggleConnection,
+        onMeasure = viewModel::addMeasurement,
+        onClear = viewModel::clearMeasurements,
+        onExportMessage = viewModel::setExportMessage,
+        getCsvText = viewModel::getCsvText
+    )
 }
 ```
 
@@ -454,13 +766,58 @@ is the mostly pure UI layer.
 
 This syntax:
 
-```text
+```kotlin
 onMeasure = viewModel::addMeasurement
 ```
 
 means:
 
-Pass the function addMeasurement as a callback.
+```text
+Pass the addMeasurement function itself.
+Do not call it yet.
+Let ResearchScreenContent call it later when the button is clicked.
+```
+
+That is different from this:
+
+```kotlin
+onMeasure = viewModel.addMeasurement()
+```
+
+That would mean:
+
+```text
+Call addMeasurement immediately while building the UI.
+Then pass its result to onMeasure.
+```
+
+That is not what we want, because the measurement should happen later, when the user presses the button.
+
+Remember that `ResearchScreenContent` receives:
+
+```kotlin
+onMeasure: () -> Unit
+```
+
+This means:
+
+```text
+onMeasure is a function.
+It takes no input.
+It returns nothing important.
+```
+
+Then the button can use it:
+
+```kotlin
+Button(
+    onClick = onMeasure
+) {
+    Text("Measure")
+}
+```
+
+The button needs a function it can call later.
 
 It is roughly like saying:
 
@@ -470,19 +827,37 @@ onMeasure = {
 }
 ```
 
-Both are valid.
+Both are valid, because both pass a function.
 
 So:
 
+```kotlin
 viewModel::addMeasurement
+```
 
-is just a shorter way to pass the function.
+is just a shorter way to write:
+
+```kotlin
+{
+    viewModel.addMeasurement()
+}
+```
+
+Quick comparison:
+
+| Code | Meaning |
+|---|---|
+| `viewModel.addMeasurement()` | call the function now |
+| `viewModel::addMeasurement` | pass the function itself |
+| `{ viewModel.addMeasurement() }` | pass a small function that calls it later |
+
+The `::` syntax is called a function reference.
 
 ## 12. Full Lesson 8 app
 
 Here is the full code. Keep your own package name.
 
-        value
+        
 
 ```kotlin
 package com.example.researchapp
@@ -531,6 +906,9 @@ data class ResearchUiState(
     val exportMessage: String = ""
 )
 
+// These CSV/name functions are pure helper functions.
+// They do not read uiState, update state, or draw UI.
+// The ViewModel can call them, but it does not need to own them.
 fun escapeCsv(value: String): String {
     val needsEscaping =
         value.contains(",") ||
@@ -540,6 +918,7 @@ fun escapeCsv(value: String): String {
     return if (needsEscaping) {
         "\"" + value.replace("\"", "\"\"") + "\""
     } else {
+         value
     }
 }
 
@@ -570,6 +949,8 @@ fun safeFilename(text: String): String {
 
 class ResearchViewModel : ViewModel() {
 
+    // There is no remember here because this state lives inside the ViewModel.
+    // The by keyword lets us use uiState like a normal variable instead of writing uiState.value.
     var uiState by mutableStateOf(ResearchUiState())
         private set
 
@@ -612,14 +993,14 @@ class ResearchViewModel : ViewModel() {
         )
 
         uiState = uiState.copy(
-            measurements = uiState.measurements + newMeasurement,
+            measurements = uiState.measurements + newMeasurement, // old list + new item = new list. It does not change the old measurements list but reassigned it. 
             exportMessage = ""
         )
     }
 
     fun clearMeasurements() {
         uiState = uiState.copy(
-            measurements = emptyList(),
+            measurements = emptyList(), // replace measurements with a new empty list
             exportMessage = ""
         )
     }
@@ -630,6 +1011,8 @@ class ResearchViewModel : ViewModel() {
         )
     }
 
+    // This belongs in the ViewModel because it reads the current uiState.
+    // The actual CSV conversion is a pure helper function outside the ViewModel.
     fun getCsvText(): String {
         return measurementsToCsv(uiState.measurements)
     }
@@ -866,7 +1249,128 @@ fun MeasurementRow(
 }
 ```
 
-## 13. What changed compared with Lesson 7?
+## 13. Alternative: let ViewModel prepare the CSV export
+
+The full app above keeps the whole export button flow together in the composable:
+
+```kotlin
+pendingCsvText = getCsvText()
+
+val filename = if (uiState.sampleId.isNotBlank()) {
+    "${safeFilename(uiState.sampleId)}_measurements.csv"
+} else {
+    "measurements.csv"
+}
+
+createCsvLauncher.launch(filename)
+```
+
+That is okay for learning, because you can see the whole export flow in one place.
+
+But this block has two different kinds of work:
+
+| Code | Kind of work | Good place |
+|---|---|---|
+| create CSV text | app/data preparation | ViewModel |
+| decide export filename | app/export decision | ViewModel or helper |
+| launch Android file picker | UI/system action | Composable |
+
+So a cleaner version is:
+
+```text
+ViewModel prepares what to export.
+Composable launches the file picker.
+```
+
+First, create a small data class for the export request:
+
+```kotlin
+data class CsvExportRequest(
+    val filename: String,
+    val csvText: String
+)
+```
+
+Then the ViewModel can prepare both the filename and the text:
+
+```kotlin
+fun prepareCsvExport(): CsvExportRequest {
+    val filename = if (uiState.sampleId.isNotBlank()) {
+        "${safeFilename(uiState.sampleId)}_measurements.csv"
+    } else {
+        "measurements.csv"
+    }
+
+    return CsvExportRequest(
+        filename = filename,
+        csvText = measurementsToCsv(uiState.measurements)
+    )
+}
+```
+
+Now `ResearchScreen` passes that function to the UI:
+
+```kotlin
+ResearchScreenContent(
+    uiState = uiState,
+    onSampleIdChange = viewModel::updateSampleId,
+    onToggleConnection = viewModel::toggleConnection,
+    onMeasure = viewModel::addMeasurement,
+    onClear = viewModel::clearMeasurements,
+    onExportMessage = viewModel::setExportMessage,
+    prepareCsvExport = viewModel::prepareCsvExport
+)
+```
+
+So `ResearchScreenContent` receives:
+
+```kotlin
+prepareCsvExport: () -> CsvExportRequest
+```
+
+Then the export button becomes:
+
+```kotlin
+Button(
+    onClick = {
+        val exportRequest = prepareCsvExport()
+
+        pendingCsvText = exportRequest.csvText
+
+        createCsvLauncher.launch(exportRequest.filename)
+    },
+    enabled = uiState.measurements.isNotEmpty(),
+    modifier = Modifier.fillMaxWidth()
+) {
+    Text("Export CSV")
+}
+```
+
+Notice what stayed in the composable:
+
+```kotlin
+createCsvLauncher.launch(exportRequest.filename)
+```
+
+That line opens the Android file picker, so it belongs with the UI code.
+
+Notice what moved into the ViewModel:
+
+```kotlin
+val filename = ...
+val csvText = ...
+```
+
+Those lines prepare the export data, so they fit well in the ViewModel.
+
+This alternative is not required for the first version of Lesson 8. It is just a cleaner architecture direction:
+
+```text
+ViewModel: decide what data should be exported
+Composable: ask Android where to save it
+```
+
+## 14. What changed compared with Lesson 7?
 
 In Lesson 7, the screen directly owned the state:
 
@@ -879,6 +1383,8 @@ In Lesson 8, the ViewModel owns the state:
 
 ```kotlin
 class ResearchViewModel : ViewModel() {
+    // There is no remember here because this state lives inside the ViewModel.
+    // The by keyword lets us use uiState like a normal variable instead of writing uiState.value.
     var uiState by mutableStateOf(ResearchUiState())
         private set
 }
@@ -899,7 +1405,7 @@ onClear = viewModel::clearMeasurements
 
 So the UI becomes less responsible for business logic.
 
-## 14. Important benefit: screen rotation
+## 15. Important benefit: screen rotation
 
 On Android, rotating the device can recreate the Activity. State stored only inside composables with simple remember can be lost in some situations. A ViewModel is designed to hold screen state and survive configuration changes such as screen rotation. Android Developers
 
@@ -909,7 +1415,7 @@ For your research tablet app, that matters because you do not want to accidental
 
 However, ViewModel is not permanent storage. If the app process is killed, data can still be lost unless you save it to file/database. So for important research data, you still need CSV export or local database saving.
 
-## 15. One limitation of this ViewModel
+## 16. One limitation of the current ViewModel
 
 This ViewModel still uses:
 
@@ -942,7 +1448,7 @@ That is a better long-term structure.
 
 But for now, keeping fake measurement generation inside the ViewModel is acceptable for learning.
 
-## 16. Simple architecture comparison
+## 17. Simple architecture comparison
 
 For a very small app:
 
@@ -970,7 +1476,7 @@ Hardware / file / database / ML model
 
 is better still.
 
-## 17. What you should remember from Lesson 8
+## 18. What you should remember from Lesson 8
 
 The most important pattern is this:
 

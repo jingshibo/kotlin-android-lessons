@@ -180,7 +180,9 @@ Covered:
 - classes and objects
 - constructors
 - `val` and `var` inside classes
+- `val` and `var` for object variables versus object properties
 - functions inside classes
+- class inheritance with `: ParentClass()`
 - `data class`
 - named arguments
 - `copy()`
@@ -321,6 +323,42 @@ Covered:
 - keeping the UI mostly responsible for display, not business logic
 
 This is the first architecture lesson. It introduces the idea that the screen should display state, while the ViewModel manages the state and logic.
+
+### Lesson 8 note - How to think about ViewModel
+
+Short summary:
+This companion note explains how to judge what belongs in a `ViewModel`, what should stay in a composable, and how UI events update screen state through ViewModel functions.
+
+Covered:
+
+- how ViewModel differs from a regular Kotlin class
+- why `ResearchUiState` is owned by the ViewModel
+- why `private set` protects state
+- what kinds of variables and functions belong in ViewModel
+- why pure helper functions can stay outside ViewModel
+- what temporary UI state can stay in composables
+- how `viewModel::addMeasurement` passes a function for later
+- why `viewModel()` is different from `ResearchViewModel()`
+- how list updates use new lists such as `measurements + newMeasurement`
+- how CSV export can be split between ViewModel and composable
+- a checklist for deciding where code belongs
+
+### Lesson 8 note - Compose observable state
+
+Short summary:
+This companion note explains the state pattern that develops from Lesson 4 through Lesson 8: `mutableStateOf` creates Compose-observable state, `remember` keeps state alive inside composables, and `ViewModel` keeps screen state outside composables.
+
+Covered:
+
+- why ordinary variables do not automatically update Compose UI
+- how `mutableStateOf` creates observable state
+- what the `by` keyword means in Compose state declarations
+- why `remember { mutableStateOf(...) }` is used inside composables
+- why `var uiState by mutableStateOf(...)` inside a ViewModel does not need `remember`
+- how `mutableStateListOf` differs from a normal mutable list
+- why calculated values such as `meanText` are normal `val` values, not state
+- why `private set` protects ViewModel state
+- the state down, events up architecture pattern
 
 ### Lesson 9 - Simple data persistence: auto-save and reload previous session
 
