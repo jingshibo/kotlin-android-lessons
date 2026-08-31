@@ -401,6 +401,29 @@ Covered:
 
 This lesson prepares the app for file saving, loading previous sessions, device communication, signal processing, ML inference, and long-running acquisition without freezing the interface.
 
+### Lesson 10 note - Coroutines, threads, and dispatchers
+
+Short summary:
+This companion note explains the mental model behind Lesson 10 by starting from the main `viewModelScope.launch` plus `withContext(Dispatchers.IO)` pattern, then unpacking coroutine, thread, dispatcher, `suspend`, blocking work, and safe ViewModel state updates.
+
+Covered:
+
+- how `viewModelScope.launch` usually starts on Main
+- how `withContext(Dispatchers.IO)` moves one block to IO
+- how `withContext(...)` can return a value and how block scope works
+- difference between thread, coroutine, and dispatcher
+- what "current thread" means
+- where `suspend` comes from in Lesson 10
+- when a helper function needs `suspend`
+- the difference between suspending a coroutine and blocking a thread
+- `delay()` versus `Thread.sleep(...)`
+- why normal file reading/writing is blocking work
+- why quick `uiState` updates should stay outside `Dispatchers.IO`
+- race-condition-style risks with shared state
+- two valid styles: caller chooses IO versus helper function chooses IO
+- when helper functions contain `viewModelScope.launch` versus when callers launch and call suspend helpers
+- when reusable helpers should catch errors and return a success/failure result without updating `uiState` from IO
+
 ### Lesson 11 - Simulated live data stream
 
 Short summary:

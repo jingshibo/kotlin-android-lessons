@@ -107,6 +107,7 @@ fun saveMeasurementsToInternalStorage(
 ) {
     val csvText = measurementsToCsv(measurements)
 
+    // save text to a private internal app file. This is a fixed pattern to write file
     context.openFileOutput(
         AUTOSAVE_FILENAME,
         Context.MODE_PRIVATE
@@ -136,6 +137,7 @@ fun loadMeasurementsFromInternalStorage(
 ): List<Measurement> {
 
     return try {
+        // Read app file content into a text, also a fixed Android file-reading pattern.
         val csvText = context
             .openFileInput(AUTOSAVE_FILENAME)
             .bufferedReader()
@@ -146,6 +148,8 @@ fun loadMeasurementsFromInternalStorage(
         measurementsFromCsv(csvText)
 
     } catch (e: Exception) {
+        // Return a real list with zero items. Think of it as an empty box
+        // We do not return null because the rest of the app expects a List<Measurement>. emptyList() = an empty box, null = no box
         emptyList()
     }
 }
@@ -163,6 +167,54 @@ That means:
 
 No saved measurements yet.
 
+This is different from:
+
+```kotlin
+null
+```
+
+`emptyList()` means:
+
+```text
+There is a real list.
+It has zero measurements.
+```
+
+`null` means:
+
+```text
+There is no list object here.
+```
+
+For app state, an empty measurement list is easier to work with than a nullable measurement list.
+
+With `emptyList()`, the UI can safely do:
+
+```kotlin
+uiState.measurements.size
+uiState.measurements.isEmpty()
+uiState.measurements + newMeasurement
+```
+
+If measurements were nullable, like this:
+
+```kotlin
+val measurements: List<Measurement>? = null
+```
+
+then we would always need null checks:
+
+```kotlin
+uiState.measurements?.size
+```
+
+So in this app:
+
+```text
+emptyList() = no saved measurements
+null = not used for the measurement list itself
+```
+
 ## 7. Parse CSV back into measurements
 
 Now add:
@@ -177,6 +229,8 @@ fun measurementsFromCsv(
         .filter { it.isNotBlank() }
 
     if (lines.size <= 1) {
+        // The file has no data rows after the header.
+        // Return a real empty list, not null.
         return emptyList()
     }
 
@@ -187,6 +241,8 @@ fun measurementsFromCsv(
             val parts = line.split(",")
 
             if (parts.size < 4) {
+                // Here null means "skip this one bad row".
+                // mapNotNull removes null results from the final list.
                 return@mapNotNull null
             }
 
@@ -200,6 +256,8 @@ fun measurementsFromCsv(
                 value == null ||
                 timestamp == null
             ) {
+                // One value failed to parse, so skip this row.
+                // This null is temporary; the function still returns List<Measurement>.
                 return@mapNotNull null
             }
 
@@ -413,6 +471,8 @@ fun measurementsFromCsv(
         .filter { it.isNotBlank() }
 
     if (lines.size <= 1) {
+        // No data rows after the header.
+        // Return a real empty list, not null.
         return emptyList()
     }
 
@@ -423,6 +483,8 @@ fun measurementsFromCsv(
             val parts = line.split(",")
 
             if (parts.size < 4) {
+                // Skip this one bad row.
+                // mapNotNull removes null results.
                 return@mapNotNull null
             }
 
@@ -436,6 +498,7 @@ fun measurementsFromCsv(
                 value == null ||
                 timestamp == null
             ) {
+                // Skip this row if one value failed to parse.
                 return@mapNotNull null
             }
 
@@ -483,6 +546,8 @@ fun loadMeasurementsFromInternalStorage(
         measurementsFromCsv(csvText)
 
     } catch (e: Exception) {
+        // The autosave file may not exist yet.
+        // Return a real empty list so the UI can still use .size, .isEmpty(), etc.
         emptyList()
     }
 }
@@ -866,27 +931,24 @@ That does not correctly parse quoted CSV fields containing commas.
 Therefore, for now, keep sample IDs simple:
 
 Good:
-
-S001
-
-D1-ETO-W0-U1-S1
-
-U01_S03
-
 ```text
+S001
+D1-ETO-W0-U1-S1
+U01_S03
+```
+
 Avoid for now:
+```text
 Sample, 001
 Sample "A"
 Sample
 001
-For a real app, use one of these approaches:
-- enforce a safe sample ID format
 ```
 
+For a real app, use one of these approaches:
+- enforce a safe sample ID format
 - use a real CSV parser
-
 - store internal autosave as JSON
-
 - use Room database
 
 For your research app, enforcing safe IDs may actually be useful because it also improves file naming and downstream data processing.
@@ -895,7 +957,7 @@ For your research app, enforcing safe IDs may actually be useful because it also
 
 In this lesson, we write the autosave file directly from the click event path.
 
-For a small CSV file, this is usually okay for a learning prototype. But for larger files or real-time data acquisition, you should not do heavy file writing on the main UI thread.
+For a small CSV file, this is usually okay for a learning prototype. But for larger files or real-time data acquisition, you should not do heavy file writing on the main UI thread. This would block the UI operation and you hope it runs in the background.
 
 Later we should move saving into:
 
@@ -935,13 +997,15 @@ This is a good pattern for research apps.
 
 For your current prototype:
 
-internal CSV autosave + manual CSV export
-
 ```text
-is enough.
-Use DataStore for small structured settings, such as:
-- last used sample ID
+internal CSV autosave + manual CSV export
 ```
+
+is enough.
+
+Use DataStore for small structured settings, such as:
+
+- last used sample ID
 
 - device name
 
@@ -950,6 +1014,7 @@ Use DataStore for small structured settings, such as:
 - default export filename
 
 - user preferences
+
 
 Android’s DataStore documentation describes it as a Jetpack storage solution, commonly used for key-value or typed data persistence and as a replacement for SharedPreferences. Android Developers
 
@@ -986,10 +1051,6 @@ context.openFileOutput(
     AUTOSAVE_FILENAME,
     Context.MODE_PRIVATE
 )
-```
-
-```kotlin
-context.openFileInput(AUTOSAVE_FILENAME)
 ```
 
 ```kotlin
@@ -1053,4 +1114,5 @@ Next, I suggest we cover coroutines and background work, because real research a
 - Bluetooth/USB communication
 - ML inference
 - long-running acquisition
+
 That lesson will prepare us for real device communication and model inference.

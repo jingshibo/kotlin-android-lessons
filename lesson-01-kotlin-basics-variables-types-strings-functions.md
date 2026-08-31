@@ -46,6 +46,77 @@ const std::string sampleId = "S001";
 double temperature = 25.3;
 ```
 
+### val versus const val
+
+Later in Android code, you may also see:
+
+```kotlin
+const val AUTOSAVE_FILENAME = "autosave_measurements.csv"
+```
+
+This looks like `val`, but with an extra word in front.
+
+In Kotlin:
+
+```text
+val
+    -> read-only variable
+    -> cannot be reassigned after it gets a value
+
+const val
+    -> compile-time constant
+    -> value must be known before the program runs
+```
+
+So `const` does not replace `val`.
+
+It modifies `val`.
+
+The grammar is:
+
+```kotlin
+const val NAME = "fixed value"
+```
+
+not:
+
+```kotlin
+const NAME = "fixed value"
+```
+
+This is valid:
+
+```kotlin
+const val AUTOSAVE_FILENAME = "autosave_measurements.csv"
+```
+
+because the string is fixed and known at compile time.
+
+This is also valid:
+
+```kotlin
+val currentTime = System.currentTimeMillis()
+```
+
+but it cannot be `const val`, because the time is only known while the program is running:
+
+```kotlin
+const val currentTime = System.currentTimeMillis() // Error
+```
+
+Beginner rule:
+
+```text
+Use val for normal read-only values.
+Use const val for fixed simple values that are known before the app runs.
+```
+
+For example, a fixed autosave filename is a good `const val`:
+
+```kotlin
+const val AUTOSAVE_FILENAME = "autosave_measurements.csv"
+```
+
 ## 2. Kotlin types
 
 The common types you will encounter are:
@@ -513,6 +584,7 @@ The important concepts here are:
 
 - val          immutable value
 - var          mutable value
+- const val    compile-time constant
 
 ```text
 Int          integer

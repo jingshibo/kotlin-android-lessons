@@ -187,7 +187,11 @@ For file saving, we usually want:
 
 ```kotlin
 viewModelScope.launch {
+    // Start a coroutine tied to this ViewModel.
+    // If the ViewModel is cleared, this coroutine is cancelled automatically.
     withContext(Dispatchers.IO) {
+        // Switch this block to the IO dispatcher.
+        // Put slow file/database/network/device work here.
         // file read/write work here
     }
 }
@@ -206,6 +210,46 @@ run file/network/database-style work on an IO dispatcher
 ```
 
 `Dispatchers.IO` is intended for input/output work such as file operations, database access, or network communication.
+
+You can treat this as a common Android ViewModel pattern:
+
+```kotlin
+viewModelScope.launch {
+    withContext(Dispatchers.IO) {
+        // slow IO work
+    }
+}
+```
+
+The outer block:
+
+```kotlin
+viewModelScope.launch {
+    ...
+}
+```
+
+starts coroutine work that belongs to the ViewModel.
+
+The inner block:
+
+```kotlin
+withContext(Dispatchers.IO) {
+    ...
+}
+```
+
+temporarily switches to an IO thread pool for slow input/output work.
+
+Important: `withContext(Dispatchers.IO)` is not complete by itself. It needs a block:
+
+```kotlin
+withContext(Dispatchers.IO) {
+    // work here
+}
+```
+
+After the `withContext` block finishes, the coroutine continues after it.
 
 ---
 
@@ -338,58 +382,90 @@ Then the file saving happens through a coroutine.
 
 For the user, the app feels more responsive.
 
+This first version is useful because you can see the whole coroutine pattern directly inside `addMeasurement()`.
+
+But the function is starting to mix two ideas:
+
+```text
+addMeasurement()
+    -> create and add a measurement
+    -> know exactly how background saving works
+```
+
+As the app grows, we often want to move the background-saving detail into a helper function.
+
+That is why the next concept appears:
+
+```kotlin
+suspend fun
+```
+
 ---
 
 ## 7. What does `suspend` mean?
 
-You will often see functions like this:
+The first coroutine version works, but this part is still written directly inside `addMeasurement()`:
 
 ```kotlin
-suspend fun saveMeasurements(...)
-```
-
-The word:
-
-```kotlin
-suspend
-```
-
-means:
-
-```text
-This function may pause without blocking the thread.
-```
-
-A `suspend` function must normally be called from another coroutine or another suspend function.
-
-For example:
-
-```kotlin
-suspend fun saveMeasurementsInBackground(
-    context: Context,
-    measurements: List<Measurement>
-) {
+viewModelScope.launch {
     withContext(Dispatchers.IO) {
-        saveMeasurementsToInternalStorage(
-            context = context,
-            measurements = measurements
-        )
+        saveMeasurementsToInternalStorage(...)
     }
 }
 ```
 
-Then we can call it from:
+To make `addMeasurement()` easier to read, we can move the background-saving detail into a helper function.
+
+That helper will contain:
 
 ```kotlin
-viewModelScope.launch {
-    saveMeasurementsInBackground(
-        context = context,
-        measurements = updatedMeasurements
-    )
+withContext(Dispatchers.IO) {
+    ...
 }
 ```
 
-So the structure becomes cleaner.
+`withContext(...)` is a suspend function.
+
+So a function that directly calls `withContext(...)` must also be marked with `suspend`:
+
+```kotlin
+suspend fun saveMeasurementsInBackground(...)
+```
+
+Basic meaning:
+
+```text
+suspend fun = a function that can be called from coroutine code and may pause/resume inside that coroutine
+```
+
+For this lesson, remember:
+
+```text
+viewModelScope.launch { ... }
+    -> starts coroutine work
+
+withContext(Dispatchers.IO) { ... }
+    -> runs one block on the IO dispatcher
+
+suspend fun
+    -> lets us put coroutine-only code such as withContext(...) inside a reusable function
+```
+
+A `suspend` function is usually called from inside a coroutine:
+
+```kotlin
+viewModelScope.launch {
+    saveMeasurementsInBackground(...)
+}
+```
+
+So section 8 will use this idea to create a cleaner save helper.
+
+For the deeper mental model, see:
+
+```text
+lesson-10-notes-coroutines.md
+```
 
 ---
 
@@ -398,6 +474,8 @@ So the structure becomes cleaner.
 Let us create this helper function inside the ViewModel:
 
 ```kotlin
+// This helper contains withContext(...), so the helper itself must be suspend.
+// The caller no longer needs to see the Dispatchers.IO detail.
 private suspend fun saveMeasurementsInBackground(
     context: Context,
     measurements: List<Measurement>
@@ -471,6 +549,8 @@ So we can write:
 ```kotlin
 fun loadSavedMeasurements(context: Context) {
     viewModelScope.launch {
+        // Put val outside withContext so loadedMeasurements is still visible after the IO block.
+        // withContext returns the last expression from its block.
         val loadedMeasurements = withContext(Dispatchers.IO) {
             loadMeasurementsFromInternalStorage(context)
         }
@@ -497,6 +577,26 @@ uiState = uiState.copy(...)
  ↓
 update UI after loading
 ```
+
+This line is important:
+
+```kotlin
+val loadedMeasurements = withContext(Dispatchers.IO) {
+    loadMeasurementsFromInternalStorage(context)
+}
+```
+
+The variable is declared outside the `withContext` block, so we can use it after the block finishes.
+
+Do not write this if you need the value later:
+
+```kotlin
+withContext(Dispatchers.IO) {
+    val loadedMeasurements = loadMeasurementsFromInternalStorage(context)
+}
+```
+
+In that version, `loadedMeasurements` only exists inside the `{ ... }` block.
 
 This is a very common Android pattern.
 
@@ -628,6 +728,7 @@ fun loadSavedMeasurements(context: Context) {
         )
 
         try {
+            // Put val outside withContext so loadedMeasurements is visible after the IO block.
             val loadedMeasurements = withContext(Dispatchers.IO) {
                 loadMeasurementsFromInternalStorage(context)
             }
