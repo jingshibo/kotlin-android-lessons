@@ -594,7 +594,56 @@ It does not make normal file writing magically non-blocking.
 
 It moves blocking work away from Main.
 
-## 7. Main Work Versus IO Work
+## 7. When Do We Use a Coroutine Without Dispatchers.IO?
+
+It is not always necessary to use coroutine together with dispather IO. Use a coroutine without `Dispatchers.IO` when the work is not blocking the Main thread.
+
+For example:
+
+```kotlin
+viewModelScope.launch {
+    while (uiState.isAcquiring) {
+        addSimulatedMeasurement(context)
+        delay(1000)
+    }
+}
+```
+
+This is okay because the work is mostly:
+
+```text
+create a small object
+update uiState
+wait using delay(...)
+```
+
+`delay(...)` does not block the Main thread.
+
+It suspends the coroutine for 1s and lets Main continue handling the UI.
+
+When the delay time is up, the coroutine resumes execution from where it was suspended, which is somewhat similar to a timer interrupt in an MCU. 
+
+So this coroutine can start from the normal `viewModelScope.launch { ... }`.
+
+We do not need this:
+
+```kotlin
+viewModelScope.launch(Dispatchers.IO) {
+    while (uiState.isAcquiring) {
+        addSimulatedMeasurement(context)
+        delay(1000)
+    }
+}
+```
+
+Beginner rule:
+
+```text
+Use a coroutine by itself when the code waits by suspension, such as delay.
+Use Dispatchers.IO when the code blocks a thread, such as file writing.
+```
+
+## 8. Main Work Versus IO Work
 
 Do not put everything inside `Dispatchers.IO`.
 
@@ -694,7 +743,7 @@ StateFlow
 structured state updates
 ```
 
-## 8. How to Organize Helper Functions
+## 9. How to Organize Helper Functions
 
 There are three related design questions.
 
@@ -896,7 +945,7 @@ Put try/catch in the caller if the catch needs to update uiState directly,
 or if different callers need different reactions.
 ```
 
-## 9. Common Misunderstandings
+## 10. Common Misunderstandings
 
 | Misunderstanding | Better understanding |
 |---|---|
@@ -907,7 +956,7 @@ or if different callers need different reactions.
 | withContext runs at the same time as code after it | inside one coroutine, code after withContext waits |
 | file IO in a coroutine is automatically non-blocking | normal file IO still blocks an IO thread |
 
-## 10. Checklist and Summary
+## 11. Checklist and Summary
 
 When writing coroutine code in a ViewModel, ask:
 

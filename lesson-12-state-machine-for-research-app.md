@@ -972,7 +972,7 @@ The user cannot press Stop unless acquisition is active.
 
 This lesson is not mainly about making more buttons.
 
-It teaches a very important Android app design idea:
+**It teaches a very important Android app design idea:**
 
 ```text
 App behaviour should be controlled by state.
@@ -984,7 +984,7 @@ Instead of thinking:
 What should this button do?
 ```
 
-you should think:
+**you should think:**
 
 ```text
 What state is the app currently in?

@@ -254,7 +254,7 @@ The idea is:
 
 ```kotlin
 viewModelScope.launch {
-    while (uiState.isAcquiring) {
+    while (uiState.isAcquiring) { // This works a bit like interrupt
         // generate measurement
         // update state
         // wait
@@ -267,7 +267,7 @@ But we need to be careful.
 A loop without waiting would run extremely fast:
 
 ```kotlin
-while (uiState.isAcquiring) {
+while (uiState.isAcquiring) { 
     generateMeasurement()
 }
 ```
@@ -297,7 +297,7 @@ wait for 1 second
 So the conceptual loop becomes:
 
 ```kotlin
-while (uiState.isAcquiring) {
+while (uiState.isAcquiring) { 
     generate one measurement
     delay(1000)
 }

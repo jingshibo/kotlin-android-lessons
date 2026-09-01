@@ -713,12 +713,13 @@ If a function only transforms input into output, keep it as a helper.
 
 ## 16. What should not grow inside ViewModel forever?
 
-The ViewModel should not become the whole app.
+The ViewModel should not become the whole app.  
 
 If code becomes long because it is screen behavior, ViewModel is okay.
 
 If code becomes long because it does specialized work, move that work to another class.
 
+**A basic principle is: ViewModel only includes those functions that directly operates on UI state update. If it is a general function, not involving state operation, this function can be moved out of the ViewModel and ViewModel can call it when needed.**  
 | Long code is about | Better place |
 |---|---|
 | changing screen state | ViewModel |
@@ -744,7 +745,7 @@ The ViewModel coordinates the screen.
 
 It should not personally do every low-level job.
 
-## 17. A practical checklist
+## 17. A practical checklist to decide
 
 When deciding where code belongs, ask these questions.
 

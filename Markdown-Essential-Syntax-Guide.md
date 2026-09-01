@@ -2,6 +2,32 @@
 
 This guide covers the main Markdown syntax needed for writing structured notes, technical documentation, and Kotlin/Android lessons in Visual Studio Code.
 
+
+## Quick reference
+
+````text
+# Heading
+## Subheading
+**Bold**
+*Italic*
+`Inline code`
+- Bullet point
+1. Numbered item
+- [ ] Checklist item
+[Link text](URL)
+![Image description](path)
+> Blockquote
+
+```language
+Code block
+```
+````
+
+These elements are sufficient for most lesson notes and technical documentation.
+
+---
+
+
 ## 1. Headings
 
 Use `#` symbols to create headings. More symbols produce a lower-level heading.
@@ -372,26 +398,4 @@ In this lesson, you learned:
 [Continue to Lesson 2](02-Control-Flow.md)
 ````
 
----
 
-## Quick reference
-
-````text
-# Heading
-## Subheading
-**Bold**
-*Italic*
-`Inline code`
-- Bullet point
-1. Numbered item
-- [ ] Checklist item
-[Link text](URL)
-![Image description](path)
-> Blockquote
-
-```language
-Code block
-```
-````
-
-These elements are sufficient for most lesson notes and technical documentation.
