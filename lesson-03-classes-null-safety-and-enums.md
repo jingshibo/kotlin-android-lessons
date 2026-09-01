@@ -383,21 +383,41 @@ repository is a property of ResearchViewModel,
 but only code inside ResearchViewModel can use it directly.
 ```
 
+This is still a property inside the class. Kotlin lets you declare it in the primary constructor.
+
+These two styles are similar:
+
+```kotlin
+class ResearchViewModel(
+    private val repository: MeasurementRepository = MeasurementRepository()
+) : ViewModel()
+```
+
+```kotlin
+class ResearchViewModel : ViewModel() {
+    private val repository: MeasurementRepository = MeasurementRepository()
+}
+```
+
+The constructor style makes it clearer that `ResearchViewModel` needs a repository.
+
+It also makes the repository easier to replace later, for example in testing.
+
 So compare these two patterns:
 
 ```kotlin
 class ResearchViewModel : ViewModel()
 ```
 
-This class inherits from `ViewModel`, but does not ask for anything when it is created.
+This class inherits from `ViewModel`, but does not ask for anything when it is created. The ViewModel always creates its own repository, and it is harder to replace during testing. 
 
 ```kotlin
 class ResearchViewModel(
-    private val repository: MeasurementRepository
+    private val repository: MeasurementRepository = MeasurementRepository()
 ) : ViewModel()
 ```
 
-This class inherits from `ViewModel`, and also asks for a `MeasurementRepository` when it is created.
+This class inherits from `ViewModel`with a default repository, and it also asks for a `MeasurementRepository` when it is created, so you can replace it with your own when needed.
 
 For now, you do not need to design your own inheritance structure. You mainly need to recognize this syntax because Android uses it often.
 
