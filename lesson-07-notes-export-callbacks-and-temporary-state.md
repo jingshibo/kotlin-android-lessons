@@ -22,12 +22,13 @@ This note is organized in this order:
 2. Understand why that method needs a temporary variable.
 3. Understand why the variable used `var`, `remember`, and `mutableStateOf`.
 4. Understand how the Android file picker and `onResult` callback work.
-5. See what may continue while the file picker is open.
-6. Understand the weakness of the old method.
-7. Move to the cleaner callback-local method.
-8. Compare `pendingCsvText` with a local `val csvText`.
-9. Decide when each export style makes sense.
-10. Use the final checklist.
+5. Follow the exact timing of `onClick`, `launch(...)`, the picker, and `onResult`.
+6. See what may continue while the file picker is open.
+7. Understand the weakness of the old method.
+8. Move to the cleaner callback-local method.
+9. Compare `pendingCsvText` with a local `val csvText`.
+10. Decide when each export style makes sense.
+11. Use the final checklist.
 
 ## 1. The Old Method
 
@@ -65,7 +66,7 @@ Read it as:
 1. User clicks Export.
 2. App converts measurements to CSV text.
 3. App stores that text in pendingCsvText.
-4. App opens the Android file picker.
+4. App requests the Android file picker.
 5. Later, Android returns a Uri.
 6. App writes pendingCsvText to that Uri.
 ```
@@ -88,7 +89,13 @@ createCsvLauncher.launch("measurements.csv")
 
 This does not save the file immediately.
 
-It only asks Android to open the system file picker.
+It only sends a request to Android:
+
+```text
+Please open the system file picker for this document.
+```
+
+After `launch(...)` sends that request, the `onClick` callback can finish.
 
 The user may then spend time choosing a folder, changing the filename, or cancelling.
 
@@ -182,8 +189,11 @@ The answer is:
 
 ```text
 onClick only blocks recomposition during the short time that onClick is running.
-After onClick finishes, the file picker is open and onResult has not returned yet.
-During that gap, recomposition or Activity recreation may still happen.
+createCsvLauncher.launch(...) is called inside onClick,
+but it only starts the file-picker request.
+Then onClick finishes.
+The picker/result flow continues outside that onClick callback.
+During the gap before onResult, recomposition or Activity recreation may still happen.
 ```
 
 So this is not enough:
@@ -253,7 +263,8 @@ createCsvLauncher.launch("measurements.csv")
 Meaning:
 
 ```text
-Ask Android to open a system UI where the user can create a document.
+Send a request to Android to open a system UI
+where the user can create a document.
 ```
 
 Stage 2 comes back later:
@@ -272,16 +283,28 @@ If uri is not null, your app can write to that chosen location.
 If uri is null, the user cancelled.
 ```
 
+Important:
+
+```text
+onResult is not the return value of launch(...).
+launch(...) returns quickly.
+onResult is a separate callback that runs later.
+```
+
 So the important flow is:
 
 ```text
 onClick:
-    starts the request
+    calls createCsvLauncher.launch(...)
+    sends the file-picker request
+    finishes quickly
 
 system file picker:
+    opens/takes over after the request
     user chooses location or cancels
 
 onResult:
+    runs later
     receives the Uri and writes the file
 ```
 
@@ -291,11 +314,78 @@ It is not one continuous block of code that immediately saves a file.
 
 It is an event now plus a callback later.
 
-## 5. What May Happen While the File Picker Is Open
+## 5. Exact Timing: Who Runs When?
+
+This is the most important timing picture.
+
+```text
+1. User taps Export.
+2. Android runs the Button onClick callback on your app's Main thread.
+3. onClick may create CSV text, depending on the export style.
+4. onClick calls createCsvLauncher.launch(...).
+5. launch(...) sends a file-picker request to Android.
+6. launch(...) returns; it does not wait for the user to choose a file.
+7. onClick finishes.
+8. Android shows the system file picker.
+9. The user chooses a location/name, or cancels.
+10. Android delivers the result back to your app.
+11. The launcher's onResult callback runs in your app.
+12. In this beginner version, your app writes the CSV from that callback if the Uri is not null.
+```
+
+So this line:
+
+```kotlin
+createCsvLauncher.launch("measurements.csv")
+```
+
+is called inside `onClick`.
+
+But the user's file choice is not returned inside `onClick`.
+
+The result comes later through `onResult`.
+
+Another way to see it:
+
+| Time | Who is active? | What happens? |
+| --- | --- | --- |
+| Button tap | App Main thread | `onClick` starts |
+| Inside `onClick` | App Main thread | app calls `createCsvLauncher.launch(...)` |
+| After `launch(...)` | App Main thread | `onClick` continues and finishes quickly |
+| Picker visible | Android/system picker UI | user chooses location or cancels |
+| Result returns | App callback, usually Main thread | `onResult` receives `Uri?` |
+| File write | App callback code | app writes CSV to the selected `Uri` |
+
+In this beginner code, treat `onResult` like other UI callbacks:
+
+```text
+It should stay quick.
+Small file writing is okay for the lesson.
+Large file writing should move to background work later.
+```
+
+This timing explains why a `val` created inside `onClick` is not visible later in `onResult`.
+
+It also explains why the old method needed a value that survived from `onClick` to `onResult`.
+
+## 6. What May Happen While the File Picker Is Open
 
 The file picker is usually a different Activity.
 
 It may also be part of another app or system process.
+
+During this period, there are three different pieces to think about:
+
+```text
+System picker UI:
+    foreground screen where the user chooses a file
+
+Your app's visible Activity:
+    may be paused, stopped, or covered
+
+Your app's background work:
+    may continue if its scope is still alive
+```
 
 When it opens, your own Activity may move to:
 
@@ -308,10 +398,19 @@ That means:
 
 ```text
 Your visible app screen may stop drawing.
+Your visible app screen may not be recomposing normally while covered/stopped.
 Your app process may still be alive.
 Your ViewModel may still be alive.
 Some background work may continue.
 ```
+
+So "the UI is not visible" does not mean:
+
+```text
+the whole app process is blocked
+```
+
+It means the visible Activity is no longer the foreground screen.
 
 For this research app, the important example is measurement acquisition.
 
@@ -343,9 +442,9 @@ During that gap, app state may or may not change.
 So we should be clear about when the CSV text is created.
 ```
 
-## 6. The Weakness of the Old Method
+## 7. The Weakness of the Old Method
 
-The old method creates CSV text before the picker opens:
+The old method creates CSV text before requesting the picker:
 
 ```kotlin
 onClick = {
@@ -391,7 +490,7 @@ But conceptually, the CSV text is not really UI state.
 
 It is temporary file-writing data.
 
-## 7. The Cleaner Method
+## 8. The Cleaner Method: Create CSV in `onResult`
 
 The cleaner method waits until `onResult` to create the CSV text.
 
@@ -422,9 +521,12 @@ Read it as:
 
 ```text
 onClick:
-    open the file picker
+    call createCsvLauncher.launch(...)
+    request the file picker
+    finish quickly
 
 onResult:
+    run later after the picker returns
     create CSV text from the current measurements
     write the file
 ```
@@ -439,7 +541,7 @@ The CSV is created at the moment the file is written.
 
 For a live measurement app, this is often the better default.
 
-## 8. Why Local `val csvText` Is Not the Same Problem
+## 9. Why Local `val csvText` Is Not the Same Problem
 
 The cleaner method still has this line:
 
@@ -490,7 +592,7 @@ Does this value need to live as screen state,
 or is it only temporary data for this callback?
 ```
 
-## 9. Recomposition and the Callback
+## 10. Recomposition and the Callback
 
 Recomposition means Compose reruns composable code to describe the latest UI.
 
@@ -538,7 +640,7 @@ Keep Main-thread callbacks quick.
 
 If a callback builds a huge CSV file or writes a huge file on Main, the UI may feel frozen.
 
-## 10. Snapshot Export Versus Latest Export
+## 11. Snapshot Export Versus Latest Export
 
 Now the design choice has a name.
 
@@ -600,7 +702,7 @@ database
 
 For important research data, saving to a reliable source before export is better than relying only on temporary screen memory.
 
-## 11. A Better Beginner Version
+## 12. A Better Beginner Version
 
 For the simple Lesson 7 app, a clean export version is:
 
@@ -654,7 +756,7 @@ exportMessage is displayed by the UI.
 csvText is temporary data used only to write a file.
 ```
 
-## 12. Small Files Versus Large Files
+## 13. Small Files Versus Large Files
 
 In Lesson 7, direct callback export is acceptable for small CSV files:
 
@@ -704,7 +806,7 @@ Large export:
     prepare/write in background work.
 ```
 
-## 13. Final Checklist
+## 14. Final Checklist
 
 When you see export code, ask:
 
