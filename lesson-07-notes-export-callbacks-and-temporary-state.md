@@ -1,128 +1,8 @@
 # Lesson 7 Notes - Export Callbacks, Temporary State, and Recomposition
 
-Lesson 7 teaches CSV export.
+This note starts from the export method used in Lesson 7.
 
-At first, export sounds simple:
-
-```text
-User clicks Export -> app saves a CSV file
-```
-
-But Android does not usually let your app directly choose an ordinary file path.
-
-Instead, your app asks Android to open a system file picker. The user chooses where to save the file, and Android returns a `Uri` later.
-
-That delay is the key idea in this note.
-
-Because the file picker returns later, we need to decide:
-
-```text
-Should the app create CSV text before the picker opens?
-Or should the app create CSV text after the picker returns?
-```
-
-This note is organized in this order:
-
-1. Understand the two-step file-picker workflow.
-2. Understand the launcher and `onResult` callback.
-3. Start from the old `pendingCsvText` method.
-4. Understand what the old method means.
-5. Move to the cleaner callback-local method.
-6. Compare Compose state with a local `val`.
-7. Connect this to recomposition and Activity lifecycle.
-8. Choose between snapshot export and latest export.
-9. Decide when background work is needed.
-10. Use the final checklist.
-
-## 1. The File Picker Workflow
-
-Android CSV export with `ActivityResultContracts.CreateDocument` is a two-step workflow.
-
-```text
-Step 1:
-Your app launches the file picker.
-
-Step 2:
-Later, Android returns a Uri,
-and your app writes data to that Uri.
-```
-
-The first step usually happens in `onClick`:
-
-```kotlin
-Button(
-    onClick = {
-        createCsvLauncher.launch("measurements.csv")
-    }
-) {
-    Text("Export CSV")
-}
-```
-
-The second step happens in `onResult`:
-
-```kotlin
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        if (uri != null) {
-            // Write the CSV file here.
-        }
-    }
-)
-```
-
-So the button click does not directly write the file.
-
-It only starts the file-picker request.
-
-The real file writing happens later, after Android gives your app a `Uri`.
-
-This is why the export code needs a callback.
-
-## 2. What the Launcher Remembers
-
-This code creates a launcher:
-
-```kotlin
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        ...
-    }
-)
-```
-
-`rememberLauncherForActivityResult` remembers the launcher across recompositions.
-
-It also keeps the `onResult` callback connected so Android can deliver the result later.
-
-But this is important:
-
-```text
-Remembering the launcher does not mean local variables inside onResult already exist.
-```
-
-Example:
-
-```kotlin
-onResult = { uri: Uri? ->
-    val csvText = measurementsToCsv(measurements)
-    ...
-}
-```
-
-Here, `csvText` is created only when `onResult` actually runs.
-
-It is not created when the screen first draws.
-
-It is not recreated during every recomposition.
-
-It is normal local Kotlin code inside a callback.
-
-## 3. The Old Method: Store CSV Before Opening the Picker
-
-The first Lesson 7 version used `pendingCsvText`.
+That method used a variable named `pendingCsvText`:
 
 ```kotlin
 var pendingCsvText by remember {
@@ -130,22 +10,34 @@ var pendingCsvText by remember {
 }
 ```
 
-When the user clicked Export, the app created the CSV text immediately:
+At first, this can feel strange.
+
+Why do we need a remembered mutable state variable just to export a CSV file?
+
+This note explains that question step by step.
+
+This note is organized in this order:
+
+1. Start from the old `pendingCsvText` method.
+2. Understand why that method needs a temporary variable.
+3. Understand why the variable used `var`, `remember`, and `mutableStateOf`.
+4. Understand how the Android file picker and `onResult` callback work.
+5. See what may continue while the file picker is open.
+6. Understand the weakness of the old method.
+7. Move to the cleaner callback-local method.
+8. Compare `pendingCsvText` with a local `val csvText`.
+9. Decide when each export style makes sense.
+10. Use the final checklist.
+
+## 1. The Old Method
+
+The first Lesson 7 export code used this pattern:
 
 ```kotlin
-Button(
-    onClick = {
-        pendingCsvText = measurementsToCsv(measurements)
-        createCsvLauncher.launch("measurements.csv")
-    }
-) {
-    Text("Export CSV")
+var pendingCsvText by remember {
+    mutableStateOf("")
 }
-```
 
-Then, when the file picker returned, the app wrote the already-created text:
-
-```kotlin
 val createCsvLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.CreateDocument("text/csv"),
     onResult = { uri: Uri? ->
@@ -156,35 +48,315 @@ val createCsvLauncher = rememberLauncherForActivityResult(
         }
     }
 )
+
+Button(
+    onClick = {
+        pendingCsvText = measurementsToCsv(measurements)
+        createCsvLauncher.launch("measurements.csv")
+    }
+) {
+    Text("Export CSV")
+}
 ```
 
-Read the old method as:
+Read it as:
+
+```text
+1. User clicks Export.
+2. App converts measurements to CSV text.
+3. App stores that text in pendingCsvText.
+4. App opens the Android file picker.
+5. Later, Android returns a Uri.
+6. App writes pendingCsvText to that Uri.
+```
+
+This method works.
+
+But it only makes sense after we understand one important Android idea:
+
+```text
+The file picker does not return a file location immediately.
+```
+
+## 2. Why the Old Method Needed a Temporary Variable
+
+When the user clicks the button, this line runs:
+
+```kotlin
+createCsvLauncher.launch("measurements.csv")
+```
+
+This does not save the file immediately.
+
+It only asks Android to open the system file picker.
+
+The user may then spend time choosing a folder, changing the filename, or cancelling.
+
+Only later does Android call:
+
+```kotlin
+onResult = { uri: Uri? ->
+    ...
+}
+```
+
+So there is a time gap:
+
+```text
+onClick runs now.
+onResult runs later.
+```
+
+The old method creates the CSV during `onClick`.
+
+But the file can only be written later inside `onResult`.
+
+So the old method needs somewhere to keep the CSV text during that gap:
 
 ```text
 onClick:
-    create CSV text now
-    store it in pendingCsvText
-    open the file picker
+    create CSV text
+    store it somewhere
 
 onResult:
-    write the stored CSV text
+    retrieve that stored CSV text
+    write it to the Uri
 ```
 
-This method works, and it is easy to understand.
+That "somewhere" is `pendingCsvText`.
 
-But it has a specific meaning.
+## 3. Why `pendingCsvText` Was `var`, `remember`, and `mutableStateOf`
 
-## 4. What the Old Method Means
+The old method used:
 
-The old method creates a click-time snapshot.
+```kotlin
+var pendingCsvText by remember {
+    mutableStateOf("")
+}
+```
+
+Each part has a reason.
+
+### Why `var`
+
+The value starts as an empty string:
+
+```kotlin
+""
+```
+
+Later, when the user clicks Export, the code replaces it:
+
+```kotlin
+pendingCsvText = measurementsToCsv(measurements)
+```
+
+Because the variable is reassigned with `=`, it must be `var`.
+
+A `val` would not allow this reassignment.
+
+### Why `remember`
+
+Composable functions can recompose.
+
+That means Compose can rerun the composable function to describe the latest UI.
+
+If we used a normal local variable:
+
+```kotlin
+var pendingCsvText = ""
+```
+
+then the variable could be recreated when the composable runs again.
+
+That is risky because the file picker result comes back later.
+
+A common confusion is:
 
 ```text
-Click-time snapshot:
-    the exported CSV contains the measurements that existed
-    when the user clicked Export
+If onClick blocks recomposition while it is running,
+why can pendingCsvText still be lost?
 ```
 
+The answer is:
+
+```text
+onClick only blocks recomposition during the short time that onClick is running.
+After onClick finishes, the file picker is open and onResult has not returned yet.
+During that gap, recomposition or Activity recreation may still happen.
+```
+
+So this is not enough:
+
+```kotlin
+var pendingCsvText = ""
+```
+
+Even if you assign it in `onClick`, it is still just a normal variable from one run of the composable.
+
+If the composable runs again before `onResult`, this line creates a fresh empty variable again:
+
+```kotlin
+var pendingCsvText = ""
+```
+
+The old method wants the CSV text to survive between:
+
+```text
+button click
+file picker result
+```
+
+So it uses `remember`.
+
+### Why `mutableStateOf`
+
+`mutableStateOf` creates Compose-observable state.
+
+That is useful when the UI displays or reacts to the value.
+
 For example:
+
+```kotlin
+var exportMessage by remember {
+    mutableStateOf("")
+}
+```
+
+`exportMessage` should be state because the UI displays it.
+
+For `pendingCsvText`, the reason is weaker.
+
+The UI usually does not display the raw CSV text.
+
+In the old method, `mutableStateOf` is mainly being used as a remembered mutable holder:
+
+```text
+Store the CSV text now.
+Read it later in onResult.
+```
+
+So the old method is understandable, but not ideal.
+
+It uses screen state for data that is not really part of the screen.
+
+## 4. How the File Picker Really Works
+
+Android file export with `ActivityResultContracts.CreateDocument` has two separate stages.
+
+Stage 1 starts from your app:
+
+```kotlin
+createCsvLauncher.launch("measurements.csv")
+```
+
+Meaning:
+
+```text
+Ask Android to open a system UI where the user can create a document.
+```
+
+Stage 2 comes back later:
+
+```kotlin
+onResult = { uri: Uri? ->
+    ...
+}
+```
+
+Meaning:
+
+```text
+Android gives your app the result.
+If uri is not null, your app can write to that chosen location.
+If uri is null, the user cancelled.
+```
+
+So the important flow is:
+
+```text
+onClick:
+    starts the request
+
+system file picker:
+    user chooses location or cancels
+
+onResult:
+    receives the Uri and writes the file
+```
+
+This is why export code often feels unusual.
+
+It is not one continuous block of code that immediately saves a file.
+
+It is an event now plus a callback later.
+
+## 5. What May Happen While the File Picker Is Open
+
+The file picker is usually a different Activity.
+
+It may also be part of another app or system process.
+
+When it opens, your own Activity may move to:
+
+```text
+onPause
+possibly onStop
+```
+
+That means:
+
+```text
+Your visible app screen may stop drawing.
+Your app process may still be alive.
+Your ViewModel may still be alive.
+Some background work may continue.
+```
+
+For this research app, the important example is measurement acquisition.
+
+If measurement is running in a coroutine that is still alive, opening the file picker does not automatically stop that measurement work.
+
+For example:
+
+```text
+file picker is open
+visible app screen is paused or covered
+measurement coroutine may still add new measurements
+onResult runs later when the user chooses a file
+```
+
+But be careful:
+
+```text
+This does not mean background work always continues.
+Android can still recreate the Activity.
+Android can still kill the app process if needed.
+Lifecycle-aware UI collection may pause while the screen is stopped.
+```
+
+The safe beginner idea is:
+
+```text
+The file picker can create a time gap.
+During that gap, app state may or may not change.
+So we should be clear about when the CSV text is created.
+```
+
+## 6. The Weakness of the Old Method
+
+The old method creates CSV text before the picker opens:
+
+```kotlin
+onClick = {
+    pendingCsvText = measurementsToCsv(measurements)
+    createCsvLauncher.launch("measurements.csv")
+}
+```
+
+This creates a click-time snapshot.
+
+Example:
 
 ```text
 10:00:00
@@ -196,35 +368,32 @@ User chooses the file location.
 The app now has 25 measurements.
 
 Export result:
-The file still contains 10 measurements,
-because pendingCsvText was created at 10:00:00.
+The file still contains 10 measurements.
 ```
 
-This is not automatically wrong.
+This is not always wrong.
 
-Sometimes a snapshot is exactly what you want.
-
-But in a live measurement app, it may be surprising because new measurements can arrive while the file picker is open.
-
-The old method also stores CSV text as Compose state.
-
-That raises another question:
+It is correct if Export means:
 
 ```text
-Is CSV text really UI state?
+Export exactly what existed when the user clicked the button.
 ```
 
-Usually, no.
+But for a live measurement app, this may be surprising.
 
-CSV text is usually temporary data for writing a file.
+The user may expect the file to include the measurements available when they finally choose the save location.
 
-It is not something the UI needs to display, edit, or react to.
+The old method also keeps a CSV string in remembered state while the picker is open.
 
-That leads to the cleaner method.
+For small data this is not dangerous.
 
-## 5. The Cleaner Method: Create CSV Inside `onResult`
+But conceptually, the CSV text is not really UI state.
 
-Instead of preparing CSV before the picker opens, prepare it after the picker returns:
+It is temporary file-writing data.
+
+## 7. The Cleaner Method
+
+The cleaner method waits until `onResult` to create the CSV text.
 
 ```kotlin
 val createCsvLauncher = rememberLauncherForActivityResult(
@@ -239,11 +408,7 @@ val createCsvLauncher = rememberLauncherForActivityResult(
         }
     }
 )
-```
 
-Then the button only launches the picker:
-
-```kotlin
 Button(
     onClick = {
         createCsvLauncher.launch("measurements.csv")
@@ -253,7 +418,7 @@ Button(
 }
 ```
 
-Read the cleaner method as:
+Read it as:
 
 ```text
 onClick:
@@ -264,133 +429,80 @@ onResult:
     write the file
 ```
 
-This method is often better because:
+This solves the main issues of the old method:
 
 ```text
-CSV text is created only when it is needed.
-CSV text is not stored as screen state.
-The export uses the data available when the file is written.
+No pendingCsvText state is needed.
+No CSV string is stored while the picker is open.
+The CSV is created at the moment the file is written.
 ```
 
-For a live measurement app, this is usually the better beginner default.
+For a live measurement app, this is often the better default.
 
-## 6. Compose State Versus Local `val`
+## 8. Why Local `val csvText` Is Not the Same Problem
 
-Now the variable difference matters.
-
-The old method used Compose state:
-
-```kotlin
-var pendingCsvText by remember {
-    mutableStateOf("")
-}
-```
-
-The cleaner method uses a local `val`:
-
-```kotlin
-onResult = { uri: Uri? ->
-    val csvText = measurementsToCsv(measurements)
-    ...
-}
-```
-
-They are not the same kind of storage.
-
-### Compose State
-
-Use Compose state for values the UI needs to remember or react to.
-
-Examples:
-
-```text
-sample ID typed by the user
-selected option
-current screen message
-export success or cancelled message
-```
-
-This is state:
-
-```kotlin
-var exportMessage by remember {
-    mutableStateOf("")
-}
-```
-
-That makes sense because the UI displays `exportMessage`.
-
-### Local `val`
-
-Use a local `val` for temporary work inside one function or callback.
-
-Example:
+The cleaner method still has this line:
 
 ```kotlin
 val csvText = measurementsToCsv(measurements)
 ```
 
-This value exists only while that callback is running.
+So it is natural to ask:
+
+```text
+Are we still storing the CSV text?
+```
+
+Yes, but only briefly.
+
+This `csvText` is a local variable inside the `onResult` callback.
+
+It exists only during that callback execution.
 
 After the callback finishes, your code cannot use that local variable anymore.
 
 More precisely, the value becomes unreachable by your code, and the memory becomes available for garbage collection later.
 
-So:
+Compare:
 
 ```text
 pendingCsvText:
-    remembered screen state
+    remembered Compose state
+    exists across recompositions while remembered
+    used to carry data from onClick to onResult
 
-csvText inside onResult:
-    temporary local value
+local csvText:
+    normal local variable
+    exists only while onResult is running
+    used immediately to write the file
 ```
 
-The problem is not `val`.
-
-The important question is:
+So the problem is not:
 
 ```text
-Is this value part of the screen state,
-or is it only temporary work for this callback?
+Do we use val or not?
 ```
 
-## 7. Why a Local `val` Is Still Useful
+The better question is:
 
-You could write the export in one line:
-
-```kotlin
-outputStream.write(measurementsToCsv(measurements).toByteArray())
+```text
+Does this value need to live as screen state,
+or is it only temporary data for this callback?
 ```
 
-But developers often use a local `val` because it is easier to read:
+## 9. Recomposition and the Callback
 
-```kotlin
-val csvText = measurementsToCsv(measurements)
-val bytes = csvText.toByteArray()
+Recomposition means Compose reruns composable code to describe the latest UI.
 
-outputStream.write(bytes)
-```
+But recomposition does not interrupt an `onClick` callback halfway through.
 
-Both styles create the CSV when `onResult` runs.
+An `onClick` callback usually runs on the Android Main thread.
 
-The local `val` does not make it Compose state.
+Recomposition also needs the Main thread.
 
-It is just a temporary name for a temporary value.
+Because there is only one Main thread, these jobs take turns.
 
-## 8. Recomposition and Callbacks
-
-Recomposition means Compose reruns composable code to describe the latest UI on the Main thread.
-
-An `onClick` callback also usually runs on the Android Main thread.
-
-Because there is only one Main thread, these two jobs must take turns.
-
-So if an `onClick` callback is currently running, Compose cannot recompose in the middle of that same callback.
-
-Compose can notice that state changed and then schedule recomposition, but the actual recomposition waits until the `onClick` callback finishes.
-
-Example:
+If state changes inside `onClick`, Compose can schedule recomposition:
 
 ```kotlin
 Button(
@@ -403,9 +515,7 @@ Button(
 }
 ```
 
-If `exportMessage` changes, Compose schedules a UI update.
-
-But recomposition waits until the current callback finishes.
+But the actual recomposition waits until the callback finishes:
 
 ```text
 onClick starts
@@ -416,88 +526,25 @@ Main thread becomes free
 Compose can recompose
 ```
 
-So recomposition does not delete a local `val` while its callback is running.
+This also means a local `val` inside `onResult` is safe while `onResult` is running.
 
-The local variable is safe during that callback execution.
+Recomposition does not reach into the middle of that callback and delete the local variable.
 
-The real caution is different:
+The real caution is:
 
 ```text
 Keep Main-thread callbacks quick.
 ```
 
-If a callback does heavy work for several seconds, the UI cannot update smoothly during that time.
-
-## 9. What Happens While the File Picker Is Open
-
-When you call:
-
-```kotlin
-createCsvLauncher.launch("measurements.csv")
-```
-
-your app asks Android to open a system UI for creating a document.
-
-That picker is usually a different Activity. It may be run on another system process.
-
-Your own Activity may move to:
-
-```text
-onPause
-possibly onStop
-```
-
-That means:
-
-```text
-Your app's visible UI may stop drawing.
-Your app process may still be alive.
-Your ViewModel may still be alive.
-Some background work may continue, depending on how it was started.
-```
-
-For this research app, the important example is measurement acquisition.
-
-If measurement is running in a coroutine that is still alive, then opening the file picker does not automatically stop that measurement work because it runs on a different process.
-
-For example, a `viewModelScope` acquisition loop may continue while the `ViewModel` is alive:
-
-```text
-file picker is open
-visible app screen is paused or covered
-measurement coroutine may still add new measurements
-onResult runs later when the user chooses a file
-```
-
-This is why export timing matters.
-
-If CSV text was created before the picker opened, the file may miss measurements collected while the picker was open.
-
-If CSV text is created inside `onResult`, it can include the measurements available at the moment the file is written.
-
-But do not overstate this:
-
-```text
-Android can still destroy and recreate an Activity.
-Android can still kill a background process if resources are needed.
-Some lifecycle-aware UI collection may pause while the screen is stopped.
-```
-
-The safe beginner mental model is:
-
-```text
-The visible screen may pause.
-The app may still have state or background work alive.
-When the picker returns, onResult runs if Android can deliver the result.
-```
+If a callback builds a huge CSV file or writes a huge file on Main, the UI may feel frozen.
 
 ## 10. Snapshot Export Versus Latest Export
 
-Now we can name the design choice.
+Now the design choice has a name.
 
 ### Snapshot Export
 
-Create the CSV before opening the file picker:
+Create CSV text in `onClick`:
 
 ```kotlin
 onClick = {
@@ -509,14 +556,14 @@ onClick = {
 Meaning:
 
 ```text
-Export the data as it looked when the user clicked Export.
+Export the data as it existed when the user clicked Export.
 ```
 
-Use this if the button should freeze a deliberate snapshot.
+Use this if clicking Export should freeze a deliberate snapshot.
 
 ### Latest Export
 
-Create the CSV after the file picker returns:
+Create CSV text in `onResult`:
 
 ```kotlin
 onResult = { uri: Uri? ->
@@ -619,9 +666,7 @@ context.contentResolver.openOutputStream(uri)?.use { outputStream ->
 }
 ```
 
-But this work still runs in the callback.
-
-For small beginner examples, that is fine.
+For small beginner examples, this is fine.
 
 For very large exports, this can become slow:
 
@@ -664,7 +709,13 @@ Large export:
 When you see export code, ask:
 
 ```text
-Does this variable need to be displayed by the UI?
+Why do we need a callback?
+    -> because the file picker returns a Uri later
+
+Does this value need to survive from onClick to onResult?
+    -> the old method used pendingCsvText for that
+
+Does the UI display or react to this value?
     -> use Compose state if yes
 
 Is this value only needed while writing the file?
