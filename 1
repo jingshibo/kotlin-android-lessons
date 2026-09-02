@@ -37,12 +37,12 @@ This note is organized in this order:
 3. Understand `var`, `remember`, and `mutableStateOf` in that old method.
 4. Learn what a callback is.
 5. Follow the exact timing of `onClick`, `launch(...)`, the file picker, and `onResult`.
-6. Understand what may happen while the file picker is open.
-7. Understand recomposition during callbacks, including batching.
-8. Understand why picker blocking does not make local variables absolutely safe.
-9. See the stale-data problem and extra-state burden in the old method.
-10. Learn the cleaner `onResult` method.
-11. Compare `pendingCsvText` with local `val csvText`.
+6. Understand recomposition, batching, and why callbacks should stay quick.
+7. Understand what may happen while the file picker is open.
+8. See the stale-data problem in the old method.
+9. Learn the cleaner `onResult` method.
+10. Compare `pendingCsvText` with local `val csvText`.
+11. Decide which export meaning you want.
 12. Compare snapshot export with latest export.
 13. See a better beginner version.
 14. Understand small export versus large export.
@@ -135,7 +135,7 @@ That is the first reason Lesson 7 used a variable outside `onClick`.
 
 ## 2. The Old `pendingCsvText` Method
 
-The method in lesson-07 moves the variable outside the button (old method):
+The old method moves the variable outside the button:
 
 ```kotlin
 var pendingCsvText by remember {
@@ -255,13 +255,13 @@ var pendingCsvText = ""
 
 then `pendingCsvText` is just a normal local variable in one run of the composable.
 
-If the composable runs again for some reasons, that line creates a fresh new variable again:
+If the composable runs again, that line creates a fresh variable again:
 
 ```kotlin
 var pendingCsvText = ""
 ```
 
-That is risky for the old method because the data is lost before `onResult` saves it, after the Android file picker returns.
+That is risky for the old method because the file-picker result comes back later.
 
 For more details on how the file picker works and what happens to the main UI at the time, see section 5.
 
@@ -315,10 +315,11 @@ store CSV text now
 read it later in onResult
 ```
 
-The old method needs a remembered mutable value. However:
+However:
 
 ```text
-It does not strongly need Compose-observable UI state unless the UI reads/display pendingCsvText, but this is uncommon.
+The old method needs a remembered mutable value.
+It does not strongly need Compose-observable UI state unless the UI reads pendingCsvText, but this is uncommon.
 ```
 
 That is why the old method is understandable but not ideal.
@@ -326,10 +327,6 @@ That is why the old method is understandable but not ideal.
 It uses screen state for data that is really just temporary file-writing data.
 
 ## 4. What Is a Callback?
-
-We have already mentioned `onClick` and `onResult` several times.
-
-They play a central role in the export function, and they are both examples of callbacks.
 
 A callback is code that you give to something else, so that it can call your code later.
 
@@ -402,19 +399,17 @@ That difference between where code is written and when code runs is the heart of
 
 Now we can describe the whole export process accurately by connecting the code to the timing.
 
-Here is the old export pattern from the earlier sections:
+Here is the cleaner export pattern:
 
 ```kotlin
-var pendingCsvText by remember {
-    mutableStateOf("")
-}
-
 val createCsvLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.CreateDocument("text/csv"),
     onResult = { uri: Uri? ->
         if (uri != null) {
+            val csvText = measurementsToCsv(measurements)
+
             context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(pendingCsvText.toByteArray())
+                outputStream.write(csvText.toByteArray())
             }
 
             exportMessage = "CSV exported successfully."
@@ -426,8 +421,6 @@ val createCsvLauncher = rememberLauncherForActivityResult(
 
 Button(
     onClick = {
-        pendingCsvText = measurementsToCsv(measurements)
-
         val filename = if (sampleId.isNotBlank()) {
             "${safeFilename(sampleId)}_measurements.csv"
         } else {
@@ -505,8 +498,6 @@ This part runs when the user taps the Export button:
 
 ```kotlin
 onClick = {
-    pendingCsvText = measurementsToCsv(measurements)
-
     val filename = if (sampleId.isNotBlank()) {
         "${safeFilename(sampleId)}_measurements.csv"
     } else {
@@ -528,22 +519,12 @@ What is running?
 
 ```text
 The Button's onClick callback is running.
-The app creates CSV text from the current measurements.
-The app stores that text in pendingCsvText.
 The app reads sampleId.
 The app creates a suggested filename String.
 The app sends a file-picker request to Android.
 ```
 
-This line creates the CSV text now:
-
-```kotlin
-pendingCsvText = measurementsToCsv(measurements)
-```
-
-That means the old method creates a click-time snapshot.
-
-Then this code creates a filename:
+This line only creates a filename:
 
 ```kotlin
 val filename = if (sampleId.isNotBlank()) {
@@ -558,7 +539,6 @@ At this moment:
 ```text
 No Uri exists yet.
 No output stream exists yet.
-CSV text has been created and stored in pendingCsvText.
 No CSV file has been written.
 ```
 
@@ -597,11 +577,11 @@ The Main thread is busy while onClick is running.
 Compose cannot recompose in the middle of this same onClick callback.
 ```
 
-But this is usually still short for small beginner data.
+But this is usually very short.
 
-In this old code, `onClick` creates the CSV text, creates a filename, and sends the picker request.
+In this code, `onClick` only creates a filename and sends the picker request.
 
-For a small CSV file, the Main thread is not blocked for a long time.
+So the Main thread is not blocked for a long time.
 
 ### Part C: File Picker Is Open
 
@@ -609,14 +589,12 @@ After `createCsvLauncher.launch(filename)`, Android opens the system file picker
 
 The picker is not more code continuing inside `onClick`.
 
-`onClick` blcok running has already finished.
+`onClick` has already finished.
 
 Think of it like this:
 
 ```text
 onClick:
-    create CSV text from current measurements
-    store it in pendingCsvText
     create filename
     call createCsvLauncher.launch(filename)
     finish
@@ -626,22 +604,121 @@ Android/system picker:
     or user cancels
 
 onResult:
-    runs later after Android file picker sends the result back
+    runs later after Android sends the result back
 ```
 
-The important timing point is:
+Where is the picker running?
 
 ```text
-The app has already created pendingCsvText.
-The app is now waiting for Android to return a Uri.
-The actual file has not been written yet.
+It is Android/system UI.
+It is usually another Activity, often from Android or another app.
+It is not code continuing on your app's Main thread.
+It may belong to Android or another document-provider app.
 ```
 
-The next section explains in detail what may happen to your app while the picker is open.
+What about your app during this time?
+
+```text
+Your visible Activity may be paused, stopped, or covered.
+Your app process may still be alive.
+Your ViewModel may still be alive.
+Background acquisition may continue if its scope/coroutine is still alive.
+```
+
+This needs careful wording.
+
+When we say the Activity is "paused" or "stopped", we mean the visible screen lifecycle.
+
+We do not mean:
+
+```text
+The app Main thread is permanently stopped.
+The app process is frozen.
+Every coroutine is stopped.
+```
+
+After `onClick` finishes, your app's Main thread is free again.
+
+It may be idle, it may receive lifecycle callbacks such as `onPause`, or it may later receive the file-picker result.
+
+But because your Activity is covered by the picker, the visible UI may not keep drawing normally.
+
+So if the measurement list changes while the picker is open, two things are separate:
+
+```text
+State/data may change in memory.
+Visible recomposition/drawing may be paused or delayed while the screen is covered.
+```
+
+If a coroutine was already running before the picker opened, the picker does not automatically cancel it.
+
+For example:
+
+```kotlin
+viewModelScope.launch {
+    val data = withContext(Dispatchers.IO) {
+        readFromDeviceOrFile()
+    }
+
+    measurements = measurements + data
+}
+```
+
+While the picker is open, this coroutine can still continue if `viewModelScope` is still alive.
+
+**Without `Dispatchers.IO`**
+
+A coroutine started with `viewModelScope.launch { ... }` usually runs on the app's Main thread.
+
+It can still continue while the picker is open if the app process and scope are alive, but it only runs when the app's Main thread gets a turn.
+
+If it does long blocking work there, it blocks the app's Main thread.
+
+**Inside `withContext(Dispatchers.IO)`**
+
+This block can run on an IO background thread while the picker is visible:
+
+```kotlin
+val data = withContext(Dispatchers.IO) {
+    readFromDeviceOrFile()
+}
+```
+
+After the IO block finishes, the coroutine usually returns to its original context, which is usually Main:
+
+```kotlin
+measurements = measurements + data
+```
+
+That state update can happen in memory even if the app screen is currently covered by the picker.
+
+So if acquisition work is still running while the picker is open, the measurement data may keep changing in memory.
+
+The covered UI may not visibly redraw immediately, but the stored state can still be updated.
+
+So the file picker does not mean:
+
+```text
+The whole app process is frozen inside launch(...).
+```
+
+**It means:**
+
+```text
+The visible screen is no longer in front.
+The app is waiting for Android to return a result later.
+Some non-UI app work may continue.
+State can still be updated in memory,
+but visible recomposition/drawing may wait until the picker is done.
+```
+
+This matters for measurements.
+
+If the app is still acquiring measurement data while the picker is open, the measurement list may change before `onResult` runs.
 
 ### Part D: Result Callback
 
-After the user chooses a file or cancels, Android file picker sends the result back. Android calls:
+After the user chooses a file or cancels, Android calls:
 
 ```kotlin
 onResult = { uri: Uri? ->
@@ -671,23 +748,23 @@ If the user cancelled, the app only updates the message:
 exportMessage = "CSV export cancelled."
 ```
 
-If the user chose a file, the app uses the CSV text that was stored earlier:
+If the user chose a file, the app creates the CSV now:
 
 ```kotlin
-pendingCsvText
+val csvText = measurementsToCsv(measurements)
 ```
 
-This is click-time data, not save-result-time data.
+This is save-result time, not click time.
 
 ```text
-The CSV uses the measurements that existed when onClick created pendingCsvText.
+The CSV uses the measurements available when onResult runs.
 ```
 
 Then the app opens a writable stream and writes the file:
 
 ```kotlin
 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-    outputStream.write(pendingCsvText.toByteArray())
+    outputStream.write(csvText.toByteArray())
 }
 ```
 
@@ -710,16 +787,12 @@ The file write is:
 not inside onClick
 not inside createCsvLauncher.launch(filename)
 not inside the system picker
-```
-
-It is:
-```text
 inside onResult
 inside the use block
 at outputStream.write(...)
 ```
 
-In this beginner version, treat this callback working in Main thread.
+In this beginner version, treat this as Main-thread callback work.
 
 For a small CSV file, this is fine.
 
@@ -733,23 +806,22 @@ The detailed timeline is:
 2. The `onResult` callback is stored for later, but does not run yet.
 3. User taps Export.
 4. Android runs the Button `onClick` callback on your app's Main thread.
-5. `onClick` creates CSV text from the current measurements.
-6. `onClick` stores that text in `pendingCsvText`.
-7. `onClick` creates a suggested filename.
-8. `onClick` calls `createCsvLauncher.launch(filename)`.
-9. `launch(...)` sends a file-picker request to Android.
-10. `launch(...)` returns; it does not wait for the user to choose a file.
-11. `onClick` finishes, so the Main thread is free again.
-12. Android shows the system file picker.
-13. Your visible Activity may be paused, stopped, or covered.
-14. Background work may continue if its scope is still alive.
-15. The user chooses a location/name, or cancels.
-16. Android delivers the result back to your app.
-17. The launcher's `onResult` callback runs in your app.
-18. If `uri` is not null, your app opens an output stream to the selected `Uri`.
-19. Your app writes the stored `pendingCsvText` bytes with `outputStream.write(...)`.
-20. Your app updates `exportMessage`.
-21. After the callback finishes, Compose can recompose if state changed.
+5. `onClick` creates a suggested filename.
+6. `onClick` calls `createCsvLauncher.launch(filename)`.
+7. `launch(...)` sends a file-picker request to Android.
+8. `launch(...)` returns; it does not wait for the user to choose a file.
+9. `onClick` finishes, so the Main thread is free again.
+10. Android shows the system file picker.
+11. Your visible Activity may be paused, stopped, or covered.
+12. Background work may continue if its scope is still alive.
+13. The user chooses a location/name, or cancels.
+14. Android delivers the result back to your app.
+15. The launcher's `onResult` callback runs in your app.
+16. If `uri` is not null, your app creates `csvText`.
+17. Your app opens an output stream to the selected `Uri`.
+18. Your app writes the CSV bytes with `outputStream.write(...)`.
+19. Your app updates `exportMessage`.
+20. After the callback finishes, Compose can recompose if state changed.
 
 The same timeline as a table:
 
@@ -757,13 +829,14 @@ The same timeline as a table:
 | --- | --- | --- | --- |
 | Launcher setup | App composition | `rememberLauncherForActivityResult(...)` creates/remembers the launcher | picker not open; `onResult` not running |
 | Button tap | App Main thread | `onClick` starts | recomposition cannot run in the middle of this callback |
-| Inside `onClick` | App Main thread | `pendingCsvText` and filename are created | no `Uri`; no file write yet |
+| Inside `onClick` | App Main thread | filename is created | no `Uri`; no file write yet |
 | Inside `onClick` | App Main thread | `createCsvLauncher.launch(filename)` sends request | it does not wait for user's choice |
 | After `launch(...)` | App Main thread | `onClick` finishes quickly | Main thread becomes free again |
 | Picker visible | Android/system picker UI | user chooses location/name or cancels | your visible Activity may be paused/covered |
-| Picker visible | Your app background work | acquisition may continue if still alive | UI drawing/ recomposition may pause while covered |
+| Picker visible | Your app background work | acquisition may continue if still alive | UI drawing/recomposition may pause while covered |
 | Result returns | App callback, usually Main thread | `onResult` receives `Uri?` | recomposition waits while callback is running |
-| File write | App callback code | `outputStream.write(...)` in `onResult` writes the stored `pendingCsvText` bytes | Main thread may be blocked during the write |
+| CSV creation | App callback code | `measurementsToCsv(measurements)` creates `csvText` | Main thread may be busy briefly |
+| File write | App callback code | `outputStream.write(...)` writes bytes | Main thread may be blocked during the write |
 | Message update | App state update | `exportMessage = ...` changes UI state | recomposition happens after callback work finishes |
 
 Important:
@@ -778,11 +851,212 @@ This timing explains why a `val` created inside `onClick` cannot be used later i
 
 It also explains why the old method needed `pendingCsvText`.
 
-## 6. What Happens While the File Picker Is Open
+## 6. Recomposition During `onClick`
 
-The timeline above mentions this briefly.
+Another question naturally appears:
 
-Now slow down and look at the picker-open period by itself.
+```text
+If the Main thread is running onClick,
+can Compose recompose the UI in the middle of that same onClick?
+```
+
+Usually, no.
+
+An `onClick` callback usually runs on the Android Main thread.
+
+Recomposition also needs the Main thread.
+
+Because there is only one Main thread, these jobs take turns.
+
+Example:
+
+```kotlin
+Button(
+    onClick = {
+        exportMessage = "Preparing..."
+        createCsvLauncher.launch("measurements.csv")
+    }
+) {
+    Text("Export CSV")
+}
+```
+
+When `exportMessage` changes, Compose can notice that the UI needs to update.
+
+But the actual recomposition waits until the current callback finishes:
+
+```text
+onClick starts
+state changes
+Compose schedules recomposition
+onClick finishes
+Main thread becomes free
+Compose can recompose
+```
+
+Important distinction:
+
+```text
+Compose is not waiting for "all UI code everywhere" to finish.
+It is waiting for the current Main-thread task to finish.
+```
+
+In this example, the current Main-thread task is the `onClick` callback.
+
+After `onClick` reaches its final `}`, the Main thread can take the next task.
+
+That next task might be recomposition, another UI event, an Android lifecycle callback, or something else Android has queued.
+
+So the better rule is:
+
+```text
+Recomposition can happen between Main-thread tasks.
+Recomposition cannot happen in the middle of the currently running onClick callback.
+```
+
+A composable function is different from an `onClick` callback.
+
+The composable function runs during recomposition.
+
+When Compose is already recomposing, it runs the needed composable code to describe the UI.
+
+It does not stop halfway through that same recomposition and start another recomposition inside itself.
+
+This is why a local variable is safe while its callback is currently running.
+
+Recomposition does not jump into the middle of the callback and delete the local variable.
+
+But this does not solve the old `pendingCsvText` problem.
+
+Why?
+
+Because `onClick` only blocks recomposition during the short time that `onClick` is running.
+
+After `onClick` finishes, the file-picker/result flow is still not finished.
+
+During that later gap, recomposition or Activity recreation may still happen.
+
+So a plain local variable like this is still not enough for the old method:
+
+```kotlin
+var pendingCsvText = ""
+```
+
+It belongs to one run of the composable.
+
+If the composable runs again before `onResult`, it can become a fresh empty variable again.
+
+### Why Picker Blocking Does Not Make a Local Variable Safe
+
+Suppose the old method tries to store the CSV text in a plain composable-local variable:
+
+```kotlin
+var pendingCsvText = ""
+```
+
+The file picker may delay or pause visible recomposition/drawing while it covers your Activity.
+
+But this does not mean `pendingCsvText` is safe.
+
+Why?
+
+Because the old method creates the CSV text in `onClick`, but uses it later in `onResult`.
+
+There is a gap between those two moments:
+
+```text
+onClick:
+    create pendingCsvText
+    request the file picker
+    finish
+
+time gap:
+    picker is open
+    app may be paused, covered, resumed, recomposed, or recreated
+
+onResult:
+    try to use pendingCsvText
+```
+
+During that gap, the picker may cover the UI and may even delay/pause visible recomposition.
+
+But the picker does not guarantee that the old composable-local variable will still be the same one when `onResult` runs.
+
+There can still be many reasons that the composable runs again or the Activity is recreated before the result is delivered.
+
+For example:
+
+```text
+The app goes through lifecycle changes while the picker is open.
+The device is rotated, changing the Activity configuration.
+Android recreates the Activity because the process was under pressure.
+```
+
+If that happens, the next composable run creates a fresh `pendingCsvText`:
+
+```kotlin
+var pendingCsvText = ""
+```
+
+Then `onResult` may run with no CSV text left to write.
+
+That would create a mistake like this:
+
+```text
+Expected:
+    write the CSV text created in onClick
+
+Actual risk:
+    onResult sees a fresh empty pendingCsvText
+    the exported file is empty or wrong
+```
+
+So the file picker blocking or covering the UI may reduce visible UI updates for a while, but it does not remove the risk.
+
+The beginner-safe rule is:
+
+```text
+If data must be used later by another callback,
+do not keep it only in a plain local variable from one composable run.
+```
+
+## 7. The Useful Side: Batching
+
+The fact that Compose waits until the callback finishes can be useful.
+
+If you update several pieces of state inside one `onClick`, Compose does not need to redraw the UI after every single assignment.
+
+Example:
+
+```kotlin
+onClick = {
+    state1 = "A"
+    state2 = "B"
+    state3 = "C"
+}
+```
+
+Compose can wait until the callback finishes, then update the UI once using the latest state values.
+
+This is efficient.
+
+So this behavior has two sides:
+
+```text
+Good:
+    multiple state updates can be batched into one UI update
+
+Caution:
+    long-running callback code can block the UI from updating smoothly
+```
+
+For this reason, Main-thread callbacks should stay quick.
+
+Small export work is okay for the beginner lesson.
+
+Large export work should move to background work later.
+
+## 8. What Happens While the File Picker Is Open
 
 When the file picker opens, your app is no longer the visible foreground screen.
 
@@ -820,25 +1094,11 @@ Your ViewModel may still be alive.
 Some background work may continue.
 ```
 
-Drawing:
-
-```text
-Your app may stop drawing to the screen while the picker covers it.
-Visible recomposition is effectively paused or delayed because your Activity is not the screen the user is looking at. There is no screen for it to draw on!
-```
-
-Main thread:
-
-```text
-Your app's Main thread may be idle.
-It is not drawing the covered screen, but it is still waiting for Android to report when the user is done with the file picker.
-```
-
 More precise version:
 
 ```text
 The visible Activity can be paused.
-The Main thread is not "dead"; after onClick finishes, it is free for other work.
+The Main thread is not "dead"; after onClick finishes, it is free for other queued work.
 The app process can still exist.
 ViewModel state can still exist.
 Coroutines can still run if their scope is still active.
@@ -930,217 +1190,6 @@ During that gap, app state may or may not change.
 So we should be clear about when the CSV text is created.
 ```
 
-## 7. Recomposition During `onClick`
-
-Another question naturally appears:
-
-```text
-If the Main thread is running onClick,
-can Compose recompose the UI in the middle of that same onClick?
-```
-
-Usually, no.
-
-An `onClick` callback usually runs on the Android Main thread.
-
-Recomposition also needs the Main thread.
-
-Because there is only one Main thread, these jobs take turns.
-
-Example:
-
-```kotlin
-Button(
-    onClick = {
-        exportMessage = "Preparing..."
-        createCsvLauncher.launch("measurements.csv")
-    }
-) {
-    Text("Export CSV")
-}
-```
-
-When `exportMessage` changes, Compose can notice that the UI needs to update.
-
-But the actual recomposition waits until the current callback finishes:
-
-```text
-onClick starts
-state changes
-Compose schedules recomposition
-onClick finishes
-Main thread becomes free
-Compose can recompose
-```
-
-Important distinction:
-
-```text
-Compose is not waiting for "all UI code everywhere" to finish.
-It is waiting for the current Main-thread task to finish.
-```
-
-In this example, the current Main-thread task is the `onClick` callback.
-
-After `onClick` reaches its final `}`, the Main thread can take the next task.
-
-That next task might be recomposition, another UI event, an Android lifecycle callback, or something else Android has queued.
-
-So the better rule is:
-
-```text
-Recomposition can happen between Main-thread tasks.
-Recomposition cannot happen in the middle of the currently running onClick callback.
-```
-
-### Composable Functions Are Not Callbacks
-
-A composable function is different from an `onClick` callback.
-
-The composable function runs during recomposition.
-
-When Compose is already recomposing, it runs the needed composable code to describe the UI.
-
-It does not stop halfway through that same recomposition and start another recomposition inside itself.
-
-This is why a local variable is safe while its callback is currently running.
-
-Recomposition does not jump into the middle of the callback and delete the local variable.
-
-But this does not solve the initial `var pendingCsvText` problem.
-
-Why?
-
-Because `onClick` only blocks recomposition during the short time that `onClick` is running.
-
-After `onClick` finishes, the file-picker/result flow is still not finished.
-
-During that later gap, recomposition or Activity recreation may still happen.
-
-So a plain local variable like this is still not enough for the old method:
-
-```kotlin
-var pendingCsvText = ""
-```
-
-It belongs to one run of the composable.
-
-If the composable runs again before `onResult`, it can become a fresh empty variable again.
-
-### The Useful Side: Batching
-
-The fact that Compose waits until the callback finishes can be useful.
-
-If you update several pieces of state inside one `onClick`, Compose does not need to redraw the UI after every single assignment.
-
-Example:
-
-```kotlin
-onClick = {
-    state1 = "A"
-    state2 = "B"
-    state3 = "C"
-}
-```
-
-Compose can wait until the callback finishes, then update the UI once using the latest state values.
-
-This is efficient.
-
-So this behavior has two sides:
-
-```text
-Good:
-    multiple state updates can be batched into one UI update
-
-Caution:
-    long-running callback code can block the UI from updating smoothly
-```
-
-For this reason, Main-thread callbacks should stay quick.
-
-Small export work is okay for the beginner lesson.
-
-Large export work should move to background work later.
-
-## 8. Why Picker Blocking Does Not Make a Local Variable Safe
-
-Previously, we said the file picker may delay or pause visible recomposition/drawing while it covers your Activity.
-
-But this does not mean `pendingCsvText` is absolutely safe.
-
-Suppose the old method tries to store the CSV text in a plain composable-local variable:
-
-```kotlin
-var pendingCsvText = ""
-```
-
-Why is this still risky?
-
-Because the old method creates the CSV text in `onClick`, but uses it later in `onResult`.
-
-There is a gap between those two moments:
-
-```text
-onClick:
-    create pendingCsvText
-    request the file picker
-    finish
-
-time gap:
-    picker is open
-    app may be paused, covered, resumed, recomposed, or recreated
-
-onResult:
-    try to use pendingCsvText
-```
-
-During that gap, the picker may cover the UI and may even delay/pause visible recomposition.
-
-But the picker does not guarantee that the old composable-local variable will still be the same one when `onResult` runs.
-
-In Android development, we have to worry about the "Unstable" situations. There can still be many reasons that the composable runs again or the Activity is recreated before the result is delivered.
-
-For example:
-
-```text
-The app goes through lifecycle changes while the picker is open.
-The device is rotated, changing the Activity configuration.
-Android recreates the Activity because the process was under pressure.
-```
-
-If that happens, the next composable run creates a fresh `pendingCsvText`:
-
-```kotlin
-var pendingCsvText = ""
-```
-
-Then `onResult` may run with no CSV text left to write.
-
-That would create a mistake like this:
-
-```text
-Expected:
-    write the CSV text created in onClick
-
-Actual risk:
-    onResult sees a fresh empty pendingCsvText
-    the exported file is empty or wrong
-```
-
-So although the file picker blocking or covering the UI may reduce visible UI updates for a while, it does not remove the risk.
-
-If we lived in a perfect world where phones never rotated, apps were never killed, and data never updated in the background, your original way would be fine!
-
-But because Android is "messy," we use the onResult approach because it is "Self-Healing." It doesn't care what happened while the user was away—it just looks at the data right now and saves it.
-
-The beginner-safe rule is:
-
-```text
-If data must be used later by another callback,
-do not keep it only in a plain local variable from one composable run.
-```
-
 ## 9. The Weakness of the Old Method
 
 The old method creates CSV text before requesting the picker:
@@ -1152,19 +1201,7 @@ onClick = {
 }
 ```
 
-The old method has two main weaknesses:
-
-```text
-Weakness 1:
-    It creates the CSV too early.
-
-Weakness 2:
-    It needs extra remembered mutable state just to move data from onClick to onResult.
-```
-
-### Weakness 1: The CSV Is Created Too Early
-
-Because `measurementsToCsv(measurements)` runs in `onClick`, the old method creates a click-time snapshot.
+This creates a click-time snapshot.
 
 Example:
 
@@ -1193,13 +1230,24 @@ But for a live measurement app, this may be surprising.
 
 The user may expect the file to include the measurements available when they finally choose the save location.
 
-### Weakness 2: It Needs a State Bridge Between Callbacks
+The old method also keeps a CSV string in remembered state while the picker is open.
 
-The old method has to carry CSV text from `onClick` to `onResult`.
+For small data this is not dangerous.
 
-Because those callbacks run at different times, a plain local variable is not enough.
+But conceptually, the CSV text is temporary file-writing data, not screen state.
 
-So the old code creates a remembered mutable value:
+So the old method has two main weaknesses:
+
+```text
+Weakness 1:
+    It creates the CSV too early.
+    The exported file may not include measurements added while the picker is open.
+
+Weakness 2:
+    It needs extra remembered mutable state just to pass data from onClick to onResult.
+```
+
+That second weakness is why the old code needed something like this:
 
 ```kotlin
 var pendingCsvText by remember {
@@ -1207,41 +1255,24 @@ var pendingCsvText by remember {
 }
 ```
 
-This works, but it makes the export code heavier than it needs to be.
-
-Every `mutableStateOf` you add makes the code slightly more complex to track.
-
-With the old method, `pendingCsvText` adds this extra burden:
+This works, but it adds more moving parts:
 
 ```text
-One more variable to manage:
-    pendingCsvText starts empty, changes in onClick, and is read later in onResult.
+var:
+    because the value changes
 
-One more state update:
-    assigning pendingCsvText can schedule recomposition, even though the UI does not show it.
+remember:
+    because the value must survive recomposition
 
-More work inside onClick:
-    onClick creates the CSV text before it opens the file picker.
+mutableStateOf:
+    because the old method uses Compose state as a convenient mutable holder
 ```
 
-It also keeps the CSV text alive longer than necessary:
+That is extra burden for temporary export data.
 
-```text
-Old method:
-    The app stores the entire CSV string in memory while the file picker is open.
+The CSV text is not something the UI needs to display.
 
-Cleaner method:
-    The app creates the string only when it is needed in onResult.
-    After the file is written, that temporary string is no longer needed.
-```
-
-The awkward part is that `pendingCsvText` is not really screen state.
-
-The UI does not display it and does not need to react to it.
-
-It is only temporary data for writing a file.
-
-So the old method uses remembered Compose state as a bridge between two callbacks, not because the UI truly needs that state.
+It only exists so the app can write a file later.
 
 ## 10. The Cleaner Method: Create CSV in `onResult`
 
@@ -1391,8 +1422,8 @@ Important limit:
 
 ```text
 "Latest" means latest data available to the code at that moment.
-It does not magically recover data if the app process was suddenly killed
-and the data has not been saved anywhere.
+It does not magically recover data if the app process was killed
+and the data was not saved anywhere.
 ```
 
 In later architecture, the current source of truth may be:
@@ -1459,9 +1490,9 @@ exportMessage is displayed by the UI.
 csvText is temporary data used only to write a file.
 ```
 
-## 14. Remaining Issue: Small Files Versus Large Files
+## 14. Small Files Versus Large Files
 
-In this lesson, the CSV is first built as one complete `String`:
+In Lesson 7, direct callback export is acceptable for small CSV files:
 
 ```kotlin
 val csvText = measurementsToCsv(measurements)
@@ -1471,19 +1502,17 @@ context.contentResolver.openOutputStream(uri)?.use { outputStream ->
 }
 ```
 
-This is acceptable for small CSV files.
+For small beginner examples, this is fine.
 
-For very large exports, however, this approach can become inefficient:
+For very large exports, this can become slow:
 
 ```text
-build one huge String in memory
-convert the whole String to bytes at once
-write all those bytes in one operation
+building a huge String
+converting it to bytes
+writing many bytes to storage
 ```
 
-Usually, the app does not need to keep the whole CSV text as a single `String` unless it wants to display that text in the UI, which is uncommon.
-
-Later lessons introduce coroutines and `Dispatchers.IO` for heavier export work.
+This is not necessary unless you want to show this CSV in the UI screen, which is uncommon. Later lessons introduce coroutines and `Dispatchers.IO`.
 
 In a larger app, heavy export should move off the Main thread:
 

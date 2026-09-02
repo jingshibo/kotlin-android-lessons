@@ -309,15 +309,19 @@ This lesson adds one of the most important research-app functions: exporting dat
 ### Lesson 7 note - Export callbacks, temporary state, and recomposition
 
 Short summary:
-This companion note explains the subtle state and callback behavior behind CSV export. It compares storing CSV text in `pendingCsvText` before opening the file picker with generating CSV text inside the file-picker `onResult` callback.
+This companion note explains the subtle state, callback, and timing behavior behind CSV export. It starts from the natural question of why a local `val pendingCsvText` inside `onClick` is not enough, then compares the old `pendingCsvText` method with generating CSV text inside the file-picker `onResult` callback.
 
 Covered:
 
+- why a local `val` inside `onClick` cannot be read later inside `onResult`
+- what a callback is
 - the two export moments: button click and file-picker result
 - what `rememberLauncherForActivityResult` remembers
+- what happens line by line inside the file-picker `onResult` block
 - why a local `val` inside `onResult` is not the same as remembered Compose state
 - why temporary CSV text usually should not be `mutableStateOf`
 - how recomposition relates to `onClick` and callbacks
+- how Compose can batch multiple state updates after a callback finishes
 - what may happen when the Android file picker opens
 - snapshot export versus latest export
 - why `exportMessage` is UI state but `csvText` is temporary data
