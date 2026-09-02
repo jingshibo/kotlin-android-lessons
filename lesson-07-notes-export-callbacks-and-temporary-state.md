@@ -21,14 +21,15 @@ This note is organized in this order:
 1. Start from the old `pendingCsvText` method.
 2. Understand why that method needs a temporary variable.
 3. Understand why the variable used `var`, `remember`, and `mutableStateOf`.
-4. Understand how the Android file picker and `onResult` callback work.
-5. Follow the exact timing of `onClick`, `launch(...)`, the picker, and `onResult`.
-6. See what may continue while the file picker is open.
-7. Understand the weakness of the old method.
-8. Move to the cleaner callback-local method.
-9. Compare `pendingCsvText` with a local `val csvText`.
-10. Decide when each export style makes sense.
-11. Use the final checklist.
+4. Understand what a callback is.
+5. Understand how the Android file picker and `onResult` callback work.
+6. Follow the exact timing of `onClick`, `launch(...)`, the picker, and `onResult`.
+7. See what may continue while the file picker is open.
+8. Understand the weakness of the old method.
+9. Move to the cleaner callback-local method.
+10. Compare `pendingCsvText` with a local `val csvText`.
+11. Decide when each export style makes sense.
+12. Use the final checklist.
 
 ## 1. The Old Method
 
@@ -250,7 +251,78 @@ So the old method is understandable, but not ideal.
 
 It uses screen state for data that is not really part of the screen.
 
-## 4. How the File Picker Really Works
+## 4. What Is a Callback?
+
+A callback is code that you give to something else, so that it can call your code later.
+
+Simple idea:
+
+```text
+I cannot finish the work right now.
+When the event happens later, call this code.
+```
+
+In Compose and Android, callbacks are everywhere.
+
+For example, `onClick` is a callback:
+
+```kotlin
+Button(
+    onClick = {
+        exportMessage = "Export clicked"
+    }
+) {
+    Text("Export CSV")
+}
+```
+
+You give the `Button` some code.
+
+The `Button` does not run that code immediately when the UI is drawn.
+
+It runs that code later when the user clicks the button.
+
+So:
+
+```text
+onClick:
+    callback for a future click event
+```
+
+`onResult` is also a callback:
+
+```kotlin
+val createCsvLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.CreateDocument("text/csv"),
+    onResult = { uri: Uri? ->
+        // This runs later when Android returns the result.
+    }
+)
+```
+
+You give Android some code.
+
+Android does not run it immediately when the launcher is created.
+
+Android runs it later when the file picker finishes.
+
+So:
+
+```text
+onResult:
+    callback for a future file-picker result event
+```
+
+This is why callback code can be confusing:
+
+```text
+You write the code now.
+But the code runs later.
+```
+
+That difference between where code is written and when code runs is the key to understanding this export logic.
+
+## 5. How the File Picker Really Works
 
 Android file export with `ActivityResultContracts.CreateDocument` has two separate stages.
 
@@ -314,7 +386,7 @@ It is not one continuous block of code that immediately saves a file.
 
 It is an event now plus a callback later.
 
-## 5. Exact Timing: Who Runs When?
+## 6. Exact Timing: Who Runs When?
 
 This is the most important timing picture.
 
@@ -368,7 +440,7 @@ This timing explains why a `val` created inside `onClick` is not visible later i
 
 It also explains why the old method needed a value that survived from `onClick` to `onResult`.
 
-## 6. What May Happen While the File Picker Is Open
+## 7. What May Happen While the File Picker Is Open
 
 The file picker is usually a different Activity.
 
@@ -442,7 +514,7 @@ During that gap, app state may or may not change.
 So we should be clear about when the CSV text is created.
 ```
 
-## 7. The Weakness of the Old Method
+## 8. The Weakness of the Old Method
 
 The old method creates CSV text before requesting the picker:
 
@@ -490,7 +562,7 @@ But conceptually, the CSV text is not really UI state.
 
 It is temporary file-writing data.
 
-## 8. The Cleaner Method: Create CSV in `onResult`
+## 9. The Cleaner Method: Create CSV in `onResult`
 
 The cleaner method waits until `onResult` to create the CSV text.
 
@@ -541,7 +613,7 @@ The CSV is created at the moment the file is written.
 
 For a live measurement app, this is often the better default.
 
-## 9. Why Local `val csvText` Is Not the Same Problem
+## 10. Why Local `val csvText` Is Not the Same Problem
 
 The cleaner method still has this line:
 
@@ -592,7 +664,7 @@ Does this value need to live as screen state,
 or is it only temporary data for this callback?
 ```
 
-## 10. Recomposition and the Callback
+## 11. Recomposition and the Callback
 
 Recomposition means Compose reruns composable code to describe the latest UI.
 
@@ -640,7 +712,7 @@ Keep Main-thread callbacks quick.
 
 If a callback builds a huge CSV file or writes a huge file on Main, the UI may feel frozen.
 
-## 11. Snapshot Export Versus Latest Export
+## 12. Snapshot Export Versus Latest Export
 
 Now the design choice has a name.
 
@@ -702,7 +774,7 @@ database
 
 For important research data, saving to a reliable source before export is better than relying only on temporary screen memory.
 
-## 12. A Better Beginner Version
+## 13. A Better Beginner Version
 
 For the simple Lesson 7 app, a clean export version is:
 
@@ -756,7 +828,7 @@ exportMessage is displayed by the UI.
 csvText is temporary data used only to write a file.
 ```
 
-## 13. Small Files Versus Large Files
+## 14. Small Files Versus Large Files
 
 In Lesson 7, direct callback export is acceptable for small CSV files:
 
@@ -806,7 +878,7 @@ Large export:
     prepare/write in background work.
 ```
 
-## 14. Final Checklist
+## 15. Final Checklist
 
 When you see export code, ask:
 
