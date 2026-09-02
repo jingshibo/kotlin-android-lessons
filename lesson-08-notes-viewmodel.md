@@ -2,10 +2,20 @@
 
 This note explains how to judge what belongs in a `ViewModel`.
 
+This note is organized in this order:
+
+1. Understand the problem `ViewModel` solves: one composable doing too many jobs.
+2. Learn what a `ViewModel` looks like and how it differs from a regular class.
+3. Study the main pattern: UI state is exposed, but state changes happen through `ViewModel` functions.
+4. Decide what belongs in `ViewModel` and what stays in the composable.
+5. Understand event callbacks, function references, `viewModel()`, and list updates.
+6. Use CSV export as a boundary example.
+7. Use the checklist to judge future variables and functions.
+
 一个基本的认识如下： 原本 lesson 07 中的UI plot函数里同时包含了各类变量的定义，UI的绘制，和状态的更新。
-- 其中有一部分变量是需要记忆和多次更新的状态量。这些量可以通过类进行组织，然后在ViewModel中进行实例化，产生一个持续存在的mutable变量。这些变量可以被外部读取，其更新也会被UI自动探测以执行相应的操作，但对其的修改只能调用在ViewModel内部的函数完成，而无法在外部直接对其赋值。
+- 其中有一部分变量是需要记忆和多次更新的状态量。这些量可以通过类进行组织，然后在ViewModel中进行实例化，产生一个持续存在的mutable变量。这些变量可以被外部读取，其变化也会被UI自动探测以更新显示，但不可直接在UI中进行赋值更新。
 - 另一部分变量是临时设置的UI参量，可能是mutable或普通变量，它们仍然留在UI中。比如，`pendingCsvText` 的存在就是仅为了支持文件选择流程，虽然这也是一个mutable变量，我们不放入ViewModel。再比如 `meanvalue`是基于state的值得到的一个普通变量，直接在UI中定义就行了，也不必放入ViewModel。
-- 所有的状态更新过程都放入ViewModel，只有ViewModel内部的函数可以对状态量进行更新。当UI上发生了一个event（比如onClick），这个event会自动调用ViewModel中的函数，这个函数会实现状态量的更新。此时UI会探测到状态量的变化，然后自动重刷UI界面，显示最新的状态值。
+- 所有的状态更新过程（改变state的操作）都放入ViewModel，而UI只负责对当前state进行显示，而不进行任何状态修改操作。只有ViewModel内部的函数可以对状态量进行更新。当UI上发生了一个event（比如onClick），这个event会自动调用ViewModel中的函数，这个函数会实现状态量的更新。此时UI会探测到状态量的变化，然后重刷UI界面，自动显示最新的状态值。
 
 The goal is not to memorize a rule like:
 

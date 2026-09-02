@@ -18,6 +18,15 @@ Lesson 5 used `Modifier` many times for layout:
 
 This note puts those ideas in one place.
 
+This note is organized in this order:
+
+1. Understand that `Modifier` is attached to one composable.
+2. Learn common modifiers such as `padding`, `width`, `height`, `fillMaxWidth`, and `weight`.
+3. Understand capital `Modifier` versus lowercase `modifier`.
+4. Learn why reusable composables should accept a `modifier` parameter.
+5. Study modifier scope, constraints, order, `Spacer`, spacing, and `Row` weight.
+6. Use the beginner mistakes and decision rule as a checklist.
+
 ## 1. What is Modifier?
 
 A `Modifier` is a set of instructions attached to one composable.
@@ -805,4 +814,3 @@ Final mental model:
 Composable = what appears
 Modifier = how that composable is placed, sized, spaced, or drawn
 ```
-

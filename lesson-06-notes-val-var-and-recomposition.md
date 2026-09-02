@@ -13,6 +13,15 @@ The short answer:
 - Use `var` when your code needs to manually assign a new value later using `=`.
 - Use `remember` when a value needs to survive recomposition.
 
+This note is organized in this order:
+
+1. Understand why changing-looking calculated values can still use `val`.
+2. Connect that idea to recomposition: the composable can run again.
+3. Learn why reassigned UI state needs `var` and `remember`.
+4. Compare `val` without `remember`, `val` with `remember`, and `var` with `remember`.
+5. Understand when recomposition reruns calculations.
+6. Use the decision rule to choose `val`, `var`, and `remember` in your own code.
+
 ## 1. The confusing example
 
 In Lesson 6, we calculate values like this:
@@ -289,6 +298,12 @@ So the pattern is:
 val measurementList
     -> the list object stays the same
     -> the contents inside the list can change
+```
+
+**You can think of a list as a bag:**
+```text
+   -> The bag itself does not change
+   -> The content in the bag can change
 ```
 
 But:

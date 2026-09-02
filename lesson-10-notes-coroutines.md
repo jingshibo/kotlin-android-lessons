@@ -22,15 +22,13 @@ The note is organized around one question:
 How do we run slow work without freezing the UI?
 ```
 
-Read the note in this order:
+This note is organized in this order:
 
-```text
-First: understand the UI-freezing problem.
-Then: learn the main launch + withContext pattern.
-Then: understand what waits, what returns, and what continues.
-Then: name the pieces: thread, coroutine, dispatcher, suspend.
-Finally: decide where helper functions, IO work, and try/catch should live.
-```
+1. Understand the UI-freezing problem.
+2. Learn the main `launch` + `withContext` pattern.
+3. Understand what waits, what returns, and what continues.
+4. Name the pieces: thread, coroutine, dispatcher, and `suspend`.
+5. Decide where helper functions, IO work, and `try/catch` should live.
 
 ## 1. The Core Problem
 

@@ -22,6 +22,16 @@ You also need to understand where the state lives:
 - inside a `ViewModel`
 - inside a Compose-aware list such as `mutableStateListOf`
 
+This note is organized in this order:
+
+1. Understand the core rule: UI is driven by observable state.
+2. Compare ordinary variables with `mutableStateOf`.
+3. Learn what `by` does and what `remember` adds.
+4. Compare state stored in a composable, a `ViewModel`, and a state list.
+5. Follow the lesson progression from Lesson 4 to Lesson 8.
+6. Understand `copy()`, `private set`, state down, and events up.
+7. Separate real state from calculated `val` values.
+
 ## 1. The Core Idea
 
 In Compose, the UI is driven by state.
