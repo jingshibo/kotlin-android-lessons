@@ -760,10 +760,10 @@ The same timeline as a table:
 | Inside `onClick` | App Main thread | `pendingCsvText` and filename are created | no `Uri`; no file write yet |
 | Inside `onClick` | App Main thread | `createCsvLauncher.launch(filename)` sends request | it does not wait for user's choice |
 | After `launch(...)` | App Main thread | `onClick` finishes quickly | Main thread becomes free again |
-| Picker visible | Android/system picker UI | user chooses location/name or cancels | your visible Activity may be paused/covered |
+| Picker visible | Android/system picker UI, usually in another process | user chooses location/name or cancels | your visible Activity may be paused/covered |
 | Picker visible | Your app background work | acquisition may continue if still alive | UI drawing/ recomposition may pause while covered |
-| Result returns | App callback, usually Main thread | `onResult` receives `Uri?` | recomposition waits while callback is running |
-| File write | App callback code | `outputStream.write(...)` in `onResult` writes the stored `pendingCsvText` bytes | Main thread may be blocked during the write |
+| Result returns | App callback, usually in Main thread | `onResult` receives `Uri?` | UI recomposition waits while callback is running |
+| File write | App callback, usually in Main thread | `outputStream.write(...)` in `onResult` writes the stored `pendingCsvText` bytes | Main thread may be blocked during the write |
 | Message update | App state update | `exportMessage = ...` changes UI state | recomposition happens after callback work finishes |
 
 Important:

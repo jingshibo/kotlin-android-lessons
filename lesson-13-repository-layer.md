@@ -1052,12 +1052,39 @@ In Lesson 14, we should introduce:
 **Room database**
 
 So far, we used simple internal file storage and CSV-style saving.
+
 That is useful for learning, but a serious research app may need structured data such as:
 
 - Patient
 - Session
 - Measurement
 - Result
+
+Another drawback of the Lesson 13 file-based approach is that saving one new measurement means saving the whole list again.
+
+In Lesson 13, after creating a measurement, we saved the whole list:
+
+```text
+create new measurement
+ ↓
+append to list
+ ↓
+save entire list to file
+```
+
+This is undesired for large dataset. 
+
+With Room, we can insert only the new measurement.
+
+Previously:
+
+```text
+create new measurement
+ ↓
+append to list
+ ↓
+save entire list to file
+```
 
 Room will help us store this kind of structured data locally on the Android tablet.
 In Lesson 14, we will cover:

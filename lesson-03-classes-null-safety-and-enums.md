@@ -92,7 +92,7 @@ Kotlin lets you define the constructor directly in the class declaration:
 
 ```kotlin
 class Measurement(
-    val sampleId: String,
+    val sampleId: String, // you must have val/var keywords for property purpose 
     val value: Double
 )
 ```
@@ -132,6 +132,51 @@ is clearer than:
 ```kotlin
 Measurement("S001", 2.45)
 ```
+
+### Constructor parameters that are not properties
+
+Not every constructor parameter automatically becomes a usable class property.
+
+If you write a parameter without `val` or `var`, it can only be used inside the constructor itself (for example, inside an `init` block or to compute another property). It cannot be accessed later from other functions in the class.
+
+```kotlin
+class MeasurementRepository(context: Context) {
+
+    fun loadFile() {
+        // Error: context is not visible here.
+        context.openFileInput("data.csv")
+    }
+}
+```
+
+This fails because `context` was never stored as a property.
+
+To use the value anywhere else in the class, add `val` (or `var`):
+
+```kotlin
+class MeasurementRepository(
+    private val context: Context
+) {
+
+    fun loadFile() {
+        // Works: context is now a stored property.
+        context.openFileInput("data.csv")
+    }
+}
+```
+
+Simple mental model:
+
+```text
+class MyClass(context: Context)
+    -> context only exists during construction
+
+class MyClass(val context: Context)
+class MyClass(private val context: Context)
+    -> context is stored as a property and can be used anywhere in the class
+```
+
+This distinction matters a lot in Android code, since almost every class that touches files, databases, or system services takes a `Context` in its constructor and needs to keep it around.
 
 ## 3. val and var inside a class
 

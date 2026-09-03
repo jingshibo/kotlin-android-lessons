@@ -1,1589 +1,1437 @@
-# Lesson 7 Notes - Export Callbacks, Temporary State, and Recomposition
+# Lesson 14 — Room Database Introduction
 
-This note explains a subtle part of Lesson 7:
+In Lesson 13, we introduced the **Repository layer**.
 
-```text
-Why does CSV export need this strange-looking pendingCsvText state?
-Can we avoid it?
-What happens while the Android file picker is open?
-```
-
-The important idea is that Android file export is not one simple line of code.
-
-It is a small conversation between your app and Android:
+Before Lesson 13, the ViewModel was doing too much:
 
 ```text
-Your app:
-    Please open a file picker.
-
-Android:
-    Okay. I will ask the user where to save the file.
-
-Later...
-
-Android:
-    Here is the Uri the user chose.
-
-Your app:
-    Now I can write the CSV file.
+ResearchViewModel
+ ├── UI state
+ ├── acquisition flow
+ ├── fake data generation
+ ├── file saving
+ └── file loading
 ```
 
-Because the result comes back later, we have to think carefully about where temporary data should live.
-
-This note is organized in this order:
-
-1. Start from the first natural question: why not use a local `val` in `onClick`?
-2. Understand the old `pendingCsvText` method.
-3. Understand `var`, `remember`, and `mutableStateOf` in that old method.
-4. Learn what a callback is.
-5. Follow the exact timing of `onClick`, `launch(...)`, the file picker, and `onResult`.
-6. Understand recomposition, batching, and why callbacks should stay quick.
-7. Understand what may happen while the file picker is open.
-8. See the stale-data problem in the old method.
-9. Learn the cleaner `onResult` method.
-10. Compare `pendingCsvText` with local `val csvText`.
-11. Decide which export meaning you want.
-12. Compare snapshot export with latest export.
-13. See a better beginner version.
-14. Understand small export versus large export.
-15. Use the final checklist.
-
-## 1. The First Natural Question
-
-When you first see export code, it is natural to think:
+After Lesson 13, we started moving data-related work into:
 
 ```text
-The user clicks Export.
-So I can create the CSV text inside the button's onClick.
-Why do I need a separate pendingCsvText state variable?
+MeasurementRepository
 ```
 
-You may want to write:
+Now we take the next step.
+
+So far, our app has used simple internal file storage and CSV-style saving. That is useful for learning, and the original tutorial already introduced internal storage as a beginner-friendly auto-save method. fileciteturn1file0L397-L405
+
+But for a more serious research app, simple files may become inconvenient.
+
+For example, later we may need to store lots of structural dataset:
+
+```text
+patients
+sessions
+measurements
+results
+timestamps
+device information
+model predictions
+export history
+```
+
+For that, Android commonly uses **Room**.
+
+Room is a persistence library that provides an abstraction layer over SQLite. Google recommends using Room instead of working directly with the low-level SQLite APIs, because Room gives benefits such as compile-time SQL checking, useful annotations, and better migration support. citeturn172874view0
+
+---
+
+## 1. Why do we need Room?
+
+Our current file-based storage is roughly like this:
+
+```text
+measurements.csv
+```
+
+That is simple and useful.
+
+But imagine your app becomes more realistic:
+
+```text
+Patient A
+ ├── Session 1
+ │    ├── Measurement 1
+ │    ├── Measurement 2
+ │    └── Result
+ └── Session 2
+      ├── Measurement 1
+      ├── Measurement 2
+      └── Result
+
+Patient B
+ └── Session 1
+      ├── Measurement 1
+      └── Result
+```
+
+If everything is just one CSV file, it becomes harder to answer questions like:
+
+```text
+Which measurements belong to this session?
+Which sessions belong to this patient?
+What was the latest session?
+Which data has not been exported yet?
+Which measurements produced an abnormal result?
+```
+
+A database is better for this kind of structured data.
+
+Room helps us use a database in an Android-friendly way.
+
+---
+
+## 2. Room is not the same as CSV export
+
+This is important.
+
+Room is for **local structured storage inside the app**.
+
+CSV export is for **sharing data outside the app**.
+
+So we should not think:
+
+```text
+Room replaces CSV export completely.
+```
+
+A better model is:
+
+```text
+Room
+ ↓
+stores app data locally and structurally
+
+CSV export
+ ↓
+exports selected data for Excel, Python, backup, or analysis
+```
+
+For a research app, both are useful.
+
+```text
+Room = app's internal database
+CSV/JSON = external research data export
+```
+
+---
+
+## 3. The three main parts of Room
+
+Room has three main components:
+
+```text
+Entity
+DAO
+Database
+```
+
+Google’s Room documentation describes these three major components as data entities, data access objects or DAOs, and the database class. The database class gives access to the DAOs; DAOs provide functions for querying, inserting, updating, and deleting data. citeturn172874view0
+
+For our research app:
+
+```text
+Entity
+ ↓
+What does one database table look like?
+
+DAO
+ ↓
+What operations can we perform on that table?
+
+Database
+ ↓
+The main Room database object that connects everything.
+```
+
+Let us go through them one by one.
+
+---
+
+## 4. Entity
+
+An entity is a Kotlin class that represents a table in the database.
+
+Room documentation explains that each entity corresponds to a table, and each instance of an entity represents a row in that table. citeturn172874view1
+
+For our app, we want to store measurements.
+
+So we can create:
 
 ```kotlin
-Button(
-    onClick = {
-        val pendingCsvText = measurementsToCsv(measurements)
-        createCsvLauncher.launch("measurements.csv")
-    }
-) {
-    Text("Export CSV")
-}
+@Entity(tableName = "measurements") // @Entity marks a class as a database table.
+data class Measurement // Measurement becomes a row in the table and each entry becomes a column
+    @PrimaryKey(autoGenerate = true) // @PrimaryKey marks the unique ID column.
+    val id: Long = 0,
+    val sampleId: String,
+    val repetition: Int,
+    val value: Double,
+    val timestamp: Long,
+    val status: String
+)
 ```
 
-This feels reasonable.
+This looks similar to our previous `Measurement` data class, but now we added Room annotations.
 
-Inside `onClick`, you create the CSV text.
+The annotation:
 
-Then you launch the file picker.
+```kotlin
+@Entity(tableName = "measurements")
+```
 
-But this local `val` has one problem:
+means:
 
 ```text
-onResult cannot see it later.
+Create a database table called measurements.
+```
+
+The annotation:
+
+```kotlin
+@PrimaryKey(autoGenerate = true)
+val id: Long = 0
+```
+
+means:
+
+```text
+Each measurement row needs a unique ID.
+Room can generate this ID automatically.
+```
+
+The other properties become columns:
+
+```text
+sampleId
+repetition
+value
+timestamp
+status
+```
+
+So this class:
+
+```kotlin
+Measurement(...)
+```
+
+becomes a row in the database.
+
+---
+
+## 5. Important note about `id`
+
+Previously, our `Measurement` had:
+
+```kotlin
+val sampleId: String
+val repetition: Int
+val value: Double
+val timestamp: Long
+val status: String
+```
+
+Now we added:
+
+```kotlin
+val id: Long = 0
 ```
 
 Why?
 
-Because `pendingCsvText` is local to the `onClick` block.
+Because database tables usually need a unique identifier for each row.
 
-It only exists inside this pair of braces:
+For example, two measurements may have the same sample ID and even similar values.
 
-```kotlin
-onClick = {
-    val pendingCsvText = measurementsToCsv(measurements)
-    createCsvLauncher.launch("measurements.csv")
-}
-```
+So Room needs a stable way to identify each row.
 
-The file is not written inside that same block, but is written later, inside the launcher's `onResult` callback:
+When we create a new measurement, we can still write:
 
 ```kotlin
-onResult = { uri: Uri? ->
-    // file writing happens here
-}
-```
-
-So this would not work:
-
-```kotlin
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        if (uri != null) {
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(pendingCsvText.toByteArray()) // Error
-            }
-        }
-    }
+Measurement(
+    sampleId = "S001",
+    repetition = 1,
+    value = 2.45,
+    timestamp = System.currentTimeMillis(),
+    status = "OK"
 )
 ```
 
-The reason is both scope and time:
+We do not need to manually provide `id`, because the default value is:
+
+```kotlin
+id = 0
+```
+
+Room will generate the real ID when inserting it.
+
+---
+
+## 6. Required imports for the entity
+
+With current Room 3 style, the imports are:
+
+```kotlin
+import androidx.room3.Entity
+import androidx.room3.PrimaryKey
+```
+
+You may see older tutorials using:
+
+```kotlin
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+```
+
+That is from Room 2.x. Current Room 3 uses the `androidx.room3` package and Room 3 requires KSP for annotation processing. citeturn172874view4
+
+For this tutorial, the main concept is the same:
 
 ```text
-Scope:
-    pendingCsvText was declared inside onClick.
-    onResult is a different block.
-
-Time:
-    onClick runs now.
-    onResult runs later.
+@Entity marks a class as a database table.
+@PrimaryKey marks the unique ID column.
 ```
 
-That is the first reason Lesson 7 used a variable outside `onClick`.
+---
 
-## 2. The Old `pendingCsvText` Method
+## 7. DAO
 
-The old method moves the variable outside the button:
+DAO means:
+
+```text
+Data Access Object
+```
+
+The DAO defines how we access the database.
+
+For our measurement table, create:
 
 ```kotlin
-var pendingCsvText by remember {
-    mutableStateOf("")
+@Dao
+interface MeasurementDao {
+
+    @Insert
+    suspend fun insertMeasurement(
+        measurement: Measurement
+    )
+
+    @Query("SELECT * FROM measurements ORDER BY timestamp ASC")
+    suspend fun getAllMeasurements(): List<Measurement>
+
+    @Query("DELETE FROM measurements")
+    suspend fun deleteAllMeasurements()
 }
 ```
 
-Then both pieces of export code can use it.
-
-The button writes into it:
+Required imports:
 
 ```kotlin
-Button(
-    onClick = {
-        pendingCsvText = measurementsToCsv(measurements)
-        createCsvLauncher.launch("measurements.csv")
-    }
-) {
-    Text("Export CSV")
-}
+import androidx.room3.Dao
+import androidx.room3.Insert
+import androidx.room3.Query
 ```
 
-The result callback reads from it:
+The DAO is very important.
+
+The ViewModel or repository should not directly write SQL everywhere.
+
+Instead, they call DAO functions.
+
+Room’s documentation says DAOs contain methods that provide abstract access to the database, and Room generates the DAO implementations at compile time. citeturn172874view2
+
+---
+
+## 8. Understand the DAO functions
+
+### Insert one measurement
 
 ```kotlin
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        if (uri != null) {
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(pendingCsvText.toByteArray())
-            }
-        }
-    }
+@Insert
+suspend fun insertMeasurement(
+    measurement: Measurement
 )
 ```
 
-Read the old method as:
+This means:
 
 ```text
-onClick:
-    create CSV text
-    store it in pendingCsvText
-    request the file picker
-
-onResult:
-    receive the Uri later
-    read pendingCsvText
-    write the file
+Insert this Measurement object into the measurements table.
 ```
 
-This method works because `pendingCsvText` now lives in a place that both `onClick` and `onResult` can access.
-
-So the old method is not nonsense.
-
-It is trying to solve a real timing problem:
+The `@Insert` annotation tells Room:
 
 ```text
-The CSV text is created now.
-The file location arrives later.
-Something must carry the text across that gap.
+This function inserts data.
 ```
 
-## 3. Why `var`, `remember`, and `mutableStateOf`
+---
 
-The old method used:
+### Read all measurements
 
 ```kotlin
-var pendingCsvText by remember {
-    mutableStateOf("")
-}
+@Query("SELECT * FROM measurements ORDER BY timestamp ASC")
+suspend fun getAllMeasurements(): List<Measurement>
 ```
 
-Each word solves a different problem.
-
-### Why `var`
-
-`pendingCsvText` starts empty:
-
-```kotlin
-""
-```
-
-Later, when the user clicks Export, the code replaces it:
-
-```kotlin
-pendingCsvText = measurementsToCsv(measurements)
-```
-
-Because the variable is reassigned with `=`, it must be `var`.
-
-This would not work:
-
-```kotlin
-val pendingCsvText = ""
-
-pendingCsvText = measurementsToCsv(measurements) // Error
-```
-
-So:
+This means:
 
 ```text
-var is needed because the old method changes the value later.
+Read all rows from the measurements table,
+ordered by timestamp from oldest to newest.
 ```
 
-### Why `remember`
+The SQL part is:
 
-Compose can recompose.
+```sql
+SELECT * FROM measurements ORDER BY timestamp ASC
+```
 
-That means the composable function can run again to describe the latest UI.
+Do not worry too much about SQL yet.
 
-If we wrote:
+For now, understand:
+
+```text
+SELECT * FROM measurements
+ ↓
+get all measurements
+
+ORDER BY timestamp ASC
+ ↓
+sort them by time
+```
+
+Room validates SQL queries at compile time, so query problems can be caught while building the app rather than only failing at runtime. citeturn172874view2
+
+---
+
+### Delete all measurements
 
 ```kotlin
-var pendingCsvText = ""
+@Query("DELETE FROM measurements")
+suspend fun deleteAllMeasurements()
 ```
 
-then `pendingCsvText` is just a normal local variable in one run of the composable.
+This means:
 
-If the composable runs again, that line creates a fresh variable again:
+```text
+Remove all saved measurements from the table.
+```
+
+This may be useful for a simple learning app.
+
+Later, for a real research app, we may not delete everything so casually.
+
+Instead, we may delete by session:
+
+```text
+delete measurements from Session 3 only
+```
+
+But not yet.
+
+---
+
+## 9. Why DAO functions are `suspend`
+
+You may notice:
 
 ```kotlin
-var pendingCsvText = ""
+suspend fun insertMeasurement(...)
+suspend fun getAllMeasurements()
+suspend fun deleteAllMeasurements()
 ```
 
-That is risky for the old method because the file-picker result comes back later.
+This connects directly to Lesson 10.
 
-For more details on how the file picker works and what happens to the main UI at the time, see section 5.
+Database operations should not block the UI.
 
-The old method needs the CSV text to survive this gap:
+Room supports coroutines, and its documentation says one-shot read/write DAO queries use `suspend`, while observable reads can use `Flow`. citeturn172874view3
 
-```text
-button click
-    -> CSV text is created
-    -> file picker request is sent
-    -> time passes
-file picker result
-    -> CSV text is needed
-```
-
-So it uses `remember`.
-
-`remember` tells Compose:
-
-```text
-Keep this value across recompositions while this composable is remembered.
-```
-
-### Why `mutableStateOf`
-
-`mutableStateOf` creates Compose-observable state.
-
-That is very useful when the UI displays or reacts to the value.
-
-For example:
+For now, use:
 
 ```kotlin
-var exportMessage by remember {
-    mutableStateOf("")
-}
+suspend
 ```
 
-`exportMessage` should be state because the UI displays it:
+for basic insert/read/delete DAO functions.
+
+This means we can call them inside:
 
 ```kotlin
-Text(exportMessage)
-```
-
-But `pendingCsvText` is different.
-
-The UI usually does not display raw CSV text.
-
-In the old method, `mutableStateOf` is mainly being used as a convenient remembered mutable holder:
-
-```text
-store CSV text now
-read it later in onResult
-```
-
-However:
-
-```text
-The old method needs a remembered mutable value.
-It does not strongly need Compose-observable UI state unless the UI reads pendingCsvText, but this is uncommon.
-```
-
-That is why the old method is understandable but not ideal.
-
-It uses screen state for data that is really just temporary file-writing data.
-
-## 4. What Is a Callback?
-
-A callback is code that you give to something else, so that it can call your code later.
-
-Simple idea:
-
-```text
-I cannot finish this work right now.
-When the event happens later, call this code.
-```
-
-`onClick` is a callback.
-
-You give code to a `Button`:
-
-```kotlin
-Button(
-    onClick = {
-        exportMessage = "Export clicked"
-    }
-) {
-    Text("Export CSV")
-}
-```
-
-The `Button` does not run that code when the UI is first drawn.
-
-It runs that code later when the user clicks the button.
-
-So:
-
-```text
-onClick:
-    callback for a future click event
-```
-
-`onResult` is also a callback.
-
-You give code to Android's activity-result system:
-
-```kotlin
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        // This runs later when Android returns the result.
-    }
-)
-```
-
-Android does not run that code when the launcher is created.
-
-Android runs it later when the file picker finishes.
-
-So:
-
-```text
-onResult:
-    callback for a future file-picker result event
-```
-
-This is why callback code can be confusing:
-
-```text
-You write the code now.
-But the code runs later.
-```
-
-That difference between where code is written and when code runs is the heart of this note.
-
-## 5. The File Picker Timeline
-
-Now we can describe the whole export process accurately by connecting the code to the timing.
-
-Here is the cleaner export pattern:
-
-```kotlin
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        if (uri != null) {
-            val csvText = measurementsToCsv(measurements)
-
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(csvText.toByteArray())
-            }
-
-            exportMessage = "CSV exported successfully."
-        } else {
-            exportMessage = "CSV export cancelled."
-        }
-    }
-)
-
-Button(
-    onClick = {
-        val filename = if (sampleId.isNotBlank()) {
-            "${safeFilename(sampleId)}_measurements.csv"
-        } else {
-            "measurements.csv"
-        }
-
-        createCsvLauncher.launch(filename)
-    }
-) {
-    Text("Export CSV")
-}
-```
-
-The confusing part is that the code is written in one place, but it runs in different moments.
-
-### Part A: Launcher Setup
-
-This part runs when Compose builds the screen:
-
-```kotlin
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        ...
-    }
-)
-```
-
-What is running?
-
-```text
-Your composable function is running.
-Compose is creating/remembering the Activity Result launcher.
-Android is storing the onResult callback for later.
-```
-
-What is not running yet?
-
-```text
-The file picker is not open.
-onClick is not running.
-onResult is not running.
-No CSV text is created.
-No file is written.
-```
-
-The `contract` describes the kind of request:
-
-```kotlin
-ActivityResultContracts.CreateDocument("text/csv")
-```
-
-Meaning:
-
-```text
-Later, when this launcher is launched,
-ask Android to create a document with CSV file type.
-```
-
-The `onResult` block is callback code:
-
-```kotlin
-onResult = { uri: Uri? ->
+viewModelScope.launch {
     ...
 }
 ```
 
-It is like instructions stored for later.
+or inside repository functions that are also `suspend`.
 
-The instructions exist now, but the body of the callback does not run now.
+---
 
-### Part B: Button Click
+## 10. Database class
 
-This part runs when the user taps the Export button:
+Now we need the Room database class.
 
-```kotlin
-onClick = {
-    val filename = if (sampleId.isNotBlank()) {
-        "${safeFilename(sampleId)}_measurements.csv"
-    } else {
-        "measurements.csv"
-    }
-
-    createCsvLauncher.launch(filename)
-}
-```
-
-Where is it running?
-
-```text
-In your app.
-Usually on the Android Main thread.
-```
-
-What is running?
-
-```text
-The Button's onClick callback is running.
-The app reads sampleId.
-The app creates a suggested filename String.
-The app sends a file-picker request to Android.
-```
-
-This line only creates a filename:
+Create:
 
 ```kotlin
-val filename = if (sampleId.isNotBlank()) {
-    "${safeFilename(sampleId)}_measurements.csv"
-} else {
-    "measurements.csv"
-}
-```
-
-At this moment:
-
-```text
-No Uri exists yet.
-No output stream exists yet.
-No CSV file has been written.
-```
-
-Then this line is called:
-
-```kotlin
-createCsvLauncher.launch(filename)
-```
-
-This `launch(...)` is easy to misunderstand.
-
-It does not mean:
-
-```text
-open picker
-wait here inside onClick
-return the user's chosen Uri
-continue writing the file inside onClick
-```
-
-It means:
-
-```text
-send a request to Android:
-"please open the file picker for this document"
-```
-
-Then `launch(...)` returns quickly.
-
-The `onClick` callback finishes.
-
-What is blocked during `onClick`?
-
-```text
-The Main thread is busy while onClick is running.
-Compose cannot recompose in the middle of this same onClick callback.
-```
-
-But this is usually very short.
-
-In this code, `onClick` only creates a filename and sends the picker request.
-
-So the Main thread is not blocked for a long time.
-
-### Part C: File Picker Is Open
-
-After `createCsvLauncher.launch(filename)`, Android opens the system file picker.
-
-The picker is not more code continuing inside `onClick`.
-
-`onClick` has already finished.
-
-Think of it like this:
-
-```text
-onClick:
-    create filename
-    call createCsvLauncher.launch(filename)
-    finish
-
-Android/system picker:
-    user chooses a location/name
-    or user cancels
-
-onResult:
-    runs later after Android sends the result back
-```
-
-Where is the picker running?
-
-```text
-It is Android/system UI.
-It is usually another Activity, often from Android or another app.
-It is not code continuing on your app's Main thread.
-It may belong to Android or another document-provider app.
-```
-
-What about your app during this time?
-
-```text
-Your visible Activity may be paused, stopped, or covered.
-Your app process may still be alive.
-Your ViewModel may still be alive.
-Background acquisition may continue if its scope/coroutine is still alive.
-```
-
-This needs careful wording.
-
-When we say the Activity is "paused" or "stopped", we mean the visible screen lifecycle.
-
-We do not mean:
-
-```text
-The app Main thread is permanently stopped.
-The app process is frozen.
-Every coroutine is stopped.
-```
-
-After `onClick` finishes, your app's Main thread is free again.
-
-It may be idle, it may receive lifecycle callbacks such as `onPause`, or it may later receive the file-picker result.
-
-But because your Activity is covered by the picker, the visible UI may not keep drawing normally.
-
-So if the measurement list changes while the picker is open, two things are separate:
-
-```text
-State/data may change in memory.
-Visible recomposition/drawing may be paused or delayed while the screen is covered.
-```
-
-If a coroutine was already running before the picker opened, the picker does not automatically cancel it.
-
-For example:
-
-```kotlin
-viewModelScope.launch {
-    val data = withContext(Dispatchers.IO) {
-        readFromDeviceOrFile()
-    }
-
-    measurements = measurements + data
-}
-```
-
-While the picker is open, this coroutine can still continue if `viewModelScope` is still alive.
-
-**Without `Dispatchers.IO`**
-
-A coroutine started with `viewModelScope.launch { ... }` usually runs on the app's Main thread.
-
-It can still continue while the picker is open if the app process and scope are alive, but it only runs when the app's Main thread gets a turn.
-
-If it does long blocking work there, it blocks the app's Main thread.
-
-**Inside `withContext(Dispatchers.IO)`**
-
-This block can run on an IO background thread while the picker is visible:
-
-```kotlin
-val data = withContext(Dispatchers.IO) {
-    readFromDeviceOrFile()
-}
-```
-
-After the IO block finishes, the coroutine usually returns to its original context, which is usually Main:
-
-```kotlin
-measurements = measurements + data
-```
-
-That state update can happen in memory even if the app screen is currently covered by the picker.
-
-So if acquisition work is still running while the picker is open, the measurement data may keep changing in memory.
-
-The covered UI may not visibly redraw immediately, but the stored state can still be updated.
-
-So the file picker does not mean:
-
-```text
-The whole app process is frozen inside launch(...).
-```
-
-**It means:**
-
-```text
-The visible screen is no longer in front.
-The app is waiting for Android to return a result later.
-Some non-UI app work may continue.
-State can still be updated in memory,
-but visible recomposition/drawing may wait until the picker is done.
-```
-
-This matters for measurements.
-
-If the app is still acquiring measurement data while the picker is open, the measurement list may change before `onResult` runs.
-
-### Part D: Result Callback
-
-After the user chooses a file or cancels, Android calls:
-
-```kotlin
-onResult = { uri: Uri? ->
-```
-
-This callback runs back in your app, usually on the Main thread.
-
-The `uri` is the result from Android:
-
-```text
-uri != null:
-    the user chose a file location
-
-uri == null:
-    the user cancelled
-```
-
-So this line decides whether there is a file location to write to:
-
-```kotlin
-if (uri != null) {
-```
-
-If the user cancelled, the app only updates the message:
-
-```kotlin
-exportMessage = "CSV export cancelled."
-```
-
-If the user chose a file, the app creates the CSV now:
-
-```kotlin
-val csvText = measurementsToCsv(measurements)
-```
-
-This is save-result time, not click time.
-
-```text
-The CSV uses the measurements available when onResult runs.
-```
-
-Then the app opens a writable stream and writes the file:
-
-```kotlin
-context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-    outputStream.write(csvText.toByteArray())
-}
-```
-
-The key point:
-
-```text
-openOutputStream(uri):
-    asks Android for a stream to the selected Uri
-
-use { ... }:
-    runs immediately and closes the stream afterward
-
-outputStream.write(...):
-    is the actual file write
-```
-
-The file write is:
-
-```text
-not inside onClick
-not inside createCsvLauncher.launch(filename)
-not inside the system picker
-inside onResult
-inside the use block
-at outputStream.write(...)
-```
-
-In this beginner version, treat this as Main-thread callback work.
-
-For a small CSV file, this is fine.
-
-For a very large CSV file or a slow storage provider, this could briefly freeze the UI. Later lessons move heavy file work to coroutines and `Dispatchers.IO`.
-
-### Full Timeline
-
-The detailed timeline is:
-
-1. Compose builds the screen and remembers `createCsvLauncher`.
-2. The `onResult` callback is stored for later, but does not run yet.
-3. User taps Export.
-4. Android runs the Button `onClick` callback on your app's Main thread.
-5. `onClick` creates a suggested filename.
-6. `onClick` calls `createCsvLauncher.launch(filename)`.
-7. `launch(...)` sends a file-picker request to Android.
-8. `launch(...)` returns; it does not wait for the user to choose a file.
-9. `onClick` finishes, so the Main thread is free again.
-10. Android shows the system file picker.
-11. Your visible Activity may be paused, stopped, or covered.
-12. Background work may continue if its scope is still alive.
-13. The user chooses a location/name, or cancels.
-14. Android delivers the result back to your app.
-15. The launcher's `onResult` callback runs in your app.
-16. If `uri` is not null, your app creates `csvText`.
-17. Your app opens an output stream to the selected `Uri`.
-18. Your app writes the CSV bytes with `outputStream.write(...)`.
-19. Your app updates `exportMessage`.
-20. After the callback finishes, Compose can recompose if state changed.
-
-The same timeline as a table:
-
-| Time | Who is active? | What is running? | What is blocked or paused? |
-| --- | --- | --- | --- |
-| Launcher setup | App composition | `rememberLauncherForActivityResult(...)` creates/remembers the launcher | picker not open; `onResult` not running |
-| Button tap | App Main thread | `onClick` starts | recomposition cannot run in the middle of this callback |
-| Inside `onClick` | App Main thread | filename is created | no `Uri`; no file write yet |
-| Inside `onClick` | App Main thread | `createCsvLauncher.launch(filename)` sends request | it does not wait for user's choice |
-| After `launch(...)` | App Main thread | `onClick` finishes quickly | Main thread becomes free again |
-| Picker visible | Android/system picker UI | user chooses location/name or cancels | your visible Activity may be paused/covered |
-| Picker visible | Your app background work | acquisition may continue if still alive | UI drawing/recomposition may pause while covered |
-| Result returns | App callback, usually Main thread | `onResult` receives `Uri?` | recomposition waits while callback is running |
-| CSV creation | App callback code | `measurementsToCsv(measurements)` creates `csvText` | Main thread may be busy briefly |
-| File write | App callback code | `outputStream.write(...)` writes bytes | Main thread may be blocked during the write |
-| Message update | App state update | `exportMessage = ...` changes UI state | recomposition happens after callback work finishes |
-
-Important:
-
-```text
-onResult is not the return value of launch(...).
-launch(...) returns quickly.
-onResult is a separate callback that runs later.
-```
-
-This timing explains why a `val` created inside `onClick` cannot be used later in `onResult`.
-
-It also explains why the old method needed `pendingCsvText`.
-
-## 6. Recomposition During `onClick`
-
-Another question naturally appears:
-
-```text
-If the Main thread is running onClick,
-can Compose recompose the UI in the middle of that same onClick?
-```
-
-Usually, no.
-
-An `onClick` callback usually runs on the Android Main thread.
-
-Recomposition also needs the Main thread.
-
-Because there is only one Main thread, these jobs take turns.
-
-Example:
-
-```kotlin
-Button(
-    onClick = {
-        exportMessage = "Preparing..."
-        createCsvLauncher.launch("measurements.csv")
-    }
-) {
-    Text("Export CSV")
-}
-```
-
-When `exportMessage` changes, Compose can notice that the UI needs to update.
-
-But the actual recomposition waits until the current callback finishes:
-
-```text
-onClick starts
-state changes
-Compose schedules recomposition
-onClick finishes
-Main thread becomes free
-Compose can recompose
-```
-
-Important distinction:
-
-```text
-Compose is not waiting for "all UI code everywhere" to finish.
-It is waiting for the current Main-thread task to finish.
-```
-
-In this example, the current Main-thread task is the `onClick` callback.
-
-After `onClick` reaches its final `}`, the Main thread can take the next task.
-
-That next task might be recomposition, another UI event, an Android lifecycle callback, or something else Android has queued.
-
-So the better rule is:
-
-```text
-Recomposition can happen between Main-thread tasks.
-Recomposition cannot happen in the middle of the currently running onClick callback.
-```
-
-A composable function is different from an `onClick` callback.
-
-The composable function runs during recomposition.
-
-When Compose is already recomposing, it runs the needed composable code to describe the UI.
-
-It does not stop halfway through that same recomposition and start another recomposition inside itself.
-
-This is why a local variable is safe while its callback is currently running.
-
-Recomposition does not jump into the middle of the callback and delete the local variable.
-
-But this does not solve the old `pendingCsvText` problem.
-
-Why?
-
-Because `onClick` only blocks recomposition during the short time that `onClick` is running.
-
-After `onClick` finishes, the file-picker/result flow is still not finished.
-
-During that later gap, recomposition or Activity recreation may still happen.
-
-So a plain local variable like this is still not enough for the old method:
-
-```kotlin
-var pendingCsvText = ""
-```
-
-It belongs to one run of the composable.
-
-If the composable runs again before `onResult`, it can become a fresh empty variable again.
-
-### Why Picker Blocking Does Not Make a Local Variable Safe
-
-Suppose the old method tries to store the CSV text in a plain composable-local variable:
-
-```kotlin
-var pendingCsvText = ""
-```
-
-The file picker may delay or pause visible recomposition/drawing while it covers your Activity.
-
-But this does not mean `pendingCsvText` is safe.
-
-Why?
-
-Because the old method creates the CSV text in `onClick`, but uses it later in `onResult`.
-
-There is a gap between those two moments:
-
-```text
-onClick:
-    create pendingCsvText
-    request the file picker
-    finish
-
-time gap:
-    picker is open
-    app may be paused, covered, resumed, recomposed, or recreated
-
-onResult:
-    try to use pendingCsvText
-```
-
-During that gap, the picker may cover the UI and may even delay/pause visible recomposition.
-
-But the picker does not guarantee that the old composable-local variable will still be the same one when `onResult` runs.
-
-There can still be many reasons that the composable runs again or the Activity is recreated before the result is delivered.
-
-For example:
-
-```text
-The app goes through lifecycle changes while the picker is open.
-The device is rotated, changing the Activity configuration.
-Android recreates the Activity because the process was under pressure.
-```
-
-If that happens, the next composable run creates a fresh `pendingCsvText`:
-
-```kotlin
-var pendingCsvText = ""
-```
-
-Then `onResult` may run with no CSV text left to write.
-
-That would create a mistake like this:
-
-```text
-Expected:
-    write the CSV text created in onClick
-
-Actual risk:
-    onResult sees a fresh empty pendingCsvText
-    the exported file is empty or wrong
-```
-
-So the file picker blocking or covering the UI may reduce visible UI updates for a while, but it does not remove the risk.
-
-The beginner-safe rule is:
-
-```text
-If data must be used later by another callback,
-do not keep it only in a plain local variable from one composable run.
-```
-
-## 7. The Useful Side: Batching
-
-The fact that Compose waits until the callback finishes can be useful.
-
-If you update several pieces of state inside one `onClick`, Compose does not need to redraw the UI after every single assignment.
-
-Example:
-
-```kotlin
-onClick = {
-    state1 = "A"
-    state2 = "B"
-    state3 = "C"
-}
-```
-
-Compose can wait until the callback finishes, then update the UI once using the latest state values.
-
-This is efficient.
-
-So this behavior has two sides:
-
-```text
-Good:
-    multiple state updates can be batched into one UI update
-
-Caution:
-    long-running callback code can block the UI from updating smoothly
-```
-
-For this reason, Main-thread callbacks should stay quick.
-
-Small export work is okay for the beginner lesson.
-
-Large export work should move to background work later.
-
-## 8. What Happens While the File Picker Is Open
-
-When the file picker opens, your app is no longer the visible foreground screen.
-
-The picker is usually a different Activity.
-
-It may also belong to another app or system process.
-
-During this period, think about three pieces separately:
-
-```text
-System picker UI:
-    foreground screen where the user chooses a file
-
-Your app's visible Activity:
-    may be paused, stopped, or covered
-
-Your app's background work:
-    may continue if its scope is still alive
-```
-
-Your Activity may move to:
-
-```text
-onPause
-possibly onStop
-```
-
-That means:
-
-```text
-Your visible app screen may stop drawing.
-Your visible app screen may not be recomposing normally while covered/stopped.
-Your app process may still be alive.
-Your ViewModel may still be alive.
-Some background work may continue.
-```
-
-More precise version:
-
-```text
-The visible Activity can be paused.
-The Main thread is not "dead"; after onClick finishes, it is free for other queued work.
-The app process can still exist.
-ViewModel state can still exist.
-Coroutines can still run if their scope is still active.
-```
-
-If a coroutine is launched like this:
-
-```kotlin
-viewModelScope.launch {
-    // usually starts on Main
-}
-```
-
-then code in that coroutine usually runs on Main unless it switches dispatcher.
-
-If it does heavy file/device work directly there, it can block Main.
-
-If it switches to IO:
-
-```kotlin
-viewModelScope.launch {
-    val newMeasurement = withContext(Dispatchers.IO) {
-        readMeasurementFromDevice()
-    }
-
-    measurements = measurements + newMeasurement
-}
-```
-
-then:
-
-```text
-readMeasurementFromDevice():
-    runs on an IO background thread
-
-measurements = measurements + newMeasurement:
-    runs after IO finishes, usually back on Main
-```
-
-So while the picker is open:
-
-```text
-Measurement data may keep changing in memory.
-The covered UI may not visibly recompose/draw immediately.
-When the app becomes visible again, Compose can show the latest state.
-```
-
-So this is wrong:
-
-```text
-The file picker is open,
-therefore the whole app process is blocked.
-```
-
-The better idea is:
-
-```text
-The visible Activity may pause,
-but other app work may still exist.
-```
-
-For this research app, the important example is measurement acquisition.
-
-If measurement is running in a coroutine that is still alive, opening the file picker does not automatically stop that measurement work.
-
-Example:
-
-```text
-file picker is open
-visible app screen is paused or covered
-measurement coroutine may still add new measurements
-onResult runs later when the user chooses a file
-```
-
-But do not overstate this:
-
-```text
-This does not mean background work always continues.
-Android can still recreate the Activity.
-Android can still kill the app process if needed.
-Lifecycle-aware UI collection may pause while the screen is stopped.
-```
-
-The safe beginner idea is:
-
-```text
-The file picker creates a time gap.
-During that gap, app state may or may not change.
-So we should be clear about when the CSV text is created.
-```
-
-## 9. The Weakness of the Old Method
-
-The old method creates CSV text before requesting the picker:
-
-```kotlin
-onClick = {
-    pendingCsvText = measurementsToCsv(measurements)
-    createCsvLauncher.launch("measurements.csv")
-}
-```
-
-This creates a click-time snapshot.
-
-Example:
-
-```text
-10:00:00
-User clicks Export.
-pendingCsvText is created with 10 measurements.
-
-10:00:15
-User chooses the file location.
-The app now has 25 measurements.
-
-Export result:
-The file still contains 10 measurements.
-```
-
-This is not always wrong.
-
-It is correct if Export means:
-
-```text
-Export exactly what existed when the user clicked the button.
-```
-
-But for a live measurement app, this may be surprising.
-
-The user may expect the file to include the measurements available when they finally choose the save location.
-
-The old method also keeps a CSV string in remembered state while the picker is open.
-
-For small data this is not dangerous.
-
-But conceptually, the CSV text is temporary file-writing data, not screen state.
-
-So the old method has two main weaknesses:
-
-```text
-Weakness 1:
-    It creates the CSV too early.
-    The exported file may not include measurements added while the picker is open.
-
-Weakness 2:
-    It needs extra remembered mutable state just to pass data from onClick to onResult.
-```
-
-That second weakness is why the old code needed something like this:
-
-```kotlin
-var pendingCsvText by remember {
-    mutableStateOf("")
-}
-```
-
-This works, but it adds more moving parts:
-
-```text
-var:
-    because the value changes
-
-remember:
-    because the value must survive recomposition
-
-mutableStateOf:
-    because the old method uses Compose state as a convenient mutable holder
-```
-
-That is extra burden for temporary export data.
-
-The CSV text is not something the UI needs to display.
-
-It only exists so the app can write a file later.
-
-## 10. The Cleaner Method: Create CSV in `onResult`
-
-The cleaner method waits until `onResult` to create the CSV text.
-
-```kotlin
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        if (uri != null) {
-            val csvText = measurementsToCsv(measurements)
-
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(csvText.toByteArray())
-            }
-        }
-    }
+@Database(
+    entities = [Measurement::class], // This database contains the Measurement table.
+    version = 1 // The current database version is 1.
 )
+abstract class ResearchDatabase : RoomDatabase() {
+    abstract fun measurementDao(): MeasurementDao // The database can provide a MeasurementDao.
+}
+```
 
-Button(
-    onClick = {
-        createCsvLauncher.launch("measurements.csv")
-    }
+Required imports:
+
+```kotlin
+import androidx.room3.Database
+import androidx.room3.RoomDatabase
+```
+
+This means:
+
+```text
+This database contains the Measurement table.
+The current database version is 1.
+The database can provide a MeasurementDao.
+```
+
+This part:
+
+```kotlin
+entities = [Measurement::class]
+```
+
+tells Room:
+
+```text
+The Measurement entity belongs to this database.
+```
+
+This part:
+
+```kotlin
+abstract fun measurementDao(): MeasurementDao
+```
+
+means:
+
+```text
+Give me access to measurement database operations.
+```
+
+---
+
+## 11. How the pieces connect
+
+Now the Room structure is:
+
+```text
+Measurement
+ ↓
+Entity/table
+
+MeasurementDao
+ ↓
+insert/read/delete measurements
+
+ResearchDatabase
+ ↓
+main database object that gives access to MeasurementDao
+```
+
+The flow is:
+
+```text
+Repository
+ ↓
+MeasurementDao
+ ↓
+ResearchDatabase
+ ↓
+SQLite database on the tablet
+```
+
+So the full architecture is becoming:
+
+```text
+ResearchScreen
+ ↓
+ResearchViewModel
+ ↓
+MeasurementRepository
+ ↓
+MeasurementDao
+ ↓
+ResearchDatabase
+ ↓
+local database file
+```
+
+This is much more realistic.
+
+---
+
+## 12. Creating the database instance
+
+To use the database, we need to create it.
+
+For a beginner version, we can do this inside the repository.
+
+```kotlin
+class MeasurementRepository(
+    context: Context
 ) {
-    Text("Export CSV")
+    private val database = Room.databaseBuilder(
+        context.applicationContext,
+        ResearchDatabase::class.java,
+        "research_database"
+    ).build()
+
+    private val measurementDao = database.measurementDao()
+
+    suspend fun insertMeasurement(
+        measurement: Measurement
+    ) {
+        measurementDao.insertMeasurement(measurement)
+    }
+
+    suspend fun getAllMeasurements(): List<Measurement> {
+        return measurementDao.getAllMeasurements()
+    }
+
+    suspend fun deleteAllMeasurements() {
+        measurementDao.deleteAllMeasurements()
+    }
 }
 ```
 
-Read it as:
-
-```text
-onClick:
-    call createCsvLauncher.launch(...)
-    request the file picker
-    finish quickly
-
-onResult:
-    run later after the picker returns
-    create CSV text from the current measurements
-    write the file
-```
-
-This solves the main issues of the old method:
-
-```text
-No pendingCsvText state is needed.
-No CSV string is stored while the picker is open.
-The CSV is created at the moment the file is written.
-```
-
-For a live measurement app, this is often the better default.
-
-## 11. Why Local `val csvText` Is Not the Same Problem
-
-The cleaner method still has this line:
+Required imports:
 
 ```kotlin
-val csvText = measurementsToCsv(measurements)
+import android.content.Context
+import androidx.room3.Room
 ```
 
-So it is natural to ask:
-
-```text
-Are we still storing the CSV text?
-```
-
-Yes, but only briefly.
-
-This `csvText` is a local variable inside the `onResult` callback.
-
-It is created and used during the same `onResult` callback, and even UI recomposition does not interrupt this callback while it is running.
-
-After the callback finishes, your code cannot use that local variable anymore, and the memory becomes available for garbage collection later.
-
-Compare:
-
-```text
-pendingCsvText:
-    remembered Compose state
-    exists across recompositions while remembered
-    used to carry data from onClick to onResult
-
-local csvText:
-    normal local variable
-    exists only while onResult is running
-    used immediately to write the file
-```
-
-The problem is not:
-
-```text
-Do we use val or not?
-```
-
-The better question is:
-
-```text
-Does this value need to live as screen state,
-or is it only temporary data for this callback?
-```
-
-## 12. Snapshot Export Versus Latest Export
-
-Now the design choice has a name.
-
-### Snapshot Export
-
-Create CSV text in `onClick`:
+Notice this:
 
 ```kotlin
-onClick = {
-    pendingCsvText = measurementsToCsv(measurements)
-    createCsvLauncher.launch("measurements.csv")
-}
+context.applicationContext
 ```
 
-Meaning:
+This is safer than storing an Activity context.
 
-```text
-Export the data as it existed when the user clicked Export.
-```
+In Lesson 13, we already mentioned that storing Activity-related context in long-lived classes can be problematic. For database creation, using application context is the safer beginner-friendly option.
 
-Use this if clicking Export should freeze a deliberate snapshot.
+---
 
-### Latest Export
+## 13. Important change from Lesson 13
 
-Create CSV text in `onResult`:
+In Lesson 13, the repository had this style:
 
 ```kotlin
-onResult = { uri: Uri? ->
-    if (uri != null) {
-        val csvText = measurementsToCsv(measurements)
+class MeasurementRepository {
+
+    suspend fun saveMeasurements(
+        context: Context,
+        measurements: List<Measurement>
+    ) {
+        ...
+    }
+
+    suspend fun loadMeasurements(
+        context: Context
+    ): List<Measurement> {
         ...
     }
 }
 ```
 
-Meaning:
-
-```text
-Export the data available when the app writes the file.
-```
-
-Use this if the file should include measurements that may arrive while the picker is open.
-
-Important limit:
-
-```text
-"Latest" means latest data available to the code at that moment.
-It does not magically recover data if the app process was killed
-and the data was not saved anywhere.
-```
-
-In later architecture, the current source of truth may be:
-
-```text
-ViewModel state
-repository
-database
-```
-
-For important research data, saving to a reliable source before export is better than relying only on temporary screen memory.
-
-## 13. A Better Beginner Version
-
-For the simple Lesson 7 app, a clean export version is:
+Now with Room, the repository is created with a `Context` once:
 
 ```kotlin
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        if (uri != null) {
-            val csvText = measurementsToCsv(measurements)
+class MeasurementRepository(
+    context: Context
+) {
+    ...
+}
+```
 
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(csvText.toByteArray())
-            }
+Then the repository functions no longer need `context` every time:
 
-            exportMessage = "CSV exported successfully."
-        } else {
-            exportMessage = "CSV export cancelled."
+```kotlin
+suspend fun insertMeasurement(measurement: Measurement)
+
+suspend fun getAllMeasurements(): List<Measurement>
+```
+
+This is cleaner.
+
+The repository owns the database connection.
+
+---
+
+## 14. But how do we create the repository in the ViewModel?
+
+Here we meet one beginner complication.
+
+Previously, our ViewModel could simply do:
+
+```kotlin
+private val measurementRepository = MeasurementRepository()
+```
+
+But now the repository needs:
+
+```kotlin
+context: Context
+```
+
+A normal `ViewModel` should not directly receive Activity context.
+
+For a simple learning app, we can use `AndroidViewModel`, which gives access to the application.
+
+```kotlin
+class ResearchViewModel(
+    application: Application
+) : AndroidViewModel(application) {
+
+    private val measurementRepository =
+        MeasurementRepository(application)
+
+    var uiState by mutableStateOf(ResearchUiState())
+        private set
+
+    ...
+}
+```
+
+Required imports:
+
+```kotlin
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+```
+
+This is not the only way.
+
+A more professional app may use dependency injection later.
+
+But for this tutorial, this is a practical beginner-friendly path.
+
+The mental model is:
+
+```text
+Application context
+ ↓
+Repository
+ ↓
+Room database
+```
+
+---
+
+## 15. Insert measurement into Room
+
+In Lesson 13, after creating a measurement, we saved the whole list.
+
+With Room, we can insert only the new measurement.
+
+Previously:
+
+```text
+create new measurement
+ ↓
+append to list
+ ↓
+save entire list to file
+```
+
+Now:
+
+```text
+create new measurement
+ ↓
+insert only this new measurement into Room
+ ↓
+update UI state
+```
+
+Inside the ViewModel:
+
+```kotlin
+private fun addSimulatedMeasurement() {
+    val newMeasurement = measurementRepository.createSimulatedMeasurement(
+        sampleId = uiState.sampleId,
+        repetition = uiState.measurements.size + 1
+    )
+
+    viewModelScope.launch {
+        try {
+            measurementRepository.insertMeasurement(newMeasurement)
+
+            val updatedMeasurements =
+                measurementRepository.getAllMeasurements()
+
+            uiState = uiState.copy(
+                measurements = updatedMeasurements,
+                latestValue = newMeasurement.value,
+                message = "Measurement saved to database"
+            )
+        } catch (e: Exception) {
+            uiState = uiState.copy(
+                message = "Database save failed"
+            )
         }
     }
-)
+}
+```
 
+But this assumes the repository still has:
+
+```kotlin
+createSimulatedMeasurement(...)
+```
+
+So we can keep that function in the repository for now.
+
+---
+
+## 16. Updated repository with simulation and Room
+
+A simple Lesson 14 repository can look like this:
+
+```kotlin
+class MeasurementRepository(
+    context: Context
+) {
+    private val database = Room.databaseBuilder(
+        context.applicationContext,
+        ResearchDatabase::class.java,
+        "research_database"
+    ).build()
+
+    private val measurementDao = database.measurementDao()
+
+    fun createSimulatedMeasurement(
+        sampleId: String,
+        repetition: Int
+    ): Measurement {
+        val value = Random.nextDouble(0.0, 5.0)
+
+        return Measurement(
+            sampleId = sampleId,
+            repetition = repetition,
+            value = value,
+            timestamp = System.currentTimeMillis(),
+            status = "OK"
+        )
+    }
+
+    suspend fun insertMeasurement(
+        measurement: Measurement
+    ) {
+        measurementDao.insertMeasurement(measurement)
+    }
+
+    suspend fun getAllMeasurements(): List<Measurement> {
+        return measurementDao.getAllMeasurements()
+    }
+
+    suspend fun deleteAllMeasurements() {
+        measurementDao.deleteAllMeasurements()
+    }
+}
+```
+
+Imports:
+
+```kotlin
+import android.content.Context
+import androidx.room3.Room
+import kotlin.random.Random
+```
+
+Now the repository handles:
+
+```text
+creating fake data
+inserting measurement
+reading all measurements
+deleting measurements
+```
+
+The ViewModel does not know the SQL details.
+
+---
+
+## 17. Load measurements from Room when app starts
+
+Previously, we loaded from internal storage.
+
+Now we load from Room:
+
+```kotlin
+fun loadSavedMeasurements() {
+    viewModelScope.launch {
+        uiState = uiState.copy(
+            isLoading = true,
+            message = "Loading measurements from database..."
+        )
+
+        try {
+            val loadedMeasurements =
+                measurementRepository.getAllMeasurements()
+
+            uiState = uiState.copy(
+                measurements = loadedMeasurements,
+                latestValue = loadedMeasurements.lastOrNull()?.value,
+                isLoading = false,
+                message = "Loaded ${loadedMeasurements.size} measurements"
+            )
+        } catch (e: Exception) {
+            uiState = uiState.copy(
+                isLoading = false,
+                message = "Could not load database measurements"
+            )
+        }
+    }
+}
+```
+
+Notice:
+
+```kotlin
+loadedMeasurements.lastOrNull()?.value
+```
+
+This means:
+
+```text
+If there is at least one saved measurement,
+show the latest value.
+
+If there are no saved measurements,
+latestValue stays null.
+```
+
+Again, this uses Kotlin null safety.
+
+---
+
+## 18. Start acquisition with Room
+
+In Lesson 12, `startAcquisition()` had:
+
+```kotlin
+fun startAcquisition(context: Context)
+```
+
+because we needed context for file saving.
+
+With Room inside the repository, we no longer need to pass context into every acquisition function.
+
+So now:
+
+```kotlin
+fun startAcquisition() {
+    if (uiState.deviceConnectionState != DeviceConnectionState.CONNECTED) {
+        uiState = uiState.copy(
+            message = "Connect device before starting acquisition"
+        )
+        return
+    }
+
+    if (uiState.acquisitionState == AcquisitionState.RECORDING) {
+        return
+    }
+
+    uiState = uiState.copy(
+        acquisitionState = AcquisitionState.RECORDING,
+        message = "Acquisition started"
+    )
+
+    viewModelScope.launch {
+        while (uiState.acquisitionState == AcquisitionState.RECORDING) {
+            addSimulatedMeasurement()
+            delay(1000)
+        }
+    }
+}
+```
+
+This is cleaner than before.
+
+The UI button can now call:
+
+```kotlin
+viewModel.startAcquisition()
+```
+
+instead of:
+
+```kotlin
+viewModel.startAcquisition(context)
+```
+
+This is a nice result of moving storage into the repository.
+
+---
+
+## 19. Full ViewModel pattern after adding Room
+
+Here is the main pattern:
+
+```kotlin
+class ResearchViewModel(
+    application: Application
+) : AndroidViewModel(application) {
+
+    private val measurementRepository =
+        MeasurementRepository(application)
+
+    var uiState by mutableStateOf(ResearchUiState())
+        private set
+
+    fun updateSampleId(newSampleId: String) {
+        uiState = uiState.copy(
+            sampleId = newSampleId
+        )
+    }
+
+    fun connectDevice() {
+        uiState = uiState.copy(
+            deviceConnectionState = DeviceConnectionState.CONNECTING,
+            message = "Connecting to device..."
+        )
+
+        viewModelScope.launch {
+            delay(1000)
+
+            uiState = uiState.copy(
+                deviceConnectionState = DeviceConnectionState.CONNECTED,
+                message = "Device connected"
+            )
+        }
+    }
+
+    fun disconnectDevice() {
+        if (uiState.acquisitionState == AcquisitionState.RECORDING) {
+            stopAcquisition()
+        }
+
+        uiState = uiState.copy(
+            deviceConnectionState = DeviceConnectionState.DISCONNECTED,
+            acquisitionState = AcquisitionState.IDLE,
+            message = "Device disconnected"
+        )
+    }
+
+    fun startAcquisition() {
+        if (uiState.deviceConnectionState != DeviceConnectionState.CONNECTED) {
+            uiState = uiState.copy(
+                message = "Connect device before starting acquisition"
+            )
+            return
+        }
+
+        if (uiState.acquisitionState == AcquisitionState.RECORDING) {
+            return
+        }
+
+        uiState = uiState.copy(
+            acquisitionState = AcquisitionState.RECORDING,
+            message = "Acquisition started"
+        )
+
+        viewModelScope.launch {
+            while (uiState.acquisitionState == AcquisitionState.RECORDING) {
+                addSimulatedMeasurement()
+                delay(1000)
+            }
+        }
+    }
+
+    fun stopAcquisition() {
+        if (uiState.acquisitionState != AcquisitionState.RECORDING) {
+            return
+        }
+
+        uiState = uiState.copy(
+            acquisitionState = AcquisitionState.STOPPED,
+            message = "Acquisition stopped"
+        )
+    }
+
+    fun loadSavedMeasurements() {
+        viewModelScope.launch {
+            uiState = uiState.copy(
+                isLoading = true,
+                message = "Loading measurements from database..."
+            )
+
+            try {
+                val loadedMeasurements =
+                    measurementRepository.getAllMeasurements()
+
+                uiState = uiState.copy(
+                    measurements = loadedMeasurements,
+                    latestValue = loadedMeasurements.lastOrNull()?.value,
+                    isLoading = false,
+                    message = "Loaded ${loadedMeasurements.size} measurements"
+                )
+            } catch (e: Exception) {
+                uiState = uiState.copy(
+                    isLoading = false,
+                    message = "Could not load database measurements"
+                )
+            }
+        }
+    }
+
+    private fun addSimulatedMeasurement() {
+        val newMeasurement =
+            measurementRepository.createSimulatedMeasurement(
+                sampleId = uiState.sampleId,
+                repetition = uiState.measurements.size + 1
+            )
+
+        viewModelScope.launch {
+            try {
+                measurementRepository.insertMeasurement(newMeasurement)
+
+                val updatedMeasurements =
+                    measurementRepository.getAllMeasurements()
+
+                uiState = uiState.copy(
+                    measurements = updatedMeasurements,
+                    latestValue = newMeasurement.value,
+                    message = "Measurement saved to database"
+                )
+            } catch (e: Exception) {
+                uiState = uiState.copy(
+                    message = "Database save failed"
+                )
+            }
+        }
+    }
+}
+```
+
+Important imports:
+
+```kotlin
+import android.app.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+```
+
+## 20. Calling `loadSavedMeasurements()` from the UI
+
+Previously, you may have used LaunchedEffect to load saved data.
+That pattern can stay.
+Inside ResearchScreen:
+
+```kotlin
+LaunchedEffect(Unit) {
+    viewModel.loadSavedMeasurements()
+}
+```
+
+This means:
+When this screen first appears,
+ask the ViewModel to load saved measurements.
+The function now loads from Room rather than from an internal CSV-style file.
+
+## 21. UI Button Changes
+
+Because startAcquisition() no longer needs context, the button becomes simpler:
+
+```kotlin
 Button(
     onClick = {
-        val filename = if (sampleId.isNotBlank()) {
-            "${safeFilename(sampleId)}_measurements.csv"
-        } else {
-            "measurements.csv"
-        }
-
-        createCsvLauncher.launch(filename)
+        viewModel.startAcquisition()
     },
-    enabled = measurements.isNotEmpty()
+    enabled =
+        uiState.deviceConnectionState == DeviceConnectionState.CONNECTED &&
+        uiState.acquisitionState != AcquisitionState.RECORDING
 ) {
-    Text("Export CSV")
+    Text("Start Acquisition")
 }
 ```
 
-This keeps:
-
-```text
-filename choice in onClick
-CSV generation in onResult
-file writing in onResult
-status message as UI state
-```
-
-Why is `exportMessage` state, but `csvText` is not?
-
-```text
-exportMessage is displayed by the UI.
-csvText is temporary data used only to write a file.
-```
-
-## 14. Small Files Versus Large Files
-
-In Lesson 7, direct callback export is acceptable for small CSV files:
+Stop button:
 
 ```kotlin
-val csvText = measurementsToCsv(measurements)
-
-context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-    outputStream.write(csvText.toByteArray())
+Button(
+    onClick = {
+        viewModel.stopAcquisition()
+    },
+    enabled = uiState.acquisitionState == AcquisitionState.RECORDING
+) {
+    Text("Stop Acquisition")
 }
 ```
 
-For small beginner examples, this is fine.
+The UI does not know whether data is saved to:
 
-For very large exports, this can become slow:
+- file
+- Room database
+- cloud
+- memory
 
-```text
-building a huge String
-converting it to bytes
-writing many bytes to storage
-```
+The UI only talks to the ViewModel.
+That is good architecture.
 
-This is not necessary unless you want to show this CSV in the UI screen, which is uncommon. Later lessons introduce coroutines and `Dispatchers.IO`.
+## 22. Add a Clear Database Button
 
-In a larger app, heavy export should move off the Main thread:
+For learning, it is useful to clear the table.
+In the ViewModel:
 
 ```kotlin
-viewModelScope.launch {
-    val csvText = withContext(Dispatchers.Default) {
-        measurementsToCsv(measurements)
-    }
+fun clearMeasurements() {
+    viewModelScope.launch {
+        try {
+            measurementRepository.deleteAllMeasurements()
 
-    withContext(Dispatchers.IO) {
-        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-            outputStream.write(csvText.toByteArray())
+            uiState = uiState.copy(
+                measurements = emptyList(),
+                latestValue = null,
+                message = "All measurements deleted"
+            )
+        } catch (e: Exception) {
+            uiState = uiState.copy(
+                message = "Could not delete measurements"
+            )
         }
     }
 }
 ```
 
-Beginner idea:
+In the UI:
 
-```text
-Small export:
-    direct callback code is okay.
-
-Large export:
-    prepare/write in background work.
+```kotlin
+Button(
+    onClick = {
+        viewModel.clearMeasurements()
+    },
+    enabled = uiState.acquisitionState != AcquisitionState.RECORDING
+) {
+    Text("Clear Measurements")
+}
 ```
 
-## 15. Final Checklist
+We disable it while recording because deleting data during acquisition is unsafe.
+The logic is:
 
-When you see export code, ask:
+> Do not allow destructive actions while recording.
 
-```text
-Can onResult see a val created inside onClick?
-    -> no, because it is local to onClick
+This is a good research-app habit.
 
-Why does the old method need pendingCsvText?
-    -> to carry CSV text from onClick to onResult
+## 23. What About CSV Export Now?
 
-Why does the old method need var?
-    -> because pendingCsvText is reassigned
-
-Why does the old method need remember?
-    -> because the value must survive until onResult
-
-Does the UI display or react to this value?
-    -> use Compose state if yes
-
-Is this value only needed while writing the file?
-    -> use a local val inside onResult
-
-Should Export mean "data at click time"?
-    -> create CSV in onClick
-
-Should Export mean "data at save time"?
-    -> create CSV in onResult
-
-Could the export be large or slow?
-    -> use background work in a later lesson
-```
-
-The main rule:
+Even after adding Room, CSV export is still useful.
+The new flow becomes:
 
 ```text
-State is for values the UI displays, edits, remembers, or reacts to.
-Local variables are for temporary work inside one function or callback.
+Room database
+ ↓
+stores all measurements locally
+
+Export CSV button
+ ↓
+reads selected measurements from Room
+ ↓
+writes them to a CSV file
+ ↓
+user analyses the CSV in Excel/Python
 ```
 
-The main file-picker rule:
+So the app architecture becomes:
 
 ```text
-onClick starts the request.
-onResult handles the returned Uri.
-Create the CSV where it best matches the meaning of export.
+MeasurementRepository
+ ├── insert into Room
+ ├── read from Room
+ ├── delete from Room
+ └── later export selected data
 ```
+
+Room is not mainly for external analysis.
+Room is for reliable local app storage.
+CSV is still better for sharing with Python, Excel, or collaborators.
+
+## 24. Does Room Replace Internal Storage?
+
+For our simple measurement history, yes, Room can replace the internal auto-save file.
+Before Room:
+
+```text
+measurement list
+ ↓
+save whole list to internal CSV-style file
+ ↓
+reload whole list on app start
+```
+
+With Room:
+
+```text
+new measurement
+ ↓
+insert one row into database
+ ↓
+query rows when needed
+```
+
+This is better as the app grows.
+However, internal storage is still useful for other things, such as:
+
+- exported CSV files
+- temporary files
+- raw binary logs
+- model files
+- configuration files
+
+So the idea is not:
+
+> Room good, files bad
+
+The better idea is:
+
+> Use the right storage for the right purpose.
+
+## 25. Beginner Warning About Migrations
+
+In our database class, we wrote:
+
+```kotlin
+@Database(
+    entities = [Measurement::class],
+    version = 1
+)
+```
+
+The version number matters.
+Later, if you change the database structure, for example by adding:
+
+```kotlin
+val deviceId: String
+```
+
+or:
+
+```kotlin
+val sessionId: Long
+```
+
+then the database schema changes.
+Real apps need database migrations.
+Room’s documentation lists streamlined database migration paths as one of its benefits. Android Developers
+But for this beginner lesson, we will not handle migrations yet.
+For learning, if you change the entity and the app complains, you can often uninstall the app from the emulator/tablet and reinstall it.
+For real research deployment, do not rely on uninstalling the app, because that would delete collected data.
+## 26. Current Architecture After Lesson 14
+
+After adding Room, our architecture becomes:
+
+```text
+Presentation layer
+ResearchScreen
+ ↓
+ViewModel layer
+ResearchViewModel
+ ↓
+Repository layer
+MeasurementRepository
+ ↓
+Database access layer
+MeasurementDao
+ ↓
+Local database
+ResearchDatabase / Room / SQLite
+```
+
+This is a major step toward a real research app.
+We now have:
+
+- UI state
+- acquisition state
+- repository
+- local structured database
+- simulated measurement stream
+
+That is much more serious than only having a button that generates a random value.
+
+## 27. What You Learned in Lesson 14
+
+The key concepts are:
+
+- `@Entity` marks a Kotlin data class as a database table.
+- `@PrimaryKey(autoGenerate = true)` marks a unique ID column.
+- `@Dao` marks an interface that defines database operations.
+- `@Insert` inserts an entity into the database.
+- `@Query("SELECT * FROM measurements")` reads data from the database.
+- `@Database(entities = [Measurement::class], version = 1)` defines the Room database.
+
+The most important mental model is:
+
+```text
+Entity = table structure
+DAO = database operations
+Database = main Room object
+Repository = app-facing data manager
+ViewModel = screen state and user flow
+UI = display and buttons
+```
+
+For a research app:
+
+- Room stores structured data locally.
+- CSV exports data for analysis outside the app.
+
+## Lesson 15 Preview
+
+In Lesson 15, we should move from:
+
+```text
+one flat Measurement table
+                ↓
+a more realistic research data model:
+Patient
+Session
+Measurement
+Result
+```
+
+This is important because your final app should probably not only save values.
+It should know:
+
+- which patient/sample the data belongs to
+- which session the measurement belongs to
+- when the session started and ended
+- what result or prediction was produced
+
+So Lesson 15 will cover:
+
+- Patient data class
+- Session data class
+- Measurement belongs to Session
+- Session belongs to Patient
+- basic relationship thinking
+- why data modelling matters before app complexity grows

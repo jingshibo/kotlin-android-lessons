@@ -25,7 +25,7 @@ So far, our app has used simple internal file storage and CSV-style saving. That
 
 But for a more serious research app, simple files may become inconvenient.
 
-For example, later we may need to store:
+For example, later we may need to store lots of structural dataset:
 
 ```text
 patients
@@ -134,7 +134,7 @@ DAO
 Database
 ```
 
-Google’s Room documentation describes these three major components as the database class, data entities, and data access objects, or DAOs. The database class gives access to the DAOs; DAOs provide functions for querying, inserting, updating, and deleting data. citeturn172874view0
+Google’s Room documentation describes these three major components as data entities, data access objects or DAOs, and the database class. The database class gives access to the DAOs; DAOs provide functions for querying, inserting, updating, and deleting data. citeturn172874view0
 
 For our research app:
 
@@ -167,8 +167,8 @@ For our app, we want to store measurements.
 So we can create:
 
 ```kotlin
-@Entity(tableName = "measurements")
-data class Measurement(
+@Entity(tableName = "measurements") // @Entity marks a class as a database table.
+data class Measurement // Measurement becomes a row in the table and each entry becomes a column
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val sampleId: String,
@@ -590,7 +590,7 @@ For a beginner version, we can do this inside the repository.
 
 ```kotlin
 class MeasurementRepository(
-    context: Context
+    private val context: Context
 ) {
     private val database = Room.databaseBuilder(
         context.applicationContext,
