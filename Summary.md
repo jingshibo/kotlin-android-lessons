@@ -519,7 +519,7 @@ Covered:
 
 This lesson explains why a serious research app eventually needs structured database storage instead of only saving one CSV-style file.
 
-### Lesson 15 - Patient and session data model
+### Lesson 15 - Multi-table Room data model
 
 Short summary:
 Lesson 14 introduces Room storage, but storing only measurements is not enough research context. Lesson 15 expands the model to patients, sessions, measurements, and results so every value belongs to the correct research record.
@@ -541,6 +541,10 @@ Covered:
 - the idea that sessions should belong to patients or samples
 
 This lesson turns the app from a simple measurement logger into a more realistic research data system.
+
+Related note:
+
+- `lesson-15-notes-room-database-thinking-map.md` explains the developer thinking flow from entity design, to DAO operations, to database class wiring, to repository usage, and finally to multi-table ID relationships.
 
 ### Lesson 16 - Multi-screen app navigation
 

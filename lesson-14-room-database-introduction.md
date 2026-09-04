@@ -273,6 +273,87 @@ id = 0
 
 Room will generate the real ID when inserting it.
 
+### Does Room always auto-generate an ID?
+
+No.
+
+Room requires every entity to have a primary key, but it does not always auto-generate that key.
+
+Room only auto-generates the ID when we explicitly write:
+
+```kotlin
+@PrimaryKey(autoGenerate = true)
+val id: Long = 0
+```
+
+For `Int` and `Long` primary keys, the value `0` means:
+
+```text
+This object does not have a real database ID yet.
+Please generate one when inserting.
+```
+
+So this object:
+
+```kotlin
+val measurement = Measurement(
+    sampleId = "S001",
+    repetition = 1,
+    value = 2.45,
+    timestamp = System.currentTimeMillis(),
+    status = "OK"
+)
+```
+
+starts with:
+
+```text
+id = 0
+```
+
+Then Room inserts it into SQLite and gives it a real ID, for example:
+
+```text
+id = 1
+```
+
+### What if we do not use `autoGenerate = true`?
+
+Then we still need a primary key.
+
+But the app must provide the key manually:
+
+```kotlin
+@Entity(tableName = "measurements")
+data class Measurement(
+    @PrimaryKey
+    val id: Long,
+
+    val sampleId: String,
+    val repetition: Int,
+    val value: Double,
+    val timestamp: Long,
+    val status: String
+)
+```
+
+Now when creating a measurement, we must choose the ID ourselves:
+
+```kotlin
+val measurement = Measurement(
+    id = 1,
+    sampleId = "S001",
+    repetition = 1,
+    value = 2.45,
+    timestamp = System.currentTimeMillis(),
+    status = "OK"
+)
+```
+
+For most app data, manually choosing IDs is not convenient.
+
+That is why this tutorial uses auto-generated internal IDs.
+
 ---
 
 ## 6. Required imports for the entity
@@ -394,9 +475,9 @@ The SQL part is:
 SELECT * FROM measurements ORDER BY timestamp ASC
 ```
 
-Do not worry too much about SQL yet.
+"*" means select  all coumns. 
 
-For now, understand:
+Do not worry too much about SQL yet. For now, understand:
 
 ```text
 SELECT * FROM measurements
@@ -1384,6 +1465,7 @@ The key concepts are:
 
 - `@Entity` marks a Kotlin data class as a database table.
 - `@PrimaryKey(autoGenerate = true)` marks a unique ID column.
+- Every Room entity needs a primary key, but Room only generates it automatically when `autoGenerate = true`.
 - `@Dao` marks an interface that defines database operations.
 - `@Insert` inserts an entity into the database.
 - `@Query("SELECT * FROM measurements")` reads data from the database.
@@ -1412,7 +1494,7 @@ In Lesson 15, we should move from:
 ```text
 one flat Measurement table
                 ↓
-a more realistic research data model:
+a more realistic research data model with multipe relational tables:
 Patient
 Session
 Measurement

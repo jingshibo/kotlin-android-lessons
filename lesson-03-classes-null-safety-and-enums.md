@@ -25,6 +25,7 @@ We will cover:
 - `val` and `var` inside classes
 - `val` and `var` for object variables versus object properties
 - functions inside classes
+- `companion object`
 - class inheritance
 - `data class`
 - named arguments
@@ -317,7 +318,128 @@ Value: 2.45
 
 This means an object can store data and also have functions related to that data.
 
-## 6. Class inheritance
+## 6. Companion object
+
+Normally, you create an object first, then call functions on that object.
+
+For example:
+
+```kotlin
+class MeasurementPrinter {
+
+    fun printValue(value: Double) {
+        println("Value: $value")
+    }
+}
+```
+
+To use `printValue()`, you first create a `MeasurementPrinter` object:
+
+```kotlin
+val printer = MeasurementPrinter()
+
+printer.printValue(2.45)
+```
+
+But sometimes you want a function or value to belong to the class itself.
+
+That is where `companion object` is useful.
+
+```kotlin
+class MeasurementPrinter {
+
+    companion object {
+        fun printValue(value: Double) {
+            println("Value: $value")
+        }
+    }
+}
+```
+
+Now you can call the function directly from the class name:
+
+```kotlin
+MeasurementPrinter.printValue(2.45)
+```
+
+You do not need to write:
+
+```kotlin
+val printer = MeasurementPrinter()
+```
+
+Simple mental model:
+
+```text
+Normal class function
+    belongs to one object
+    call it with objectName.functionName()
+
+Companion object function
+    belongs to the class itself
+    call it with ClassName.functionName()
+```
+
+### Why this matters in Android
+
+Later, in the Room database lesson, you will see code like this:
+
+```kotlin
+class ResearchDatabase {
+
+    companion object {
+        fun getDatabase(context: Context): ResearchDatabase {
+            // Create or return the database.
+        }
+    }
+}
+```
+
+Then other code can call:
+
+```kotlin
+val database = ResearchDatabase.getDatabase(context)
+```
+
+This reads like:
+
+```text
+ResearchDatabase class,
+please give me the database object.
+```
+
+That is different from:
+
+```kotlin
+val database = ResearchDatabase()
+```
+
+because the Room version usually wants to control database creation carefully.
+
+It often wants:
+
+```text
+Create the database once.
+Reuse the same database object later.
+```
+
+So for now, remember:
+
+```text
+companion object lets a class provide shared functions or shared values.
+```
+
+You do not need to master all advanced uses yet.
+
+You mainly need to recognize this pattern:
+
+```kotlin
+ClassName.functionName()
+```
+
+when the function is inside a `companion object`.
+
+## 7. Class inheritance
 
 Sometimes one class needs to be a special kind of another class.
 
@@ -549,7 +671,7 @@ val researchViewModel: ResearchViewModel = ResearchViewModel()
 Here the variable type and the object type are exactly the same.
 
 
-## 7. data class
+## 8. data class
 
 For research data, you will very often want a class that mainly stores information.
 
@@ -577,7 +699,7 @@ val measurement = Measurement(
 
 Use a `data class` when the main purpose of the class is to hold data.
 
-## 8. Why use data class?
+## 9. Why use data class?
 
 Suppose:
 
@@ -610,7 +732,7 @@ Measurement(sampleId=S001, value=2.45)
 
 With a normal class, printing the object would not automatically give such useful output.
 
-## 9. Comparing data classes
+## 10. Comparing data classes
 
 Consider:
 
@@ -635,7 +757,7 @@ because Kotlin compares their stored values.
 
 This is very useful when comparing research records.
 
-## 10. copy()
+## 11. copy()
 
 Another useful data class feature is `copy()`.
 
@@ -665,7 +787,7 @@ while the other properties remain the same.
 
 You will see `copy()` often in modern Android development.
 
-## 11. Default parameter values
+## 12. Default parameter values
 
 Kotlin allows default values in functions.
 
@@ -719,7 +841,7 @@ Text(
 
 where many other parameters have defaults.
 
-## 12. Default values in a data class
+## 13. Default values in a data class
 
 You can also write default values in a data class.
 
@@ -748,7 +870,7 @@ valid = true
 
 Default values are useful when some information has a normal starting value, but other information still needs to be provided.
 
-## 13. A realistic measurement model
+## 14. A realistic measurement model
 
 For a research app, a measurement often needs more than one value.
 
@@ -778,7 +900,7 @@ val measurement = Measurement(
 
 You do not need to worry about timestamps deeply yet.
 
-## 14. Lists of objects
+## 15. Lists of objects
 
 Now combine Lesson 2 with Lesson 3.
 
@@ -840,7 +962,7 @@ calculates the average.
 
 This style becomes very common in the research app.
 
-## 15. Null safety
+## 16. Null safety
 
 Now we get to one of the most important Kotlin concepts.
 
@@ -876,7 +998,7 @@ The `?` means:
 This variable may contain either a String or null.
 ```
 
-## 16. Why null safety matters in Android
+## 17. Why null safety matters in Android
 
 Android code constantly deals with things that might not exist yet:
 
@@ -908,7 +1030,7 @@ After a measurement:
 latestReading = 2.45
 ```
 
-## 17. Kotlin protects you from null errors
+## 18. Kotlin protects you from null errors
 
 Suppose:
 
@@ -934,7 +1056,7 @@ You must explicitly handle that possibility.
 
 This is a major reason Kotlin is safer than Java.
 
-## 18. Safe-call operator ?.
+## 19. Safe-call operator ?.
 
 You can write:
 
@@ -986,7 +1108,7 @@ null
 
 rather than crashing.
 
-## 19. A very common Android pattern
+## 20. A very common Android pattern
 
 Suppose:
 
@@ -1016,7 +1138,7 @@ This is safe, but usually you do not want to display `null` to the user.
 
 That is where the Elvis operator helps.
 
-## 20. Elvis operator ?:
+## 21. Elvis operator ?:
 
 Usually you do not want to display `null`.
 
@@ -1057,7 +1179,7 @@ Unknown device
 
 You will see this operator frequently.
 
-## 21. Combining ?. and ?:
+## 22. Combining ?. and ?:
 
 This is very common:
 
@@ -1082,7 +1204,7 @@ val displayValue = latestReading?.toString() ?: "No data"
 
 Very useful.
 
-## 22. Standard if null check
+## 23. Standard if null check
 
 You can also do:
 
@@ -1108,7 +1230,7 @@ to:
 String
 ```
 
-## 23. !! - non-null assertion
+## 24. !! - non-null assertion
 
 You will also encounter:
 
@@ -1166,7 +1288,7 @@ over:
 val deviceName = name!!
 ```
 
-## 24. A practical nullable measurement example
+## 25. A practical nullable measurement example
 
 Suppose:
 
@@ -1205,7 +1327,7 @@ Do not worry too much about `let` yet. We will encounter lambdas and scope funct
 
 The first `if` version is perfectly good while learning.
 
-## 25. enum class
+## 26. enum class
 
 Sometimes a value should only be one of a small fixed set of options.
 
@@ -1255,7 +1377,7 @@ Later:
 state = DeviceState.CONNECTED
 ```
 
-## 26. Enum constants are not strings
+## 27. Enum constants are not strings
 
 The items in an enum class are enum constants of type `DeviceState`, not `String` values.
 
@@ -1296,7 +1418,7 @@ val displayText = when (state) {
 }
 ```
 
-## 27. when + enum
+## 28. when + enum
 
 Enums work beautifully with `when`.
 
@@ -1323,7 +1445,7 @@ Because Kotlin knows you have handled every possible value of `DeviceState`.
 
 That is safer than using arbitrary strings.
 
-## 28. Research example
+## 29. Research example
 
 Now we can combine data classes, null safety, and enums.
 
@@ -1382,7 +1504,7 @@ val statusMessage = when (measurement.status) {
 
 This looks much more like real Android application code.
 
-## 29. A complete example
+## 30. A complete example
 
 ```kotlin
 enum class DeviceState {
@@ -1434,7 +1556,7 @@ Repetition: 1
 Value: 2.43
 ```
 
-## 30. What you need to remember from Lesson 3
+## 31. What you need to remember from Lesson 3
 
 If you remember only these patterns, you are doing well.
 
@@ -1463,6 +1585,25 @@ val measurement = Measurement(
     sampleId = "S001",
     value = 2.45
 )
+```
+
+Companion object:
+
+```kotlin
+class MeasurementRules {
+
+    companion object {
+        fun isValid(value: Double): Boolean {
+            return value >= 0.0
+        }
+    }
+}
+```
+
+Call a companion object function:
+
+```kotlin
+val valid = MeasurementRules.isValid(2.45)
 ```
 
 Copy with one changed field:
@@ -1515,7 +1656,7 @@ val message = when (state) {
 }
 ```
 
-## 31. One mental model for ?, ?., ?:, !!
+## 32. One mental model for ?, ?., ?:, !!
 
 This is worth memorizing:
 
