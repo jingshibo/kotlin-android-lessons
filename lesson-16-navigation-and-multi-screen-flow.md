@@ -258,7 +258,24 @@ For this lesson, focus on the app structure first.
 
 For beginner learning, we can start with simple string routes.
 
-Create an object:
+Each full screen should have a route name.
+
+A route is the screen's address.
+
+For example:
+
+```text
+patient_list:
+    address for the Patient List screen
+
+patient_detail:
+    base address for the Patient Detail screen
+
+settings:
+    address for the Settings screen
+```
+
+Create one `Routes` object to keep these screen addresses in one place:
 
 ```kotlin
 object Routes {
@@ -266,10 +283,34 @@ object Routes {
     const val PATIENT_DETAIL = "patient_detail"
     const val MEASUREMENT = "measurement"
     const val RESULT = "result"
+    const val ADD_PATIENT = "add_patient"
+    const val SETTINGS = "settings"
 }
 ```
 
 This avoids writing raw strings everywhere.
+
+Think of `Routes` as the app's screen address book:
+
+```text
+PATIENT_LIST:
+    PatientListScreen
+
+PATIENT_DETAIL:
+    PatientDetailScreen
+
+MEASUREMENT:
+    MeasurementScreen
+
+RESULT:
+    ResultScreen
+
+ADD_PATIENT:
+    AddPatientScreen
+
+SETTINGS:
+    SettingsScreen
+```
 
 Instead of:
 
@@ -727,15 +768,16 @@ A route with an argument can look like this:
 patient_detail/{patientId}
 ```
 
-Add this route pattern:
+Remember, `Routes.PATIENT_DETAIL` stores the base route name:
 
 ```kotlin
-object Routes {
-    const val PATIENT_LIST = "patient_list"
-    const val PATIENT_DETAIL = "patient_detail"
-    const val MEASUREMENT = "measurement"
-    const val RESULT = "result"
-}
+const val PATIENT_DETAIL = "patient_detail"
+```
+
+For a detail screen, we combine that base route with an argument:
+
+```kotlin
+"${Routes.PATIENT_DETAIL}/{patientId}"
 ```
 
 Then inside `NavHost`, add:
@@ -780,6 +822,34 @@ composable(
 }
 ```
 
+Here, `backStackEntry` means:
+
+```text
+the navigation record for the screen that is currently being opened
+```
+
+When `NavHost` matches this route:
+
+```text
+patient_detail/{patientId}
+```
+
+with an actual route like this:
+
+```text
+patient_detail/1
+```
+
+it stores the route information in `backStackEntry`.
+
+So `backStackEntry.arguments` contains:
+
+```text
+patientId = "1"
+```
+
+Then the screen can read that value and use it.
+
 This part:
 
 ```kotlin
@@ -797,6 +867,49 @@ If conversion fails, return null.
 ```
 
 Again, this uses Kotlin null safety.
+
+One `backStackEntry` can also contain more than one route argument.
+
+For example:
+
+```kotlin
+composable(
+    route = "measurement/{patientId}/{sessionId}"
+) { backStackEntry ->
+    val patientId = backStackEntry.arguments
+        ?.getString("patientId")
+        ?.toLongOrNull()
+
+    val sessionId = backStackEntry.arguments
+        ?.getString("sessionId")
+        ?.toLongOrNull()
+}
+```
+
+If the app navigates to:
+
+```kotlin
+navController.navigate("measurement/1/10")
+```
+
+then `backStackEntry.arguments` can contain:
+
+```text
+patientId = "1"
+sessionId = "10"
+```
+
+Important wording:
+
+```text
+The values are not returned to backStackEntry.
+
+Instead:
+    navController.navigate(...) sends route values
+    NavHost matches the route pattern
+    backStackEntry stores the values for the current destination
+    the destination reads them from backStackEntry.arguments
+```
 
 ---
 
@@ -1052,88 +1165,117 @@ But for Lesson 16, the goal is navigation.
 
 Now the navigation structure looks like this:
 
+This version also adds a simple `Scaffold` around the `NavHost`.
+
 ```kotlin
 @Composable
 fun ResearchApp() {
     val navController = rememberNavController()
 
-    NavHost(
-        navController = navController,
-        startDestination = Routes.PATIENT_LIST
-    ) {
-        composable(Routes.PATIENT_LIST) {
-            PatientListScreen(
-                onPatientClick = { patientId ->
-                    navController.navigate(
-                        "${Routes.PATIENT_DETAIL}/$patientId"
+    Scaffold(
+        modifier = Modifier.fillMaxSize()
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = Routes.PATIENT_LIST,
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            composable(Routes.PATIENT_LIST) {
+                PatientListScreen(
+                    onPatientClick = { patientId ->
+                        navController.navigate(
+                            "${Routes.PATIENT_DETAIL}/$patientId"
+                        )
+                    }
+                )
+            }
+
+            composable(
+                route = "${Routes.PATIENT_DETAIL}/{patientId}"
+            ) { backStackEntry ->
+                val patientId = backStackEntry.arguments
+                    ?.getString("patientId")
+                    ?.toLongOrNull()
+
+                if (patientId != null) {
+                    PatientDetailScreen(
+                        patientId = patientId,
+                        onStartSessionClick = { sessionId ->
+                            navController.navigate(
+                                "${Routes.MEASUREMENT}/$sessionId"
+                            )
+                        },
+                        onBackClick = {
+                            navController.popBackStack()
+                        }
                     )
                 }
-            )
-        }
-
-        composable(
-            route = "${Routes.PATIENT_DETAIL}/{patientId}"
-        ) { backStackEntry ->
-            val patientId = backStackEntry.arguments
-                ?.getString("patientId")
-                ?.toLongOrNull()
-
-            if (patientId != null) {
-                PatientDetailScreen(
-                    patientId = patientId,
-                    onStartSessionClick = { sessionId ->
-                        navController.navigate(
-                            "${Routes.MEASUREMENT}/$sessionId"
-                        )
-                    },
-                    onBackClick = {
-                        navController.popBackStack()
-                    }
-                )
             }
-        }
 
-        composable(
-            route = "${Routes.MEASUREMENT}/{sessionId}"
-        ) { backStackEntry ->
-            val sessionId = backStackEntry.arguments
-                ?.getString("sessionId")
-                ?.toLongOrNull()
+            composable(
+                route = "${Routes.MEASUREMENT}/{sessionId}"
+            ) { backStackEntry ->
+                val sessionId = backStackEntry.arguments
+                    ?.getString("sessionId")
+                    ?.toLongOrNull()
 
-            if (sessionId != null) {
-                MeasurementScreen(
-                    sessionId = sessionId,
-                    onResultClick = {
-                        navController.navigate(
-                            "${Routes.RESULT}/$sessionId"
-                        )
-                    },
-                    onBackClick = {
-                        navController.popBackStack()
-                    }
-                )
+                if (sessionId != null) {
+                    MeasurementScreen(
+                        sessionId = sessionId,
+                        onResultClick = {
+                            navController.navigate(
+                                "${Routes.RESULT}/$sessionId"
+                            )
+                        },
+                        onBackClick = {
+                            navController.popBackStack()
+                        }
+                    )
+                }
             }
-        }
 
-        composable(
-            route = "${Routes.RESULT}/{sessionId}"
-        ) { backStackEntry ->
-            val sessionId = backStackEntry.arguments
-                ?.getString("sessionId")
-                ?.toLongOrNull()
+            composable(
+                route = "${Routes.RESULT}/{sessionId}"
+            ) { backStackEntry ->
+                val sessionId = backStackEntry.arguments
+                    ?.getString("sessionId")
+                    ?.toLongOrNull()
 
-            if (sessionId != null) {
-                ResultScreen(
-                    sessionId = sessionId,
-                    onBackClick = {
-                        navController.popBackStack()
-                    }
-                )
+                if (sessionId != null) {
+                    ResultScreen(
+                        sessionId = sessionId,
+                        onBackClick = {
+                            navController.popBackStack()
+                        }
+                    )
+                }
             }
         }
     }
 }
 ```
+
+Here the `Scaffold` sits around the `NavHost`.
+
+That gives the app a place for screen-level structure such as:
+
+```text
+top bar
+bottom bar
+floating action button
+snackbar
+content padding
+```
+
+For now, the `Scaffold` does not show a top bar or bottom bar yet.
+
+But it already gives the `NavHost` the `innerPadding` value:
+
+```kotlin
+modifier = Modifier.padding(innerPadding)
+```
+
+That means the screen content is drawn inside the content area managed by `Scaffold`.
 
 This is the core of Lesson 16.
 
@@ -1141,7 +1283,187 @@ The app now has multiple screens.
 
 ---
 
-## 19. Use `ResearchApp()` in `MainActivity`
+## 19. One Screen Can Open Different Screens
+
+The examples above move in a simple chain:
+
+```text
+Patient List
+ -> Patient Detail
+ -> Measurement
+ -> Result
+```
+
+But a real screen often has several buttons, and different buttons can open different screens.
+
+For example, the Patient List screen might have buttons for:
+
+```text
+open one patient's detail screen
+add a new patient
+open settings
+```
+
+The rule is:
+
+```text
+Each target screen needs a route.
+Each button calls a callback.
+ResearchApp decides which route that callback opens.
+NavHost contains the matching composable(...) destination.
+```
+
+In Section 7, we already gave each full screen a route name in `Routes`.
+
+Now we can use those route names from different buttons.
+
+Then the Patient List screen can receive several callbacks:
+
+```kotlin
+@Composable
+fun PatientListScreen(
+    onPatientClick: (Long) -> Unit,
+    onAddPatientClick: () -> Unit,
+    onSettingsClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.padding(16.dp)
+    ) {
+        Text("Patients")
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                onPatientClick(1L)
+            }
+        ) {
+            Text("Open Patient P001")
+        }
+
+        Button(
+            onClick = onAddPatientClick
+        ) {
+            Text("Add Patient")
+        }
+
+        Button(
+            onClick = onSettingsClick
+        ) {
+            Text("Settings")
+        }
+    }
+}
+```
+
+Inside the `NavHost` of `ResearchApp`, the Patient List route decides where each callback goes:
+
+```kotlin
+composable(Routes.PATIENT_LIST) {
+    PatientListScreen(
+        onPatientClick = { patientId ->
+            navController.navigate(
+                "${Routes.PATIENT_DETAIL}/$patientId"
+            )
+        },
+        onAddPatientClick = {
+            navController.navigate(Routes.ADD_PATIENT)
+        },
+        onSettingsClick = {
+            navController.navigate(Routes.SETTINGS)
+        }
+    )
+}
+```
+
+Because these callbacks navigate to `Routes.ADD_PATIENT` and `Routes.SETTINGS`, the same `NavHost` also needs matching destination routes for those screens:
+
+```kotlin
+composable(Routes.ADD_PATIENT) {
+    AddPatientScreen(
+        onSavePatientClick = { patientCode ->
+            // Later: viewModel.addPatient(patientCode)
+            navController.popBackStack()
+        },
+        onBackClick = {
+            navController.popBackStack()
+        }
+    )
+}
+
+composable(Routes.SETTINGS) {
+    SettingsScreen(
+        onBackClick = {
+            navController.popBackStack()
+        }
+    )
+}
+```
+
+Here are two simple destination screens:
+
+```kotlin
+@Composable
+fun AddPatientScreen(
+    onSavePatientClick: (String) -> Unit,
+    onBackClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.padding(16.dp)
+    ) {
+        Text("Add Patient")
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                onSavePatientClick("PAT_1003")
+            }
+        ) {
+            Text("Save Patient")
+        }
+
+        Button(
+            onClick = onBackClick
+        ) {
+            Text("Cancel")
+        }
+    }
+}
+
+@Composable
+fun SettingsScreen(
+    onBackClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.padding(16.dp)
+    ) {
+        Text("Settings")
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = onBackClick
+        ) {
+            Text("Back")
+        }
+    }
+}
+```
+
+The important idea is:
+
+```text
+PatientListScreen does not decide the route directly.
+It only reports what the user clicked.
+
+ResearchApp receives that click event.
+Then ResearchApp uses navController.navigate(...) to open the correct route.
+```
+
+---
+
+## 20. Use `ResearchApp()` in `MainActivity`
 
 In `MainActivity.kt`, instead of directly calling one screen:
 
@@ -1151,17 +1473,7 @@ setContent {
 }
 ```
 
-you now call:
-
-```kotlin
-setContent {
-    ResearchApp()
-}
-```
-
-So the app starts with the navigation system.
-
-A simplified `MainActivity`:
+you now call `ResearchApp()` inside a full-screen `Surface`:
 
 ```kotlin
 class MainActivity : ComponentActivity() {
@@ -1169,15 +1481,54 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            ResearchApp()
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .systemBarsPadding(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    ResearchApp()
+                }
+            }
         }
     }
 }
 ```
 
+Read it as:
+
+```text
+MaterialTheme:
+    use Material colors and typography
+
+Surface:
+    draw a full-screen app background
+
+systemBarsPadding():
+    keep the app content away from the status bar and navigation bar
+
+ResearchApp():
+    start the navigation system
+```
+
+So the outer structure is:
+
+```text
+MainActivity
+    MaterialTheme
+        Surface
+            ResearchApp
+                Scaffold
+                    NavHost
+                        current screen
+```
+
+So the app starts with the navigation system inside a proper screen container.
+
 ---
 
-## 20. If `ResearchApp()` Looks Blank or Clipped
+## 21. If `ResearchApp()` Looks Blank or Clipped
 
 When you first test `ResearchApp()`, you might wonder:
 
@@ -1201,78 +1552,41 @@ Text("Patients")
 
 may be drawn at the top edge and become hidden or clipped.
 
-Another useful habit is to wrap the navigation host in a full-screen `Surface`.
+A safer beginner structure is to use both `Surface` and `Scaffold`:
 
-The `Surface` gives the app a real Material container and a solid background color.
+```text
+Surface:
+    gives the whole app a full-screen background and safe outer padding
 
-A safer beginner version of `ResearchApp()` looks like this:
+Scaffold:
+    gives the app screen structure and passes innerPadding to NavHost
 
-```kotlin
-@Composable
-fun ResearchApp() {
-    val navController = rememberNavController()
+NavHost:
+    decides which screen is currently visible
+```
 
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        NavHost(
-            navController = navController,
-            startDestination = Routes.PATIENT_LIST
-        ) {
-            composable(Routes.PATIENT_LIST) {
-                PatientListScreen(
-                    onPatientClick = { patientId ->
-                        navController.navigate(
-                            "${Routes.PATIENT_DETAIL}/$patientId"
-                        )
-                    }
-                )
-            }
+The important beginner rule is:
 
-            // Other composable(...) routes go here.
-        }
-    }
-}
+```text
+NavHost decides which screen to show.
+Surface/Scaffold/padding decide where that screen is drawn.
 ```
 
 Required imports:
 
 ```kotlin
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 ```
 
-Read it as:
-
-```text
-fillMaxSize():
-    make the app content fill the whole available window
-
-systemBarsPadding():
-    keep content away from the status bar and navigation bar areas
-
-Surface:
-    draw a Material background behind the navigation content
-```
-
-If you use `Scaffold` later, the same idea appears as `innerPadding`.
-
-For now, the important beginner rule is:
-
-```text
-NavHost decides which screen to show.
-Surface/background/padding decide where that screen is drawn.
-```
-
 ---
 
-## 21. Why screen functions receive callbacks
+## 22. Why screen functions receive callbacks
 
 You may notice that screens do not directly call:
 
@@ -1311,7 +1625,7 @@ This keeps the screen more reusable and easier to test.
 
 ---
 
-## 22. Where should the ViewModel live?
+## 23. Where should the ViewModel live?
 
 This is an important question.
 
@@ -1355,7 +1669,7 @@ Do not try to solve everything at once.
 
 ---
 
-## 23. Passing IDs between screens
+## 24. Passing IDs between screens
 
 The most important thing in this lesson is passing IDs.
 
@@ -1404,13 +1718,16 @@ The next screen can use the ID to load the required data from Room.
 
 ---
 
-## 24. Current architecture after Lesson 16
+## 25. Current architecture after Lesson 16
 
 After this lesson, the app structure becomes:
 
 ```text
 MainActivity
+ -> MaterialTheme
+ -> Surface
  -> ResearchApp
+ -> Scaffold
  -> NavHost
     -> PatientListScreen
     -> PatientDetailScreen
@@ -1442,7 +1759,7 @@ This is closer to a real Android research app.
 
 ---
 
-## 25. What This Teaches You
+## 26. What This Teaches You
 
 This lesson is not mainly about making more UI pages.
 It teaches this mental model:
@@ -1470,7 +1787,7 @@ Result Screen
 
 This is much better than putting everything into one very large screen.
 
-## 26. What You Learned in Lesson 16
+## 27. What You Learned in Lesson 16
 
 The key patterns are:
 

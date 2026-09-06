@@ -398,6 +398,174 @@ But the code runs later.
 
 That difference between where code is written and when code runs is the heart of this note.
 
+### Passing a Callback Versus Calling a Function
+
+A common Kotlin question is:
+
+```text
+Why can I write this?
+
+onClick = onClear
+
+But inside another click block, why do I write this?
+
+startAcquisition()
+```
+
+The difference is:
+
+```text
+onClear:
+    pass the function itself
+
+onClear():
+    run the function now
+```
+
+For example, suppose a screen receives this callback:
+
+```kotlin
+@Composable
+fun MeasurementScreen(
+    onClear: () -> Unit
+) {
+    Button(
+        onClick = onClear
+    ) {
+        Text("Clear")
+    }
+}
+```
+
+`Button` expects `onClick` to receive a function with this shape:
+
+```kotlin
+() -> Unit
+```
+
+`onClear` already has that shape.
+
+So this means:
+
+```text
+Give the Button this function.
+Do not run it now.
+Run it later when the user clicks.
+```
+
+This is also valid:
+
+```kotlin
+Button(
+    onClick = {
+        onClear()
+    }
+) {
+    Text("Clear")
+}
+```
+
+Here the lambda is the callback given to the Button.
+
+When the user clicks, the lambda runs, and then `onClear()` runs inside it.
+
+But this is not correct:
+
+```kotlin
+Button(
+    onClick = onClear()
+) {
+    Text("Clear")
+}
+```
+
+Why?
+
+Because `onClear()` means:
+
+```text
+Run onClear immediately while Compose is building the UI.
+```
+
+But `onClick` does not want the result of running `onClear`.
+
+It wants a function that can be saved and run later.
+
+Now compare this with a button that must choose between two actions:
+
+```kotlin
+Button(
+    onClick = {
+        when {
+            uiState.acquisitionState == AcquisitionState.RECORDING -> {
+                stopAcquisition()
+            }
+
+            else -> {
+                startAcquisition()
+            }
+        }
+    }
+) {
+    Text("Start or Stop")
+}
+```
+
+Here, the outer `{ ... }` is already the callback passed to `onClick`.
+
+When the user clicks, that callback is running.
+
+Inside that running callback, you now want to execute the selected action.
+
+That is why you call:
+
+```kotlin
+startAcquisition()
+```
+
+not just:
+
+```kotlin
+startAcquisition
+```
+
+Simple comparison:
+
+```kotlin
+// Pass the function to Button.
+Button(onClick = onClear) {
+    Text("Clear")
+}
+
+// Same idea, but written with a lambda wrapper.
+Button(onClick = { onClear() }) {
+    Text("Clear")
+}
+
+// Use a lambda when the click needs extra logic.
+Button(
+    onClick = {
+        if (isRecording) {
+            stopAcquisition()
+        } else {
+            startAcquisition()
+        }
+    }
+) {
+    Text("Start or Stop")
+}
+```
+
+Beginner rule:
+
+```text
+If you are giving a function to another function to run later,
+you often pass the name without ().
+
+If you are already inside the event block and want the work to happen now,
+you call the function with ().
+```
+
 ## 5. The File Picker Timeline
 
 Now we can describe the whole export process accurately by connecting the code to the timing.

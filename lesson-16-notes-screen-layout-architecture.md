@@ -201,18 +201,23 @@ Example:
 fun ResearchApp() {
     val navController = rememberNavController()
 
-    NavHost(
-        navController = navController,
-        startDestination = Routes.PATIENT_LIST
-    ) {
-        composable(Routes.PATIENT_LIST) {
-            PatientListScreen(
-                onPatientClick = { patientId ->
-                    navController.navigate(
-                        "${Routes.PATIENT_DETAIL}/$patientId"
-                    )
-                }
-            )
+    Scaffold(
+        modifier = Modifier.fillMaxSize()
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = Routes.PATIENT_LIST,
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            composable(Routes.PATIENT_LIST) {
+                PatientListScreen(
+                    onPatientClick = { patientId ->
+                        navController.navigate(
+                            "${Routes.PATIENT_DETAIL}/$patientId"
+                        )
+                    }
+                )
+            }
         }
     }
 }
@@ -222,9 +227,14 @@ Read it as:
 
 ```text
 Create the navigation controller.
-Create the navigation graph via HavHosts.
+Create a Scaffold for app-level screen structure.
+Put the NavHost inside the Scaffold content area.
 For each route, say which screen to show.
 ```
+
+`innerPadding` comes from `Scaffold`.
+
+Passing it to `NavHost` helps the displayed screen avoid areas reserved by the `Scaffold`.
 
 ### Screen Composables
 
@@ -807,14 +817,19 @@ MainActivity
         Theme
             Surface
                 ResearchApp
-                    NavHost
-                        PatientListScreen
-                        PatientDetailScreen
-                        MeasurementScreen
-                        ResultScreen
+                    Scaffold
+                        NavHost
+                            PatientListScreen
+                            PatientDetailScreen
+                            MeasurementScreen
+                            ResultScreen
 ```
 
-The individual screens can use simple `Column` layouts.
+The individual screens can still use simple `Column` layouts.
+
+Here, `Surface` belongs around the whole app.
+
+`Scaffold` belongs around the `NavHost` because it manages the app screen area.
 
 ### Larger App Structure
 
