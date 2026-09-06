@@ -1,4 +1,4 @@
-# Lesson 3 - Classes, Data Classes, Null Safety, and Enums
+﻿# Lesson 3 - Classes, Data Classes, Null Safety, and Enums
 
 This lesson is especially important because these features appear constantly in Android code.
 
@@ -25,6 +25,7 @@ We will cover:
 - `val` and `var` inside classes
 - `val` and `var` for object variables versus object properties
 - functions inside classes
+- `object`
 - `companion object`
 - class inheritance
 - `data class`
@@ -318,7 +319,80 @@ Value: 2.45
 
 This means an object can store data and also have functions related to that data.
 
-## 6. Companion object
+## 6. The `object` keyword
+
+Normally, a `class` is a blueprint.
+
+You create objects from it:
+
+```kotlin
+class MeasurementPrinter {
+    fun printValue(value: Double) {
+        println("Value: $value")
+    }
+}
+
+val printer = MeasurementPrinter()
+printer.printValue(2.45)
+```
+
+The `object` keyword is different.
+
+It creates one ready-made object directly:
+
+```kotlin
+object MeasurementRules {
+    fun isValid(value: Double): Boolean {
+        return value >= 0.0
+    }
+}
+```
+
+Then you use it through its object name:
+
+```kotlin
+val valid = MeasurementRules.isValid(2.45)
+```
+
+You do not need to write:
+
+```kotlin
+val rules = MeasurementRules()
+```
+
+Simple mental model:
+
+```text
+class:
+    blueprint
+    can create many objects
+
+object:
+    one ready-made object
+    only one instance
+```
+
+Use `object` when you want one shared place for values or functions and you do not need many copies.
+
+For example:
+
+```kotlin
+object AppConstants {
+    const val DATABASE_NAME = "research_database"
+}
+```
+
+Then other code can use:
+
+```kotlin
+val name = AppConstants.DATABASE_NAME
+```
+
+You will also see `object` inside `companion object`.
+
+That is the next idea.
+
+## 7. Companion object
 
 Normally, you create an object first, then call functions on that object.
 
@@ -439,7 +513,7 @@ ClassName.functionName()
 
 when the function is inside a `companion object`.
 
-## 7. Class inheritance
+## 8. Class inheritance
 
 Sometimes one class needs to be a special kind of another class.
 
@@ -671,7 +745,7 @@ val researchViewModel: ResearchViewModel = ResearchViewModel()
 Here the variable type and the object type are exactly the same.
 
 
-## 8. data class
+## 9. data class
 
 For research data, you will very often want a class that mainly stores information.
 
@@ -699,7 +773,7 @@ val measurement = Measurement(
 
 Use a `data class` when the main purpose of the class is to hold data.
 
-## 9. Why use data class?
+## 10. Why use data class?
 
 Suppose:
 
@@ -732,7 +806,7 @@ Measurement(sampleId=S001, value=2.45)
 
 With a normal class, printing the object would not automatically give such useful output.
 
-## 10. Comparing data classes
+## 11. Comparing data classes
 
 Consider:
 
@@ -757,7 +831,7 @@ because Kotlin compares their stored values.
 
 This is very useful when comparing research records.
 
-## 11. copy()
+## 12. copy()
 
 Another useful data class feature is `copy()`.
 
@@ -787,7 +861,7 @@ while the other properties remain the same.
 
 You will see `copy()` often in modern Android development.
 
-## 12. Default parameter values
+## 13. Default parameter values
 
 Kotlin allows default values in functions.
 
@@ -841,7 +915,7 @@ Text(
 
 where many other parameters have defaults.
 
-## 13. Default values in a data class
+## 14. Default values in a data class
 
 You can also write default values in a data class.
 
@@ -870,7 +944,7 @@ valid = true
 
 Default values are useful when some information has a normal starting value, but other information still needs to be provided.
 
-## 14. A realistic measurement model
+## 15. A realistic measurement model
 
 For a research app, a measurement often needs more than one value.
 
@@ -900,7 +974,7 @@ val measurement = Measurement(
 
 You do not need to worry about timestamps deeply yet.
 
-## 15. Lists of objects
+## 16. Lists of objects
 
 Now combine Lesson 2 with Lesson 3.
 
@@ -962,7 +1036,7 @@ calculates the average.
 
 This style becomes very common in the research app.
 
-## 16. Null safety
+## 17. Null safety
 
 Now we get to one of the most important Kotlin concepts.
 
@@ -998,7 +1072,7 @@ The `?` means:
 This variable may contain either a String or null.
 ```
 
-## 17. Why null safety matters in Android
+## 18. Why null safety matters in Android
 
 Android code constantly deals with things that might not exist yet:
 
@@ -1030,7 +1104,7 @@ After a measurement:
 latestReading = 2.45
 ```
 
-## 18. Kotlin protects you from null errors
+## 19. Kotlin protects you from null errors
 
 Suppose:
 
@@ -1056,7 +1130,7 @@ You must explicitly handle that possibility.
 
 This is a major reason Kotlin is safer than Java.
 
-## 19. Safe-call operator ?.
+## 20. Safe-call operator ?.
 
 You can write:
 
@@ -1108,7 +1182,7 @@ null
 
 rather than crashing.
 
-## 20. A very common Android pattern
+## 21. A very common Android pattern
 
 Suppose:
 
@@ -1138,7 +1212,7 @@ This is safe, but usually you do not want to display `null` to the user.
 
 That is where the Elvis operator helps.
 
-## 21. Elvis operator ?:
+## 22. Elvis operator ?:
 
 Usually you do not want to display `null`.
 
@@ -1179,7 +1253,7 @@ Unknown device
 
 You will see this operator frequently.
 
-## 22. Combining ?. and ?:
+## 23. Combining ?. and ?:
 
 This is very common:
 
@@ -1204,7 +1278,7 @@ val displayValue = latestReading?.toString() ?: "No data"
 
 Very useful.
 
-## 23. Standard if null check
+## 24. Standard if null check
 
 You can also do:
 
@@ -1230,7 +1304,7 @@ to:
 String
 ```
 
-## 24. !! - non-null assertion
+## 25. !! - non-null assertion
 
 You will also encounter:
 
@@ -1288,7 +1362,7 @@ over:
 val deviceName = name!!
 ```
 
-## 25. A practical nullable measurement example
+## 26. A practical nullable measurement example
 
 Suppose:
 
@@ -1327,7 +1401,7 @@ Do not worry too much about `let` yet. We will encounter lambdas and scope funct
 
 The first `if` version is perfectly good while learning.
 
-## 26. enum class
+## 27. enum class
 
 Sometimes a value should only be one of a small fixed set of options.
 
@@ -1377,7 +1451,7 @@ Later:
 state = DeviceState.CONNECTED
 ```
 
-## 27. Enum constants are not strings
+## 28. Enum constants are not strings
 
 The items in an enum class are enum constants of type `DeviceState`, not `String` values.
 
@@ -1418,7 +1492,7 @@ val displayText = when (state) {
 }
 ```
 
-## 28. when + enum
+## 29. when + enum
 
 Enums work beautifully with `when`.
 
@@ -1445,7 +1519,7 @@ Because Kotlin knows you have handled every possible value of `DeviceState`.
 
 That is safer than using arbitrary strings.
 
-## 29. Research example
+## 30. Research example
 
 Now we can combine data classes, null safety, and enums.
 
@@ -1504,7 +1578,7 @@ val statusMessage = when (measurement.status) {
 
 This looks much more like real Android application code.
 
-## 30. A complete example
+## 31. A complete example
 
 ```kotlin
 enum class DeviceState {
@@ -1556,7 +1630,7 @@ Repetition: 1
 Value: 2.43
 ```
 
-## 31. What you need to remember from Lesson 3
+## 32. What you need to remember from Lesson 3
 
 If you remember only these patterns, you are doing well.
 
@@ -1585,6 +1659,20 @@ val measurement = Measurement(
     sampleId = "S001",
     value = 2.45
 )
+```
+
+Object keyword:
+
+```kotlin
+object AppConstants {
+    const val DATABASE_NAME = "research_database"
+}
+```
+
+Call an object function or value:
+
+```kotlin
+val name = AppConstants.DATABASE_NAME
 ```
 
 Companion object:
@@ -1656,7 +1744,7 @@ val message = when (state) {
 }
 ```
 
-## 32. One mental model for ?, ?., ?:, !!
+## 33. One mental model for ?, ?., ?:, !!
 
 This is worth memorizing:
 

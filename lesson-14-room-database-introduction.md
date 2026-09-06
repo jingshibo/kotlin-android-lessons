@@ -392,6 +392,16 @@ Data Access Object
 ```
 
 The DAO defines how we access the database.
+s
+Core idea:
+
+```text
+Entity:
+    what data exists as a table
+
+DAO:
+    what actions or questions the app can perform on that data
+```
 
 For our measurement table, create:
 
@@ -410,6 +420,60 @@ interface MeasurementDao {
     @Query("DELETE FROM measurements")
     suspend fun deleteAllMeasurements()
 }
+```
+
+When calling a DAO insert function, the app usually creates an entity object first, then passes that object into the DAO.
+
+Example:
+
+```kotlin
+// 1. Create a Measurement object.
+val newMeasurement = Measurement(
+    sampleId = "S001",
+    repetition = 1,
+    value = 2.45,
+    timestamp = System.currentTimeMillis(),
+    status = "OK"
+)
+
+// 2. Pass the object to the DAO function.
+measurementDao.insertMeasurement(newMeasurement)
+```
+
+Read it as:
+
+```text
+newMeasurement:
+    the Kotlin object we want to save
+
+measurementDao.insertMeasurement(newMeasurement):
+    asks Room to insert that object into the measurements table
+```
+
+After inserting data, the app can also call a DAO query function to read data back.
+
+Example:
+
+```kotlin
+// Ask Room to read all saved measurements.
+val savedMeasurements = measurementDao.getAllMeasurements()
+```
+
+This calls:
+
+```kotlin
+@Query("SELECT * FROM measurements ORDER BY timestamp ASC")
+suspend fun getAllMeasurements(): List<Measurement>
+```
+
+Read it as:
+
+```text
+measurementDao.getAllMeasurements():
+    asks Room to run the SELECT query
+
+savedMeasurements:
+    the List<Measurement> returned from the database
 ```
 
 Required imports:
@@ -431,6 +495,79 @@ Room’s documentation says DAOs contain methods that provide abstract access to
 ---
 
 ## 8. Understand the DAO functions
+
+Before reading each function, remember this rule:
+
+```text
+The function signature describes the input and output.
+The annotation tells Room what database action to perform.
+```
+
+For example:
+
+```kotlin
+@Query("SELECT * FROM measurements WHERE timestamp >= :startTime ORDER BY timestamp ASC")
+suspend fun getMeasurementsAfter(
+    startTime: Long
+): List<Measurement>
+```
+
+Read it like this:
+
+```text
+@Query(...)
+    Room should run this SQL command.
+
+getMeasurementsAfter(...)
+    This is the function name defined by us.
+    Room does not require this exact name.
+
+(startTime: Long): List<Measurement>
+    This function takes one input called startTime.
+    It returns a list of Measurement objects.
+
+:startTime
+    This placeholder in the SQL connects to the startTime function parameter.
+```
+
+For `@Query`, the SQL sentence does the database work:
+
+```sql
+SELECT * FROM measurements WHERE timestamp >= :startTime ORDER BY timestamp ASC
+```
+
+Room runs that query, gets rows from the `measurements` table, and converts those rows into `Measurement` objects because the return type is:
+
+```kotlin
+List<Measurement>
+```
+
+For `@Insert`, we do not write the SQL ourselves:
+
+```kotlin
+@Insert
+suspend fun insertMeasurement(
+    measurement: Measurement
+)
+```
+
+Room understands from `@Insert` and the `Measurement` parameter that it should insert one `Measurement` row into the `measurements` table.
+
+So:
+
+```text
+@Query:
+    you write the SQL sentence
+
+@Insert:
+    Room generates the insert SQL for you
+
+function name:
+    chosen by you to make the code readable
+
+parameters and return type:
+    tell Room what values go in and what result should come back
+```
 
 ### Insert one measurement
 
@@ -475,7 +612,7 @@ The SQL part is:
 SELECT * FROM measurements ORDER BY timestamp ASC
 ```
 
-"*" means select  all coumns. 
+"*" means select all columns.
 
 Do not worry too much about SQL yet. For now, understand:
 

@@ -1,337 +1,424 @@
-# Lesson 14 — Room Database Introduction
+# Lesson 15 Notes - Room Database Thinking Map
 
-In Lesson 13, we introduced the **Repository layer**.
+This note explains how to think when building and using a Room database.
 
-Before Lesson 13, the ViewModel was doing too much:
-
-```text
-ResearchViewModel
- ├── UI state
- ├── acquisition flow
- ├── fake data generation
- ├── file saving
- └── file loading
-```
-
-After Lesson 13, we started moving data-related work into:
+The main question is:
 
 ```text
-MeasurementRepository
+How do I go from real app data to Room tables, DAO functions, database class, and app usage?
 ```
 
-Now we take the next step.
+The simple mental order is:
 
-So far, our app has used simple internal file storage and CSV-style saving. That is useful for learning, and the original tutorial already introduced internal storage as a beginner-friendly auto-save method. fileciteturn1file0L397-L405
+1. What real-world things does the app store?
+2. What table should each thing become?
+3. What fields should each table have?
+4. What is the primary key?
+5. What relationships exist between tables?
+6. What operations does the app need?
+7. What DAO functions support those operations?
+8. What entities and DAOs must the database class include?
+9. How does the repository get the database and call the DAOs?
+10. What IDs must be passed between steps?
 
-But for a more serious research app, simple files may become inconvenient.
-
-For example, later we may need to store lots of structural dataset:
-
-```text
-patients
-sessions
-measurements
-results
-timestamps
-device information
-model predictions
-export history
-```
-
-For that, Android commonly uses **Room**.
-
-Room is a persistence library that provides an abstraction layer over SQLite. Google recommends using Room instead of working directly with the low-level SQLite APIs, because Room gives benefits such as compile-time SQL checking, useful annotations, and better migration support. citeturn172874view0
-
----
-
-## 1. Why do we need Room?
-
-Our current file-based storage is roughly like this:
-
-```text
-measurements.csv
-```
-
-That is simple and useful.
-
-But imagine your app becomes more realistic:
-
-```text
-Patient A
- ├── Session 1
- │    ├── Measurement 1
- │    ├── Measurement 2
- │    └── Result
- └── Session 2
-      ├── Measurement 1
-      ├── Measurement 2
-      └── Result
-
-Patient B
- └── Session 1
-      ├── Measurement 1
-      └── Result
-```
-
-If everything is just one CSV file, it becomes harder to answer questions like:
-
-```text
-Which measurements belong to this session?
-Which sessions belong to this patient?
-What was the latest session?
-Which data has not been exported yet?
-Which measurements produced an abnormal result?
-```
-
-A database is better for this kind of structured data.
-
-Room helps us use a database in an Android-friendly way.
-
----
-
-## 2. Room is not the same as CSV export
-
-This is important.
-
-Room is for **local structured storage inside the app**.
-
-CSV export is for **sharing data outside the app**.
-
-So we should not think:
-
-```text
-Room replaces CSV export completely.
-```
-
-A better model is:
-
-```text
-Room
- ↓
-stores app data locally and structurally
-
-CSV export
- ↓
-exports selected data for Excel, Python, backup, or analysis
-```
-
-For a research app, both are useful.
-
-```text
-Room = app's internal database
-CSV/JSON = external research data export
-```
-
----
-
-## 3. The three main parts of Room
-
-Room has three main components:
+Room can feel complicated because there are several files, but each file has a different job.
 
 ```text
 Entity
-DAO
-Database
-```
-
-Google’s Room documentation describes these three major components as data entities, data access objects or DAOs, and the database class. The database class gives access to the DAOs; DAOs provide functions for querying, inserting, updating, and deleting data. citeturn172874view0
-
-For our research app:
-
-```text
-Entity
- ↓
-What does one database table look like?
+    describes table structure
 
 DAO
- ↓
-What operations can we perform on that table?
+    describes database operations
 
-Database
- ↓
-The main Room database object that connects everything.
+Database class
+    connects multiple entities and DAOs into one Room database
+
+Repository
+    gives the rest of the app a cleaner way to call the database
+
+ViewModel
+    decides when to call the repository based on user actions
+
+UI
+    shows data and sends user events to the ViewModel
 ```
 
-Let us go through them one by one.
+## 1. Start from the app's real data
 
----
+Before writing Room code, think about the real things your app needs to remember.
 
-## 4. Entity
-
-An entity is a Kotlin class that represents a table in the database.
-
-Room documentation explains that each entity corresponds to a table, and each instance of an entity represents a row in that table. citeturn172874view1
-
-For our app, we want to store measurements.
-
-So we can create:
-
-```kotlin
-@Entity(tableName = "measurements") // @Entity marks a class as a database table.
-data class Measurement // Measurement becomes a row in the table and each entry becomes a column
-    @PrimaryKey(autoGenerate = true) // @PrimaryKey marks the unique ID column.
-    val id: Long = 0,
-    val sampleId: String,
-    val repetition: Int,
-    val value: Double,
-    val timestamp: Long,
-    val status: String
-)
-```
-
-This looks similar to our previous `Measurement` data class, but now we added Room annotations.
-
-The annotation:
-
-```kotlin
-@Entity(tableName = "measurements")
-```
-
-means:
+For the research app, the important things are:
 
 ```text
-Create a database table called measurements.
+Patient
+Session
+Measurement
+Result
 ```
 
-The annotation:
-
-```kotlin
-@PrimaryKey(autoGenerate = true)
-val id: Long = 0
-```
-
-means:
+Then ask:
 
 ```text
-Each measurement row needs a unique ID.
-Room can generate this ID automatically.
+Should this thing have its own table?
 ```
 
-The other properties become columns:
+Usually, if the thing can exist as its own record, it should probably have its own table.
+
+For example:
 
 ```text
-sampleId
-repetition
-value
-timestamp
-status
+One patient can have many sessions.
+One session can have many measurements.
+One session can have one or more results.
 ```
 
-So this class:
+That is why Lesson 15 uses multiple tables instead of one giant measurement table.
 
-```kotlin
-Measurement(...)
+In Android project terms, this usually becomes several Kotlin files:
+
+```text
+data/local/PatientEntity.kt
+data/local/SessionEntity.kt
+data/local/MeasurementEntity.kt
+data/local/ResultEntity.kt
+
+data/local/PatientDao.kt
+data/local/SessionDao.kt
+data/local/MeasurementDao.kt
+data/local/ResultDao.kt
+
+data/local/ResearchDatabase.kt
+data/MeasurementRepository.kt
+ui/ResearchViewModel.kt
+ui/ResearchScreen.kt
 ```
 
-becomes a row in the database.
+You do not need to create every file at once, but this is the shape you are slowly building toward.
 
----
+## 2. Design the entity first
 
-## 5. Important note about `id`
+An entity answers this question:
 
-Previously, our `Measurement` had:
-
-```kotlin
-val sampleId: String
-val repetition: Int
-val value: Double
-val timestamp: Long
-val status: String
+```text
+What should one row in this table look like?
 ```
 
-Now we added:
+For example, one patient row might need:
 
-```kotlin
-val id: Long = 0
+```text
+id
+patientCode
+notes
+createdAt
 ```
 
-Why?
-
-Because database tables usually need a unique identifier for each row.
-
-For example, two measurements may have the same sample ID and even similar values.
-
-So Room needs a stable way to identify each row.
-
-When we create a new measurement, we can still write:
-
-```kotlin
-Measurement(
-    sampleId = "S001",
-    repetition = 1,
-    value = 2.45,
-    timestamp = System.currentTimeMillis(),
-    status = "OK"
-)
-```
-
-We do not need to manually provide `id`, because the default value is:
-
-```kotlin
-id = 0
-```
-
-Room will generate the real ID when inserting it.
-
----
-
-## 6. Required imports for the entity
-
-With current Room 3 style, the imports are:
+So we create:
 
 ```kotlin
 import androidx.room3.Entity
 import androidx.room3.PrimaryKey
 ```
 
-You may see older tutorials using:
-
 ```kotlin
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+@Entity(tableName = "patients")
+data class PatientEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    val patientCode: String,
+    val notes: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
 ```
 
-That is from Room 2.x. Current Room 3 uses the `androidx.room3` package and Room 3 requires KSP for annotation processing. citeturn172874view4
-
-For this tutorial, the main concept is the same:
+Then one session row might need:
 
 ```text
-@Entity marks a class as a database table.
-@PrimaryKey marks the unique ID column.
+id
+patientId
+sessionName
+startedAt
+endedAt
 ```
 
----
-
-## 7. DAO
-
-DAO means:
-
-```text
-Data Access Object
-```
-
-The DAO defines how we access the database.
-
-For our measurement table, create:
+So we create:
 
 ```kotlin
-@Dao
-interface MeasurementDao {
+@Entity(tableName = "sessions")
+data class SessionEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
 
-    @Insert
-    suspend fun insertMeasurement(
-        measurement: Measurement
-    )
-
-    @Query("SELECT * FROM measurements ORDER BY timestamp ASC")
-    suspend fun getAllMeasurements(): List<Measurement>
-
-    @Query("DELETE FROM measurements")
-    suspend fun deleteAllMeasurements()
-}
+    val patientId: Long,
+    val sessionName: String,
+    val startedAt: Long = System.currentTimeMillis(),
+    val endedAt: Long? = null
+)
 ```
 
-Required imports:
+Then one measurement row might need:
+
+```text
+id
+sessionId
+repetition
+value
+timestamp
+status
+```
+
+So we create:
+
+```kotlin
+@Entity(tableName = "measurements")
+data class MeasurementEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    val sessionId: Long,
+    val repetition: Int,
+    val value: Double,
+    val timestamp: Long = System.currentTimeMillis(),
+    val status: String = "OK"
+)
+```
+
+When designing an entity, ask:
+
+- Which field uniquely identifies this row?
+- Which fields are shown to the user?
+- Which fields connect this table to another table?
+- Which fields can be empty or unknown?
+- Which fields are timestamps or status values?
+
+In this tutorial:
+
+```text
+id
+    internal database ID
+
+patientCode
+    readable code for the user, such as P001
+
+patientId
+    foreign-key-style value that points to PatientEntity.id
+
+sessionId
+    foreign-key-style value that points to SessionEntity.id
+```
+
+## 3. Decide the primary key
+
+Every Room entity needs a primary key.
+
+The primary key answers:
+
+```text
+How does the database uniquely identify one row?
+```
+
+The common beginner-friendly choice is:
+
+```kotlin
+@PrimaryKey(autoGenerate = true)
+val id: Long = 0
+```
+
+This means:
+
+```text
+When I create a new object, id starts as 0.
+When Room inserts it, SQLite gives it a real ID.
+```
+
+For example:
+
+```text
+Before insert:
+id = 0
+
+After insert:
+id = 1
+```
+
+This internal ID is usually not what the user sees.
+
+The user sees:
+
+```text
+patientCode = P001
+```
+
+The database uses:
+
+```text
+id = 1
+```
+
+### Primary Key Versus Unique Rule
+
+Important: there are two related but different uniqueness ideas.
+
+```text
+Primary key:
+    identifies one row
+    must be unique
+    commonly uses an auto-generated id
+
+Unique rule:
+    prevents some other field or field combination from repeating
+    can be added with a unique index
+```
+
+For example, a session can still use an auto-generated `id` as its primary key:
+
+```kotlin
+@PrimaryKey(autoGenerate = true)
+val id: Long = 0
+```
+
+but also have a separate rule that says:
+
+```text
+The same patient/device/day combination must not appear twice.
+```
+
+In Room, that separate rule can be written with `Index(..., unique = true)`:
+
+```kotlin
+@Entity(
+    tableName = "sessions",
+    indices = [
+        Index(
+            value = ["patientId", "deviceId", "recordingDay"],
+            unique = true
+        )
+    ]
+)
+data class SessionEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    val patientId: Long,
+    val deviceId: Long,
+    val recordingDay: String
+)
+```
+
+So `id` is still the primary key.
+
+The unique index is an extra database rule that prevents duplicate `patientId + deviceId + recordingDay` combinations.
+
+## 4. Think about relationships between tables
+
+A relationship answers:
+
+```text
+How does one table point to another table?
+```
+
+For example:
+
+```text
+Session belongs to Patient.
+Measurement belongs to Session.
+Result belongs to Session.
+```
+
+So the child table stores the parent table's ID.
+
+```text
+SessionEntity.patientId stores PatientEntity.id.
+MeasurementEntity.sessionId stores SessionEntity.id.
+ResultEntity.sessionId stores SessionEntity.id.
+```
+
+This is the core logic:
+
+```text
+Parent row has id = 5.
+Child row stores parentId = 5.
+Now the child belongs to that parent.
+```
+
+The name `sessionId` helps humans understand the code, but the actual link is the matching number.
+
+Room can also enforce the relationship with `ForeignKey`, but even then your app still needs to pass the correct ID when creating child rows.
+
+In code, the basic version looks like this:
+
+```kotlin
+data class MeasurementEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    val sessionId: Long,
+    val repetition: Int,
+    val value: Double
+)
+```
+
+The stricter Room-enforced version looks like this:
+
+```kotlin
+import androidx.room3.Entity
+import androidx.room3.ForeignKey
+import androidx.room3.Index
+import androidx.room3.PrimaryKey
+```
+
+```kotlin
+@Entity(
+    tableName = "measurements",
+    foreignKeys = [
+        ForeignKey(
+            entity = SessionEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["sessionId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["sessionId"])
+    ]
+)
+data class MeasurementEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    val sessionId: Long,
+    val repetition: Int,
+    val value: Double
+)
+```
+
+Read the foreign key from left to right:
+
+```text
+SessionEntity.id
+    parent value
+
+MeasurementEntity.sessionId
+    child value that must match the parent value
+```
+
+## 5. Design the DAO after the entity
+
+After the table structure is clear, ask:
+
+```text
+What does the app need to do with this table?
+```
+
+For a patient table, the app may need to:
+
+```text
+insert a new patient
+get all patients
+find one patient by patientCode
+```
+
+So the DAO has functions like:
 
 ```kotlin
 import androidx.room3.Dao
@@ -339,1099 +426,1136 @@ import androidx.room3.Insert
 import androidx.room3.Query
 ```
 
-The DAO is very important.
-
-The ViewModel or repository should not directly write SQL everywhere.
-
-Instead, they call DAO functions.
-
-Room’s documentation says DAOs contain methods that provide abstract access to the database, and Room generates the DAO implementations at compile time. citeturn172874view2
-
----
-
-## 8. Understand the DAO functions
-
-### Insert one measurement
-
 ```kotlin
-@Insert
-suspend fun insertMeasurement(
-    measurement: Measurement
-)
-```
+@Dao
+interface PatientDao {
 
-This means:
+    @Insert
+    suspend fun insertPatient(
+        patient: PatientEntity
+    ): Long
 
-```text
-Insert this Measurement object into the measurements table.
-```
+    @Query("SELECT * FROM patients ORDER BY createdAt DESC")
+    suspend fun getAllPatients(): List<PatientEntity>
 
-The `@Insert` annotation tells Room:
-
-```text
-This function inserts data.
-```
-
----
-
-### Read all measurements
-
-```kotlin
-@Query("SELECT * FROM measurements ORDER BY timestamp ASC")
-suspend fun getAllMeasurements(): List<Measurement>
-```
-
-This means:
-
-```text
-Read all rows from the measurements table,
-ordered by timestamp from oldest to newest.
-```
-
-The SQL part is:
-
-```sql
-SELECT * FROM measurements ORDER BY timestamp ASC
-```
-
-Do not worry too much about SQL yet.
-
-For now, understand:
-
-```text
-SELECT * FROM measurements
- ↓
-get all measurements
-
-ORDER BY timestamp ASC
- ↓
-sort them by time
-```
-
-Room validates SQL queries at compile time, so query problems can be caught while building the app rather than only failing at runtime. citeturn172874view2
-
----
-
-### Delete all measurements
-
-```kotlin
-@Query("DELETE FROM measurements")
-suspend fun deleteAllMeasurements()
-```
-
-This means:
-
-```text
-Remove all saved measurements from the table.
-```
-
-This may be useful for a simple learning app.
-
-Later, for a real research app, we may not delete everything so casually.
-
-Instead, we may delete by session:
-
-```text
-delete measurements from Session 3 only
-```
-
-But not yet.
-
----
-
-## 9. Why DAO functions are `suspend`
-
-You may notice:
-
-```kotlin
-suspend fun insertMeasurement(...)
-suspend fun getAllMeasurements()
-suspend fun deleteAllMeasurements()
-```
-
-This connects directly to Lesson 10.
-
-Database operations should not block the UI.
-
-Room supports coroutines, and its documentation says one-shot read/write DAO queries use `suspend`, while observable reads can use `Flow`. citeturn172874view3
-
-For now, use:
-
-```kotlin
-suspend
-```
-
-for basic insert/read/delete DAO functions.
-
-This means we can call them inside:
-
-```kotlin
-viewModelScope.launch {
-    ...
+    @Query("SELECT * FROM patients WHERE patientCode = :patientCode LIMIT 1")
+    suspend fun getPatientByCode(
+        patientCode: String
+    ): PatientEntity?
 }
 ```
 
-or inside repository functions that are also `suspend`.
+Think of the entity as the noun and the DAO as the verbs.
 
----
+```text
+Entity:
+    What data exists?
 
-## 10. Database class
+DAO:
+    What can we do with that data?
+```
 
-Now we need the Room database class.
+### One-table DAOs and multi-table queries
 
-Create:
+A DAO is not only for one table, but beginners often start that way.
+
+Beginner pattern:
+
+```text
+PatientEntity:
+    PatientDao
+
+SessionEntity:
+    SessionDao
+
+MeasurementEntity:
+    MeasurementDao
+
+ResultEntity:
+    ResultDao
+```
+
+This is a good starting point because many app questions are simple table questions:
+
+```text
+Given a patientCode, find one patient in the patients table.
+    -> PatientDao.getPatientByCode(patientCode)
+
+Given a patientId, find all sessions for that patient.
+    -> SessionDao.getSessionsForPatient(patientId)
+
+Given a sessionId, insert one measurement for that session.
+    -> MeasurementDao.insertMeasurement(measurement)
+```
+
+But a DAO method can also answer a question that crosses multiple tables.
+
+For example, suppose the app asks:
+
+```text
+Show all measurements for patient P001.
+```
+
+That question crosses this path:
+
+```text
+patients -> sessions -> measurements
+```
+
+So a DAO method may use a join:
+
+```kotlin
+@Query("""
+    SELECT measurements.*
+    FROM measurements
+    INNER JOIN sessions ON measurements.sessionId = sessions.id
+    INNER JOIN patients ON sessions.patientId = patients.id
+    WHERE patients.patientCode = :patientCode
+""")
+suspend fun getMeasurementsForPatientCode(
+    patientCode: String
+): List<MeasurementEntity>
+```
+
+This kind of function could live in a purpose-based DAO, such as:
+
+```text
+ResearchQueryDao
+ExportDao
+ReportDao
+```
+
+The better rule is:
+
+```text
+A DAO method belongs wherever the database question naturally fits.
+```
+
+A useful way to design DAO methods is to write a sentence first:
+
+```text
+Given ______, I want to ______ from/in ______.
+```
+
+Then turn that sentence into a DAO function:
+
+```text
+Given a patientCode, get all measurements across that patient's sessions.
+    -> ResearchQueryDao.getMeasurementsForPatientCode(patientCode)
+```
+
+So the mental model is:
+
+```text
+Table/entity:
+    What kind of data exists?
+
+DAO method:
+    What exact database action or question do I need?
+
+Repository method:
+    What app-level workflow uses those DAO actions?
+```
+
+For Lesson 15, use this beginner rule:
+
+```text
+Use one DAO per table for basic insert/query/update/delete.
+Add combined-query DAO methods only when the app asks a question that naturally crosses tables.
+```
+
+For the session table, the app may need to:
+
+```text
+insert a session
+get all sessions for one patient
+mark a session as ended
+```
+
+So the DAO might be:
+
+```kotlin
+@Dao
+interface SessionDao {
+
+    @Insert
+    suspend fun insertSession(
+        session: SessionEntity
+    ): Long
+
+    @Query("SELECT * FROM sessions WHERE patientId = :patientId ORDER BY startedAt DESC")
+    suspend fun getSessionsForPatient(
+        patientId: Long
+    ): List<SessionEntity>
+
+    @Query("UPDATE sessions SET endedAt = :endedAt WHERE id = :sessionId")
+    suspend fun endSession(
+        sessionId: Long,
+        endedAt: Long
+    )
+}
+```
+
+For the measurement table, the app may need to:
+
+```text
+insert a measurement
+get measurements for one session
+delete measurements for one session
+```
+
+So the DAO might be:
+
+```kotlin
+@Dao
+interface MeasurementDao {
+
+    @Insert
+    suspend fun insertMeasurement(
+        measurement: MeasurementEntity
+    ): Long
+
+    @Query("SELECT * FROM measurements WHERE sessionId = :sessionId ORDER BY timestamp ASC")
+    suspend fun getMeasurementsForSession(
+        sessionId: Long
+    ): List<MeasurementEntity>
+
+    @Query("DELETE FROM measurements WHERE sessionId = :sessionId")
+    suspend fun deleteMeasurementsForSession(
+        sessionId: Long
+    )
+}
+```
+
+Notice how the function parameters match the SQL placeholders:
+
+```text
+:patientId uses the function parameter patientId
+:sessionId uses the function parameter sessionId
+:endedAt uses the function parameter endedAt
+```
+
+## 6. Create the database class
+
+The database class answers:
+
+```text
+Which tables and DAOs belong to this Room database?
+```
+
+For Lesson 15:
 
 ```kotlin
 @Database(
-    entities = [Measurement::class], // This database contains the Measurement table.
-    version = 1 // The current database version is 1.
+    entities = [
+        PatientEntity::class,
+        SessionEntity::class,
+        MeasurementEntity::class,
+        ResultEntity::class
+    ],
+    version = 1
 )
 abstract class ResearchDatabase : RoomDatabase() {
-    abstract fun measurementDao(): MeasurementDao // The database can provide a MeasurementDao.
+    abstract fun patientDao(): PatientDao
+    abstract fun sessionDao(): SessionDao
+    abstract fun measurementDao(): MeasurementDao
+    abstract fun resultDao(): ResultDao
 }
 ```
 
-Required imports:
+This class does not usually contain app logic.
+
+It mainly says:
+
+```text
+These are my tables.
+These are my DAO access points.
+This is my database version.
+```
+
+If you create a new entity but forget to add it to `entities`, Room does not know it belongs to the database.
+
+If you create a new DAO but forget to expose it with an abstract function, the repository cannot access it through the database object.
+
+In a real Android app, you often create the database as a singleton so the app does not accidentally open many database instances:
 
 ```kotlin
+import android.content.Context
 import androidx.room3.Database
+import androidx.room3.Room
 import androidx.room3.RoomDatabase
 ```
 
-This means:
+```kotlin
+@Database(
+    entities = [
+        PatientEntity::class,
+        SessionEntity::class,
+        MeasurementEntity::class,
+        ResultEntity::class
+    ],
+    version = 1
+)
+abstract class ResearchDatabase : RoomDatabase() {
+    abstract fun patientDao(): PatientDao
+    abstract fun sessionDao(): SessionDao
+    abstract fun measurementDao(): MeasurementDao
+    abstract fun resultDao(): ResultDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: ResearchDatabase? = null
+
+        fun getDatabase(context: Context): ResearchDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    ResearchDatabase::class.java,
+                    "research_database"
+                ).build()
+
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
+}
+```
+
+This is a common Room singleton pattern.
+
+You can mostly reuse this structure in other Room projects.
+
+The parts that usually change are:
 
 ```text
-This database contains the Measurement table.
-The current database version is 1.
-The database can provide a MeasurementDao.
+ResearchDatabase
+    your database class name
+
+"research_database"
+    your database file name
 ```
 
-This part:
+So if your database class is called `AppDatabase`, the pattern would use:
 
 ```kotlin
-entities = [Measurement::class]
+private var INSTANCE: AppDatabase? = null
 ```
 
-tells Room:
-
-```text
-The Measurement entity belongs to this database.
-```
-
-This part:
+and:
 
 ```kotlin
-abstract fun measurementDao(): MeasurementDao
+AppDatabase::class.java
+```
+
+### Read this part slowly: companion object
+
+```kotlin
+companion object
 ```
 
 means:
 
 ```text
-Give me access to measurement database operations.
+This belongs to the ResearchDatabase class itself,
+not to one specific ResearchDatabase object.
 ```
 
----
-
-## 11. How the pieces connect
-
-Now the Room structure is:
-
-```text
-Measurement
- ↓
-Entity/table
-
-MeasurementDao
- ↓
-insert/read/delete measurements
-
-ResearchDatabase
- ↓
-main database object that gives access to MeasurementDao
-```
-
-The flow is:
-
-```text
-Repository
- ↓
-MeasurementDao
- ↓
-ResearchDatabase
- ↓
-SQLite database on the tablet
-```
-
-So the full architecture is becoming:
-
-```text
-ResearchScreen
- ↓
-ResearchViewModel
- ↓
-MeasurementRepository
- ↓
-MeasurementDao
- ↓
-ResearchDatabase
- ↓
-local database file
-```
-
-This is much more realistic.
-
----
-
-## 12. Creating the database instance
-
-To use the database, we need to create it.
-
-For a beginner version, we can do this inside the repository.
+So other code can call:
 
 ```kotlin
-class MeasurementRepository(
-    context: Context
-) {
-    private val database = Room.databaseBuilder(
-        context.applicationContext,
-        ResearchDatabase::class.java,
-        "research_database"
-    ).build()
-
-    private val measurementDao = database.measurementDao()
-
-    suspend fun insertMeasurement(
-        measurement: Measurement
-    ) {
-        measurementDao.insertMeasurement(measurement)
-    }
-
-    suspend fun getAllMeasurements(): List<Measurement> {
-        return measurementDao.getAllMeasurements()
-    }
-
-    suspend fun deleteAllMeasurements() {
-        measurementDao.deleteAllMeasurements()
-    }
-}
+ResearchDatabase.getDatabase(context)
 ```
 
-Required imports:
+without first creating a `ResearchDatabase` manually.
+
+This line stores the one shared database object:
 
 ```kotlin
-import android.content.Context
-import androidx.room3.Room
+private var INSTANCE: ResearchDatabase? = null
 ```
 
-Notice this:
+At the beginning, it is `null` because the database has not been created yet.
+
+After Room creates the database, we save it in `INSTANCE`.
+
+Then next time, the app reuses the same database object instead of building another one.
+
+This part:
 
 ```kotlin
+return INSTANCE ?: synchronized(this) {
+```
+
+means:
+
+```text
+If INSTANCE already exists, return it.
+If INSTANCE is still null, enter the synchronized block and create it.
+```
+
+The `synchronized(this)` block prevents two threads from creating the database at the same time.
+
+This part creates the actual Room database:
+
+```kotlin
+val instance = Room.databaseBuilder(
+    context.applicationContext,
+    ResearchDatabase::class.java,
+    "research_database"
+).build()
+```
+
+The three important arguments are:
+
+```text
 context.applicationContext
+    the Android app context used to create the database safely
+
+ResearchDatabase::class.java
+    the database class Room should build
+
+"research_database"
+    the database file name stored on the device
 ```
 
-This is safer than storing an Activity context.
-
-In Lesson 13, we already mentioned that storing Activity-related context in long-lived classes can be problematic. For database creation, using application context is the safer beginner-friendly option.
-
----
-
-## 13. Important change from Lesson 13
-
-In Lesson 13, the repository had this style:
+This part saves the newly created database:
 
 ```kotlin
-class MeasurementRepository {
-
-    suspend fun saveMeasurements(
-        context: Context,
-        measurements: List<Measurement>
-    ) {
-        ...
-    }
-
-    suspend fun loadMeasurements(
-        context: Context
-    ): List<Measurement> {
-        ...
-    }
-}
+INSTANCE = instance
 ```
 
-Now with Room, the repository is created with a `Context` once:
+And this last line returns it:
 
 ```kotlin
-class MeasurementRepository(
-    context: Context
-) {
-    ...
-}
+instance
 ```
 
-Then the repository functions no longer need `context` every time:
+The `@Volatile` annotation helps make sure different threads see the latest value of `INSTANCE`.
 
-```kotlin
-suspend fun insertMeasurement(measurement: Measurement)
+You do not need to fully master `@Volatile` and `synchronized` yet.
 
-suspend fun getAllMeasurements(): List<Measurement>
-```
-
-This is cleaner.
-
-The repository owns the database connection.
-
----
-
-## 14. But how do we create the repository in the ViewModel?
-
-Here we meet one beginner complication.
-
-Previously, our ViewModel could simply do:
-
-```kotlin
-private val measurementRepository = MeasurementRepository()
-```
-
-But now the repository needs:
-
-```kotlin
-context: Context
-```
-
-A normal `ViewModel` should not directly receive Activity context.
-
-For a simple learning app, we can use `AndroidViewModel`, which gives access to the application.
-
-```kotlin
-class ResearchViewModel(
-    application: Application
-) : AndroidViewModel(application) {
-
-    private val measurementRepository =
-        MeasurementRepository(application)
-
-    var uiState by mutableStateOf(ResearchUiState())
-        private set
-
-    ...
-}
-```
-
-Required imports:
-
-```kotlin
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
-```
-
-This is not the only way.
-
-A more professional app may use dependency injection later.
-
-But for this tutorial, this is a practical beginner-friendly path.
-
-The mental model is:
+For now, remember the practical idea:
 
 ```text
-Application context
- ↓
-Repository
- ↓
-Room database
+Create the Room database once.
+Reuse the same database instance everywhere.
 ```
 
----
 
-## 15. Insert measurement into Room
-
-In Lesson 13, after creating a measurement, we saved the whole list.
-
-With Room, we can insert only the new measurement.
-
-Previously:
+The important idea is:
 
 ```text
-create new measurement
- ↓
-append to list
- ↓
-save entire list to file
+Database class
+    knows which entities exist
+    exposes the DAO objects
+    creates or returns the Room database instance
 ```
 
-Now:
+## 7. Use the database through the repository
 
-```text
-create new measurement
- ↓
-insert only this new measurement into Room
- ↓
-update UI state
-```
+After the database class exists, the app needs to use it.
 
-Inside the ViewModel:
+The repository usually gets the database instance:
 
 ```kotlin
-private fun addSimulatedMeasurement() {
-    val newMeasurement = measurementRepository.createSimulatedMeasurement(
-        sampleId = uiState.sampleId,
-        repetition = uiState.measurements.size + 1
+private val database = ResearchDatabase.getDatabase(context)
+```
+
+Then it gets DAO objects from the database:
+
+```kotlin
+private val patientDao = database.patientDao()
+private val sessionDao = database.sessionDao()
+private val measurementDao = database.measurementDao()
+private val resultDao = database.resultDao()
+```
+
+Then repository functions call DAO functions.
+
+A small repository function can look like this:
+
+```kotlin
+suspend fun createSessionForPatient(
+    patientId: Long,
+    sessionName: String
+): Long {
+    return sessionDao.insertSession(
+        SessionEntity(
+            patientId = patientId,
+            sessionName = sessionName
+        )
     )
-
-    viewModelScope.launch {
-        try {
-            measurementRepository.insertMeasurement(newMeasurement)
-
-            val updatedMeasurements =
-                measurementRepository.getAllMeasurements()
-
-            uiState = uiState.copy(
-                measurements = updatedMeasurements,
-                latestValue = newMeasurement.value,
-                message = "Measurement saved to database"
-            )
-        } catch (e: Exception) {
-            uiState = uiState.copy(
-                message = "Database save failed"
-            )
-        }
-    }
 }
 ```
 
-But this assumes the repository still has:
-
-```kotlin
-createSimulatedMeasurement(...)
-```
-
-So we can keep that function in the repository for now.
-
----
-
-## 16. Updated repository with simulation and Room
-
-A simple Lesson 14 repository can look like this:
+A more complete repository flow can show the real multi-table logic:
 
 ```kotlin
 class MeasurementRepository(
     context: Context
 ) {
-    private val database = Room.databaseBuilder(
-        context.applicationContext,
-        ResearchDatabase::class.java,
-        "research_database"
-    ).build()
+    private val database = ResearchDatabase.getDatabase(context)
 
+    private val patientDao = database.patientDao()
+    private val sessionDao = database.sessionDao()
     private val measurementDao = database.measurementDao()
 
-    fun createSimulatedMeasurement(
-        sampleId: String,
-        repetition: Int
-    ): Measurement {
-        val value = Random.nextDouble(0.0, 5.0)
+    suspend fun getPatientByCode(
+        patientCode: String
+    ): PatientEntity? {
+        return patientDao.getPatientByCode(patientCode)
+    }
 
-        return Measurement(
-            sampleId = sampleId,
-            repetition = repetition,
-            value = value,
-            timestamp = System.currentTimeMillis(),
-            status = "OK"
+    suspend fun createSessionForPatient(
+        patientId: Long,
+        sessionName: String
+    ): Long {
+        return sessionDao.insertSession(
+            SessionEntity(
+                patientId = patientId,
+                sessionName = sessionName
+            )
         )
     }
 
-    suspend fun insertMeasurement(
-        measurement: Measurement
-    ) {
-        measurementDao.insertMeasurement(measurement)
+    suspend fun saveMeasurement(
+        sessionId: Long,
+        repetition: Int,
+        value: Double
+    ): Long {
+        return measurementDao.insertMeasurement(
+            MeasurementEntity(
+                sessionId = sessionId,
+                repetition = repetition,
+                value = value
+            )
+        )
     }
 
-    suspend fun getAllMeasurements(): List<Measurement> {
-        return measurementDao.getAllMeasurements()
-    }
-
-    suspend fun deleteAllMeasurements() {
-        measurementDao.deleteAllMeasurements()
+    suspend fun getMeasurementsForSession(
+        sessionId: Long
+    ): List<MeasurementEntity> {
+        return measurementDao.getMeasurementsForSession(sessionId)
     }
 }
 ```
 
-Imports:
+This repository hides the DAO details from the ViewModel.
 
-```kotlin
-import android.content.Context
-import androidx.room3.Room
-import kotlin.random.Random
+The ViewModel does not need to know the SQL string:
+
+```sql
+SELECT * FROM measurements WHERE sessionId = :sessionId
 ```
 
-Now the repository handles:
+It only needs to call:
+
+```kotlin
+repository.getMeasurementsForSession(sessionId)
+```
+
+So the chain is:
 
 ```text
-creating fake data
-inserting measurement
-reading all measurements
-deleting measurements
+ViewModel
+    calls repository function
+
+Repository
+    calls DAO function
+
+DAO
+    runs SQL through Room
+
+Room/SQLite
+    reads or writes the database
 ```
 
-The ViewModel does not know the SQL details.
+## 8. Follow the ID flow in multi-table
 
----
+In multi-table Room work, IDs are the important values that travel between steps.
 
-## 17. Load measurements from Room when app starts
-
-Previously, we loaded from internal storage.
-
-Now we load from Room:
-
-```kotlin
-fun loadSavedMeasurements() {
-    viewModelScope.launch {
-        uiState = uiState.copy(
-            isLoading = true,
-            message = "Loading measurements from database..."
-        )
-
-        try {
-            val loadedMeasurements =
-                measurementRepository.getAllMeasurements()
-
-            uiState = uiState.copy(
-                measurements = loadedMeasurements,
-                latestValue = loadedMeasurements.lastOrNull()?.value,
-                isLoading = false,
-                message = "Loaded ${loadedMeasurements.size} measurements"
-            )
-        } catch (e: Exception) {
-            uiState = uiState.copy(
-                isLoading = false,
-                message = "Could not load database measurements"
-            )
-        }
-    }
-}
-```
-
-Notice:
-
-```kotlin
-loadedMeasurements.lastOrNull()?.value
-```
-
-This means:
+Example: create or select patient, then create session.
 
 ```text
-If there is at least one saved measurement,
-show the latest value.
-
-If there are no saved measurements,
-latestValue stays null.
+User selects patient code P001
+        ->
+App finds PatientEntity(id = 1, patientCode = "P001")
+        ->
+App creates SessionEntity(patientId = 1, sessionName = "Baseline")
+        ->
+Room inserts the session
+        ->
+Room returns sessionId = 10
 ```
 
-Again, this uses Kotlin null safety.
+Then measurements use `sessionId = 10`:
 
----
-
-## 18. Start acquisition with Room
-
-In Lesson 12, `startAcquisition()` had:
-
-```kotlin
-fun startAcquisition(context: Context)
+```text
+App creates MeasurementEntity(sessionId = 10, value = 2.43)
+        ->
+Room inserts the measurement
+        ->
+Later, app queries measurements WHERE sessionId = 10
 ```
 
-because we needed context for file saving.
+The important rule is:
 
-With Room inside the repository, we no longer need to pass context into every acquisition function.
-
-So now:
-
-```kotlin
-fun startAcquisition() {
-    if (uiState.deviceConnectionState != DeviceConnectionState.CONNECTED) {
-        uiState = uiState.copy(
-            message = "Connect device before starting acquisition"
-        )
-        return
-    }
-
-    if (uiState.acquisitionState == AcquisitionState.RECORDING) {
-        return
-    }
-
-    uiState = uiState.copy(
-        acquisitionState = AcquisitionState.RECORDING,
-        message = "Acquisition started"
-    )
-
-    viewModelScope.launch {
-        while (uiState.acquisitionState == AcquisitionState.RECORDING) {
-            addSimulatedMeasurement()
-            delay(1000)
-        }
-    }
-}
+```text
+Create or find the parent first.
+Get the parent's ID.
+Put that ID into the child row.
 ```
 
-This is cleaner than before.
+For this app:
 
-The UI button can now call:
-
-```kotlin
-viewModel.startAcquisition()
+```text
+Find or create Patient first.
+Use patientId to create Session.
+Use sessionId to create Measurement.
+Use sessionId to create Result.
 ```
 
-instead of:
+In ViewModel code, the same ID flow might look like this:
 
 ```kotlin
-viewModel.startAcquisition(context)
-```
-
-This is a nice result of moving storage into the repository.
-
----
-
-## 19. Full ViewModel pattern after adding Room
-
-Here is the main pattern:
-
-```kotlin
-class ResearchViewModel(
-    application: Application
-) : AndroidViewModel(application) {
-
-    private val measurementRepository =
-        MeasurementRepository(application)
-
-    var uiState by mutableStateOf(ResearchUiState())
-        private set
-
-    fun updateSampleId(newSampleId: String) {
-        uiState = uiState.copy(
-            sampleId = newSampleId
-        )
-    }
-
-    fun connectDevice() {
-        uiState = uiState.copy(
-            deviceConnectionState = DeviceConnectionState.CONNECTING,
-            message = "Connecting to device..."
-        )
-
-        viewModelScope.launch {
-            delay(1000)
-
-            uiState = uiState.copy(
-                deviceConnectionState = DeviceConnectionState.CONNECTED,
-                message = "Device connected"
-            )
-        }
-    }
-
-    fun disconnectDevice() {
-        if (uiState.acquisitionState == AcquisitionState.RECORDING) {
-            stopAcquisition()
-        }
-
-        uiState = uiState.copy(
-            deviceConnectionState = DeviceConnectionState.DISCONNECTED,
-            acquisitionState = AcquisitionState.IDLE,
-            message = "Device disconnected"
-        )
-    }
-
-    fun startAcquisition() {
-        if (uiState.deviceConnectionState != DeviceConnectionState.CONNECTED) {
-            uiState = uiState.copy(
-                message = "Connect device before starting acquisition"
-            )
-            return
-        }
-
-        if (uiState.acquisitionState == AcquisitionState.RECORDING) {
-            return
-        }
-
-        uiState = uiState.copy(
-            acquisitionState = AcquisitionState.RECORDING,
-            message = "Acquisition started"
-        )
-
-        viewModelScope.launch {
-            while (uiState.acquisitionState == AcquisitionState.RECORDING) {
-                addSimulatedMeasurement()
-                delay(1000)
-            }
-        }
-    }
-
-    fun stopAcquisition() {
-        if (uiState.acquisitionState != AcquisitionState.RECORDING) {
-            return
-        }
-
-        uiState = uiState.copy(
-            acquisitionState = AcquisitionState.STOPPED,
-            message = "Acquisition stopped"
-        )
-    }
-
-    fun loadSavedMeasurements() {
-        viewModelScope.launch {
-            uiState = uiState.copy(
-                isLoading = true,
-                message = "Loading measurements from database..."
-            )
-
-            try {
-                val loadedMeasurements =
-                    measurementRepository.getAllMeasurements()
-
-                uiState = uiState.copy(
-                    measurements = loadedMeasurements,
-                    latestValue = loadedMeasurements.lastOrNull()?.value,
-                    isLoading = false,
-                    message = "Loaded ${loadedMeasurements.size} measurements"
-                )
-            } catch (e: Exception) {
-                uiState = uiState.copy(
-                    isLoading = false,
-                    message = "Could not load database measurements"
-                )
-            }
-        }
-    }
-
-    private fun addSimulatedMeasurement() {
-        val newMeasurement =
-            measurementRepository.createSimulatedMeasurement(
-                sampleId = uiState.sampleId,
-                repetition = uiState.measurements.size + 1
-            )
-
-        viewModelScope.launch {
-            try {
-                measurementRepository.insertMeasurement(newMeasurement)
-
-                val updatedMeasurements =
-                    measurementRepository.getAllMeasurements()
-
-                uiState = uiState.copy(
-                    measurements = updatedMeasurements,
-                    latestValue = newMeasurement.value,
-                    message = "Measurement saved to database"
-                )
-            } catch (e: Exception) {
-                uiState = uiState.copy(
-                    message = "Database save failed"
-                )
-            }
-        }
-    }
-}
-```
-
-Important imports:
-
-```kotlin
-import android.app.Application
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 ```
 
-## 20. Calling `loadSavedMeasurements()` from the UI
-
-Previously, you may have used LaunchedEffect to load saved data.
-That pattern can stay.
-Inside ResearchScreen:
-
 ```kotlin
-LaunchedEffect(Unit) {
-    viewModel.loadSavedMeasurements()
+fun onPatientCodeChange(value: String) {
+    uiState = uiState.copy(
+        patientCode = value
+    )
 }
-```
 
-This means:
-When this screen first appears,
-ask the ViewModel to load saved measurements.
-The function now loads from Room rather than from an internal CSV-style file.
-
-## 21. UI Button Changes
-
-Because startAcquisition() no longer needs context, the button becomes simpler:
-
-```kotlin
-Button(
-    onClick = {
-        viewModel.startAcquisition()
-    },
-    enabled =
-        uiState.deviceConnectionState == DeviceConnectionState.CONNECTED &&
-        uiState.acquisitionState != AcquisitionState.RECORDING
-) {
-    Text("Start Acquisition")
+fun onSessionNameChange(value: String) {
+    uiState = uiState.copy(
+        sessionName = value
+    )
 }
-```
 
-Stop button:
+fun createSessionForSelectedPatient() {
+    viewModelScope.launch { // necessary to use viewModelScope.launch because createSessionForPatient is a suspend function
+        val patient = repository.getPatientByCode(
+            uiState.patientCode
+        )
 
-```kotlin
-Button(
-    onClick = {
-        viewModel.stopAcquisition()
-    },
-    enabled = uiState.acquisitionState == AcquisitionState.RECORDING
-) {
-    Text("Stop Acquisition")
-}
-```
-
-The UI does not know whether data is saved to:
-
-- file
-- Room database
-- cloud
-- memory
-
-The UI only talks to the ViewModel.
-That is good architecture.
-
-## 22. Add a Clear Database Button
-
-For learning, it is useful to clear the table.
-In the ViewModel:
-
-```kotlin
-fun clearMeasurements() {
-    viewModelScope.launch {
-        try {
-            measurementRepository.deleteAllMeasurements()
-
+        if (patient == null) {
             uiState = uiState.copy(
-                measurements = emptyList(),
-                latestValue = null,
-                message = "All measurements deleted"
+                message = "Patient not found"
             )
-        } catch (e: Exception) {
-            uiState = uiState.copy(
-                message = "Could not delete measurements"
-            )
+            return@launch
         }
+
+        val sessionId = repository.createSessionForPatient(
+            patientId = patient.id,
+            sessionName = uiState.sessionName
+        )
+
+        uiState = uiState.copy(
+            currentPatientId = patient.id,
+            currentSessionId = sessionId,
+            message = "Session created"
+        )
     }
 }
 ```
 
-In the UI:
+Then saving a measurement uses `currentSessionId`:
 
 ```kotlin
-Button(
-    onClick = {
-        viewModel.clearMeasurements()
-    },
-    enabled = uiState.acquisitionState != AcquisitionState.RECORDING
-) {
-    Text("Clear Measurements")
+fun saveCurrentMeasurement(value: Double) {
+    val sessionId = uiState.currentSessionId
+
+    if (sessionId == null) {
+        uiState = uiState.copy(
+            message = "Create a session first"
+        )
+        return
+    }
+
+    viewModelScope.launch {
+        repository.saveMeasurement(
+            sessionId = sessionId,
+            repetition = uiState.measurements.size + 1,
+            value = value
+        )
+
+        val updatedMeasurements =
+            repository.getMeasurementsForSession(sessionId)
+
+        uiState = uiState.copy(
+            measurements = updatedMeasurements,
+            latestValue = value,
+            message = "Measurement saved"
+        )
+    }
 }
 ```
 
-We disable it while recording because deleting data during acquisition is unsafe.
-The logic is:
-
-> Do not allow destructive actions while recording.
-
-This is a good research-app habit.
-
-## 23. What About CSV Export Now?
-
-Even after adding Room, CSV export is still useful.
-The new flow becomes:
+This is the practical Android version of:
 
 ```text
-Room database
- ↓
-stores all measurements locally
-
-Export CSV button
- ↓
-reads selected measurements from Room
- ↓
-writes them to a CSV file
- ↓
-user analyses the CSV in Excel/Python
+Find parent.
+Get parent ID.
+Create child with parent ID.
 ```
 
-So the app architecture becomes:
+### Why check `sessionId == null` here?
 
-```text
-MeasurementRepository
- ├── insert into Room
- ├── read from Room
- ├── delete from Room
- └── later export selected data
-```
-
-Room is not mainly for external analysis.
-Room is for reliable local app storage.
-CSV is still better for sharing with Python, Excel, or collaborators.
-
-## 24. Does Room Replace Internal Storage?
-
-For our simple measurement history, yes, Room can replace the internal auto-save file.
-Before Room:
-
-```text
-measurement list
- ↓
-save whole list to internal CSV-style file
- ↓
-reload whole list on app start
-```
-
-With Room:
-
-```text
-new measurement
- ↓
-insert one row into database
- ↓
-query rows when needed
-```
-
-This is better as the app grows.
-However, internal storage is still useful for other things, such as:
-
-- exported CSV files
-- temporary files
-- raw binary logs
-- model files
-- configuration files
-
-So the idea is not:
-
-> Room good, files bad
-
-The better idea is:
-
-> Use the right storage for the right purpose.
-
-## 25. Beginner Warning About Migrations
-
-In our database class, we wrote:
+This check is a ViewModel/UI-state check:
 
 ```kotlin
-@Database(
-    entities = [Measurement::class],
-    version = 1
+if (sessionId == null) {
+    uiState = uiState.copy(
+        message = "Create a session first"
+    )
+    return
+}
+```
+
+It answers this question:
+
+```text
+Does the app currently know which session is active?
+```
+
+It does not answer this deeper database question:
+
+```text
+Does this sessionId definitely exist in the sessions table?
+```
+
+In the normal app flow, `currentSessionId` is set only after Room successfully creates or selects a session:
+
+```kotlin
+val sessionId = repository.createSessionForPatient(
+    patientId = patient.id,
+    sessionName = uiState.sessionName
+)
+
+uiState = uiState.copy(
+    currentSessionId = sessionId
 )
 ```
 
-The version number matters.
-Later, if you change the database structure, for example by adding:
+So if `currentSessionId` is not null, we usually trust that it came from the database.
+
+There are two different safety levels:
+
+```text
+Level 1: ViewModel safety check
+    Do we have an active session ID in UI state?
+
+Level 2: Database integrity check
+    Does that session ID really exist in the sessions table?
+```
+
+The ViewModel check is:
 
 ```kotlin
-val deviceId: String
+if (sessionId == null)
 ```
 
-or:
+The database integrity check is the `ForeignKey` constraint:
 
 ```kotlin
-val sessionId: Long
+ForeignKey(
+    entity = SessionEntity::class,
+    parentColumns = ["id"],
+    childColumns = ["sessionId"],
+    onDelete = ForeignKey.CASCADE
+)
 ```
 
-then the database schema changes.
-Real apps need database migrations.
-Room’s documentation lists streamlined database migration paths as one of its benefits. Android Developers
-But for this beginner lesson, we will not handle migrations yet.
-For learning, if you change the entity and the app complains, you can often uninstall the app from the emulator/tablet and reinstall it.
-For real research deployment, do not rely on uninstalling the app, because that would delete collected data.
-## 26. Current Architecture After Lesson 14
+With the foreign key, Room/SQLite can reject a measurement if its `sessionId` does not match an existing `sessions.id`.
 
-After adding Room, our architecture becomes:
+So the short version is:
 
 ```text
-Presentation layer
-ResearchScreen
- ↓
-ViewModel layer
-ResearchViewModel
- ↓
-Repository layer
-MeasurementRepository
- ↓
-Database access layer
-MeasurementDao
- ↓
-Local database
-ResearchDatabase / Room / SQLite
+ViewModel checks whether a session is currently selected.
+ForeignKey checks whether the selected session really exists in the database.
 ```
 
-This is a major step toward a real research app.
-We now have:
-
-- UI state
-- acquisition state
-- repository
-- local structured database
-- simulated measurement stream
-
-That is much more serious than only having a button that generates a random value.
-
-## 27. What You Learned in Lesson 14
-
-The key concepts are:
-
-- `@Entity` marks a Kotlin data class as a database table.
-- `@PrimaryKey(autoGenerate = true)` marks a unique ID column.
-- `@Dao` marks an interface that defines database operations.
-- `@Insert` inserts an entity into the database.
-- `@Query("SELECT * FROM measurements")` reads data from the database.
-- `@Database(entities = [Measurement::class], version = 1)` defines the Room database.
-
-The most important mental model is:
+You could manually query the session table before every measurement insert, but usually this is unnecessary if:
 
 ```text
-Entity = table structure
-DAO = database operations
-Database = main Room object
-Repository = app-facing data manager
-ViewModel = screen state and user flow
-UI = display and buttons
+currentSessionId came from Room
+and
+the child table uses a ForeignKey constraint
 ```
 
-For a research app:
 
-- Room stores structured data locally.
-- CSV exports data for analysis outside the app.
+## 9. The flow converting Readable Codes into Internal IDs
 
-## Lesson 15 Preview
-
-In Lesson 15, we should move from:
+The most important transferred values are:
 
 ```text
-one flat Measurement table
-                ↓
-a more realistic research data model:
+patientCode
+    user-facing code
+    used to search/select a patient
+
+patientId
+    internal ID from PatientEntity.id
+    used to create or query sessions
+
+sessionId
+    internal ID from SessionEntity.id
+    used to create or query measurements and results
+
+measurementId
+    internal ID from MeasurementEntity.id
+    useful if editing or deleting one measurement
+
+resultId
+    internal ID from ResultEntity.id
+    useful if editing or deleting one result
+```
+
+A useful way to think is using this three-step mental model:
+
+```text
+Readable codes are for humans.
+The app convert from the readable code to the internal ID.
+Internal IDs are for database relationships.
+```
+
+### 1. Readable codes are for humans
+
+Readable codes are the values the user can see, type, select, and understand.
+
+For example:
+
+```text
+patientCode = "P001"
+sessionName = "Baseline"
+deviceCode = "D003"
+```
+
+The UI stores and displays these readable values:
+
+```kotlin
+// UI state stores both readable input and internal selected IDs.
+data class ResearchUiState(
+    val patientCode: String = "",
+    val sessionName: String = "",
+    val currentPatientId: Long? = null,
+    val currentSessionId: Long? = null,
+    val measurements: List<MeasurementEntity> = emptyList(),
+    val latestValue: Double? = null,
+    val message: String = ""
+)
+```
+
+```kotlin
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+```
+
+```kotlin
+// UI shows readable values and passes user intent to the ViewModel.
+TextField(
+    value = uiState.patientCode,
+    onValueChange = viewModel::onPatientCodeChange,
+    label = {
+        Text("Patient code")
+    }
+)
+
+TextField(
+    value = uiState.sessionName,
+    onValueChange = viewModel::onSessionNameChange,
+    label = {
+        Text("Session name")
+    }
+)
+
+Button(
+    onClick = {
+        viewModel.createSessionForSelectedPatient()
+    }
+) {
+    Text("Create Session")
+}
+```
+
+At this stage, the user is thinking:
+
+```text
+I selected patient P001.
+I want to create a Baseline session.
+```
+
+### 2. The app converts readable code to internal ID
+
+The conversion does not happen inside the UI alone.
+
+It happens across these Android layers:
+
+```text
+UI
+    captures patientCode = "P001"
+
+ViewModel
+    receives the user action
+    asks the repository to find the patient
+
+Repository
+    calls the DAO
+
+DAO
+    runs a query using patientCode
+
+Room/SQLite
+    returns the matching PatientEntity
+```
+
+The bottom-level DAO query from the database is:
+
+```kotlin
+@Query("SELECT * FROM patients WHERE patientCode = :patientCode LIMIT 1")
+suspend fun getPatientByCode(
+    patientCode: String
+): PatientEntity?
+```
+
+The repository exposes that query to ViewModel as:
+
+```kotlin
+suspend fun getPatientByCode(
+    patientCode: String
+): PatientEntity? {
+    return patientDao.getPatientByCode(patientCode)
+}
+```
+
+The ViewModel performs the conversion during the user action:
+
+```kotlin
+val patient = repository.getPatientByCode(
+    patientCode = uiState.patientCode
+)
+
+if (patient == null) {
+    uiState = uiState.copy(
+        message = "Patient not found"
+    )
+    return
+}
+
+val patientId = patient.id
+```
+
+If the user selected:
+
+```text
+patientCode = "P001"
+```
+
+Room might return:
+
+```text
+PatientEntity(
+    id = 1,
+    patientCode = "P001"
+)
+```
+
+Then this line extracts the internal ID:
+
+```kotlin
+val patientId = patient.id
+```
+
+So the conversion is:
+
+```text
+Readable code from UI:
+    P001
+
+Database row found by Room:
+    PatientEntity(id = 1, patientCode = "P001")
+
+Internal ID extracted by app code:
+    patientId = 1
+```
+
+### 3. Internal IDs are for database relationships
+
+After the app has the internal ID, it uses that ID to connect tables.
+
+For example, a session belongs to a patient, so the new `SessionEntity` must store `patientId`:
+
+```kotlin
+// ViewModel passes internal IDs to the repository.
+repository.createSessionForPatient(
+    patientId = patientId,
+    sessionName = uiState.sessionName
+)
+```
+
+```kotlin
+// Repository passes entities to the DAO.
+sessionDao.insertSession(
+    SessionEntity(
+        patientId = patientId,
+        sessionName = sessionName
+    )
+)
+```
+
+The saved session row might look like:
+
+```text
+SessionEntity(
+    id = 10,
+    patientId = 1,
+    sessionName = "Baseline"
+)
+```
+
+Now the relationship is:
+
+```text
+PatientEntity.id = 1
+matches
+SessionEntity.patientId = 1
+```
+
+The same logic continues when saving measurements:
+
+```text
+SessionEntity.id = 10
+matches
+MeasurementEntity.sessionId = 10
+```
+
+So the full logic is:
+
+```text
+Readable code is for the human:
+    patientCode = P001
+
+The app converts it:
+    find PatientEntity where patientCode = P001
+    read PatientEntity.id
+
+Internal ID is for relationships:
+    patientId = 1
+```
+
+## 10. Single-table thinking versus multi-table thinking
+
+With one table, the thinking is simple:
+
+```text
+Create MeasurementEntity.
+Insert MeasurementEntity.
+Read all measurements.
+```
+
+With multiple tables, the thinking becomes:
+
+```text
+Which parent row does this child row belong to?
+Do I already have the parent ID?
+If not, should I create the parent or select an existing parent?
+After I insert a parent, do I need the returned ID?
+When I query child rows, which parent ID should I filter by?
+```
+
+Example:
+
+```text
+Do not just insert a measurement.
+Insert a measurement for a specific session.
+```
+
+That means this is incomplete:
+
+```kotlin
+MeasurementEntity(
+    value = 2.43
+)
+```
+
+This is meaningful:
+
+```kotlin
+val sessionId = currentSessionId ?: return
+
+MeasurementEntity(
+    sessionId = sessionId,
+    repetition = 1,
+    value = 2.43
+)
+```
+
+## 11. The full Room thinking loop
+
+When adding a new table, use this checklist:
+
+```text
+1. Name the real-world thing.
+2. Decide if it needs its own table.
+3. Create the Entity.
+4. Choose the primary key.
+5. Add normal fields.
+6. Add foreign-key-style fields if it belongs to another table.
+7. Decide whether to add real ForeignKey constraints.
+8. Decide whether any field or field combination should be unique.
+9. Create DAO functions for insert, read, update, and delete.
+10. Add the entity and DAO to the database class.
+11. Get the DAO inside the repository.
+12. Create repository functions that the ViewModel can call.
+13. Pass the correct IDs between parent and child operations.
+14. Query child rows using the parent ID.
+```
+
+The short version:
+
+```text
+Entity defines the table.
+DAO defines what can happen to the table.
+Database class connects the Room pieces.
+Repository uses the database.
+ViewModel decides when to use the repository.
+UI lets the user trigger the flow.
+```
+
+## 12. Most important mental model
+
+Room database work is not only about writing annotations.
+
+It is about answering this chain of questions:
+
+```text
+What data exists?
+How is each row identified?
+How do rows belong to other rows?
+What operations does the app need?
+Which IDs must move from one operation to the next?
+```
+
+For a research app, this is the main shape:
+
+```text
 Patient
+    has many Sessions
+
 Session
+    has many Measurements
+    has Results
+
 Measurement
+    must know which Session it belongs to
+
 Result
+    must know which Session it belongs to
 ```
 
-This is important because your final app should probably not only save values.
-It should know:
-
-- which patient/sample the data belongs to
-- which session the measurement belongs to
-- when the session started and ended
-- what result or prediction was produced
-
-So Lesson 15 will cover:
-
-- Patient data class
-- Session data class
-- Measurement belongs to Session
-- Session belongs to Patient
-- basic relationship thinking
-- why data modelling matters before app complexity grows
+If you understand the ID flow, the Room files become much less mysterious.

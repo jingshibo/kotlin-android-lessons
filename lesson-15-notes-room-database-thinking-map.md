@@ -15,11 +15,13 @@ The simple mental order is:
 3. What fields should each table have?
 4. What is the primary key?
 5. What relationships exist between tables?
-6. What operations does the app need?
-7. What DAO functions support those operations?
-8. What entities and DAOs must the database class include?
-9. How does the repository get the database and call the DAOs?
-10. What IDs must be passed between steps?
+6. How does multi-table thinking differ from one-table thinking?
+7. What operations does the app need?
+8. What DAO functions support those operations?
+9. What entities and DAOs must the database class include?
+10. How does the repository get the database and call the DAOs?
+11. How does the app convert readable user values into internal IDs?
+12. What IDs must be passed between steps?
 
 Room can feel complicated because there are several files, but each file has a different job.
 
@@ -41,6 +43,16 @@ ViewModel
 
 UI
     shows data and sends user events to the ViewModel
+```
+
+Read this note in two halves:
+
+```text
+Sections 1-7:
+    design the Room pieces
+
+Sections 8-10:
+    use those pieces from the app and pass the correct IDs around
 ```
 
 ## 1. Start from the app's real data
@@ -255,6 +267,60 @@ The database uses:
 id = 1
 ```
 
+### Primary Key Versus Unique Rule
+
+Important: there are two related but different uniqueness ideas.
+
+```text
+Primary key:
+    identifies one row
+    must be unique
+    commonly uses an auto-generated id
+
+Unique rule:
+    prevents some other field or field combination from repeating
+    can be added with a unique index
+```
+
+For example, a session can still use an auto-generated `id` as its primary key:
+
+```kotlin
+@PrimaryKey(autoGenerate = true)
+val id: Long = 0
+```
+
+but also have a separate rule that says:
+
+```text
+The same patient/device/day combination must not appear twice.
+```
+
+In Room, that separate rule can be written with `Index(..., unique = true)`:
+
+```kotlin
+@Entity(
+    tableName = "sessions",
+    indices = [
+        Index(
+            value = ["patientId", "deviceId", "recordingDay"],
+            unique = true
+        )
+    ]
+)
+data class SessionEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    val patientId: Long,
+    val deviceId: Long,
+    val recordingDay: String
+)
+```
+
+So `id` is still the primary key.
+
+The unique index is an extra database rule that prevents duplicate `patientId + deviceId + recordingDay` combinations.
+
 ## 4. Think about relationships between tables
 
 A relationship answers:
@@ -348,9 +414,58 @@ MeasurementEntity.sessionId
     child value that must match the parent value
 ```
 
-## 5. Design the DAO after the entity
+## 5. Single-table thinking versus multi-table thinking
 
-After the table structure is clear, ask:
+With one table, the thinking is simple:
+
+```text
+Create MeasurementEntity.
+Insert MeasurementEntity.
+Read all measurements.
+```
+
+With multiple tables, the thinking becomes:
+
+```text
+Which parent row does this child row belong to?
+Do I already have the parent ID?
+If not, should I create the parent or select an existing parent?
+After I insert a parent, do I need the returned ID?
+When I query child rows, which parent ID should I filter by?
+```
+
+Example:
+
+```text
+Do not just insert a measurement.
+Insert a measurement for a specific session.
+```
+
+That means this is incomplete:
+
+```kotlin
+MeasurementEntity(
+    value = 2.43
+)
+```
+
+This is meaningful:
+
+```kotlin
+val sessionId = currentSessionId ?: return
+
+MeasurementEntity(
+    sessionId = sessionId,
+    repetition = 1,
+    value = 2.43
+)
+```
+
+## 6. Design the DAO after the entity
+
+Now that the tables and relationships are clear, design the database operations.
+
+For each table, ask:
 
 ```text
 What does the app need to do with this table?
@@ -399,6 +514,115 @@ Entity:
 
 DAO:
     What can we do with that data?
+```
+
+### One-table DAOs and multi-table queries
+
+A DAO is not only for one table, but beginners often start that way.
+
+Beginner pattern:
+
+```text
+PatientEntity:
+    PatientDao
+
+SessionEntity:
+    SessionDao
+
+MeasurementEntity:
+    MeasurementDao
+
+ResultEntity:
+    ResultDao
+```
+
+This is a good starting point because many app questions are simple table questions:
+
+```text
+Given a patientCode, find one patient in the patients table.
+    -> PatientDao.getPatientByCode(patientCode)
+
+Given a patientId, find all sessions for that patient.
+    -> SessionDao.getSessionsForPatient(patientId)
+
+Given a sessionId, insert one measurement for that session.
+    -> MeasurementDao.insertMeasurement(measurement)
+```
+
+But a DAO method can also answer a question that crosses multiple tables.
+
+For example, suppose the app asks:
+
+```text
+Show all measurements for patient P001.
+```
+
+That question crosses this path:
+
+```text
+patients -> sessions -> measurements
+```
+
+So a DAO method may use a join:
+
+```kotlin
+@Query("""
+    SELECT measurements.*
+    FROM measurements
+    INNER JOIN sessions ON measurements.sessionId = sessions.id
+    INNER JOIN patients ON sessions.patientId = patients.id
+    WHERE patients.patientCode = :patientCode
+""")
+suspend fun getMeasurementsForPatientCode(
+    patientCode: String
+): List<MeasurementEntity>
+```
+
+This kind of function could live in a purpose-based DAO, such as:
+
+```text
+ResearchQueryDao
+ExportDao
+ReportDao
+```
+
+The better rule is:
+
+```text
+A DAO method belongs wherever the database question naturally fits.
+```
+
+A useful way to design DAO methods is to write a sentence first:
+
+```text
+Given ______, I want to ______ from/in ______.
+```
+
+Then turn that sentence into a DAO function:
+
+```text
+Given a patientCode, get all measurements across that patient's sessions.
+    -> ResearchQueryDao.getMeasurementsForPatientCode(patientCode)
+```
+
+So the mental model is:
+
+```text
+Table/entity:
+    What kind of data exists?
+
+DAO method:
+    What exact database action or question do I need?
+
+Repository method:
+    What app-level workflow uses those DAO actions?
+```
+
+For Lesson 15, use this beginner rule:
+
+```text
+Use one DAO per table for basic insert/query/update/delete.
+Add combined-query DAO methods only when the app asks a question that naturally crosses tables.
 ```
 
 For the session table, the app may need to:
@@ -472,7 +696,7 @@ Notice how the function parameters match the SQL placeholders:
 :endedAt uses the function parameter endedAt
 ```
 
-## 6. Create the database class
+## 7. Create the database class
 
 The database class answers:
 
@@ -689,7 +913,7 @@ Database class
     creates or returns the Room database instance
 ```
 
-## 7. Use the database through the repository
+## 8. Use the database through the repository
 
 After the database class exists, the app needs to use it.
 
@@ -808,225 +1032,7 @@ Room/SQLite
     reads or writes the database
 ```
 
-## 8. Follow the ID flow in multi-table
-
-In multi-table Room work, IDs are the important values that travel between steps.
-
-Example: create or select patient, then create session.
-
-```text
-User selects patient code P001
-        ->
-App finds PatientEntity(id = 1, patientCode = "P001")
-        ->
-App creates SessionEntity(patientId = 1, sessionName = "Baseline")
-        ->
-Room inserts the session
-        ->
-Room returns sessionId = 10
-```
-
-Then measurements use `sessionId = 10`:
-
-```text
-App creates MeasurementEntity(sessionId = 10, value = 2.43)
-        ->
-Room inserts the measurement
-        ->
-Later, app queries measurements WHERE sessionId = 10
-```
-
-The important rule is:
-
-```text
-Create or find the parent first.
-Get the parent's ID.
-Put that ID into the child row.
-```
-
-For this app:
-
-```text
-Find or create Patient first.
-Use patientId to create Session.
-Use sessionId to create Measurement.
-Use sessionId to create Result.
-```
-
-In ViewModel code, the same ID flow might look like this:
-
-```kotlin
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.launch
-```
-
-```kotlin
-fun onPatientCodeChange(value: String) {
-    uiState = uiState.copy(
-        patientCode = value
-    )
-}
-
-fun onSessionNameChange(value: String) {
-    uiState = uiState.copy(
-        sessionName = value
-    )
-}
-
-fun createSessionForSelectedPatient() {
-    viewModelScope.launch { // necessary to use viewModelScope.launch because createSessionForPatient is a suspend function
-        val patient = repository.getPatientByCode(
-            uiState.patientCode
-        )
-
-        if (patient == null) {
-            uiState = uiState.copy(
-                message = "Patient not found"
-            )
-            return@launch
-        }
-
-        val sessionId = repository.createSessionForPatient(
-            patientId = patient.id,
-            sessionName = uiState.sessionName
-        )
-
-        uiState = uiState.copy(
-            currentPatientId = patient.id,
-            currentSessionId = sessionId,
-            message = "Session created"
-        )
-    }
-}
-```
-
-Then saving a measurement uses `currentSessionId`:
-
-```kotlin
-fun saveCurrentMeasurement(value: Double) {
-    val sessionId = uiState.currentSessionId
-
-    if (sessionId == null) {
-        uiState = uiState.copy(
-            message = "Create a session first"
-        )
-        return
-    }
-
-    viewModelScope.launch {
-        repository.saveMeasurement(
-            sessionId = sessionId,
-            repetition = uiState.measurements.size + 1,
-            value = value
-        )
-
-        val updatedMeasurements =
-            repository.getMeasurementsForSession(sessionId)
-
-        uiState = uiState.copy(
-            measurements = updatedMeasurements,
-            latestValue = value,
-            message = "Measurement saved"
-        )
-    }
-}
-```
-
-This is the practical Android version of:
-
-```text
-Find parent.
-Get parent ID.
-Create child with parent ID.
-```
-
-### Why check `sessionId == null` here?
-
-This check is a ViewModel/UI-state check:
-
-```kotlin
-if (sessionId == null) {
-    uiState = uiState.copy(
-        message = "Create a session first"
-    )
-    return
-}
-```
-
-It answers this question:
-
-```text
-Does the app currently know which session is active?
-```
-
-It does not answer this deeper database question:
-
-```text
-Does this sessionId definitely exist in the sessions table?
-```
-
-In the normal app flow, `currentSessionId` is set only after Room successfully creates or selects a session:
-
-```kotlin
-val sessionId = repository.createSessionForPatient(
-    patientId = patient.id,
-    sessionName = uiState.sessionName
-)
-
-uiState = uiState.copy(
-    currentSessionId = sessionId
-)
-```
-
-So if `currentSessionId` is not null, we usually trust that it came from the database.
-
-There are two different safety levels:
-
-```text
-Level 1: ViewModel safety check
-    Do we have an active session ID in UI state?
-
-Level 2: Database integrity check
-    Does that session ID really exist in the sessions table?
-```
-
-The ViewModel check is:
-
-```kotlin
-if (sessionId == null)
-```
-
-The database integrity check is the `ForeignKey` constraint:
-
-```kotlin
-ForeignKey(
-    entity = SessionEntity::class,
-    parentColumns = ["id"],
-    childColumns = ["sessionId"],
-    onDelete = ForeignKey.CASCADE
-)
-```
-
-With the foreign key, Room/SQLite can reject a measurement if its `sessionId` does not match an existing `sessions.id`.
-
-So the short version is:
-
-```text
-ViewModel checks whether a session is currently selected.
-ForeignKey checks whether the selected session really exists in the database.
-```
-
-You could manually query the session table before every measurement insert, but usually this is unnecessary if:
-
-```text
-currentSessionId came from Room
-and
-the child table uses a ForeignKey constraint
-```
-
-
-## 9. The flow converting Readable Codes into Internal IDs
+## 9. Convert Readable Codes into Internal IDs
 
 The most important transferred values are:
 
@@ -1056,7 +1062,7 @@ A useful way to think is using this three-step mental model:
 
 ```text
 Readable codes are for humans.
-The app convert from the readable code to the internal ID.
+The app converts from the readable code to the internal ID.
 Internal IDs are for database relationships.
 ```
 
@@ -1285,52 +1291,225 @@ Internal ID is for relationships:
     patientId = 1
 ```
 
-## 10. Single-table thinking versus multi-table thinking
+## 10. Follow the ID flow in multi-table
 
-With one table, the thinking is simple:
+Now apply the readable-code-to-internal-ID idea to the actual ViewModel and repository flow.
 
-```text
-Create MeasurementEntity.
-Insert MeasurementEntity.
-Read all measurements.
-```
+In multi-table Room work, IDs are the important values that travel between steps.
 
-With multiple tables, the thinking becomes:
+Example: create or select patient, then create session.
 
 ```text
-Which parent row does this child row belong to?
-Do I already have the parent ID?
-If not, should I create the parent or select an existing parent?
-After I insert a parent, do I need the returned ID?
-When I query child rows, which parent ID should I filter by?
+User selects patient code P001
+        ->
+App finds PatientEntity(id = 1, patientCode = "P001")
+        ->
+App creates SessionEntity(patientId = 1, sessionName = "Baseline")
+        ->
+Room inserts the session
+        ->
+Room returns sessionId = 10
 ```
 
-Example:
+Then measurements use `sessionId = 10`:
 
 ```text
-Do not just insert a measurement.
-Insert a measurement for a specific session.
+App creates MeasurementEntity(sessionId = 10, value = 2.43)
+        ->
+Room inserts the measurement
+        ->
+Later, app queries measurements WHERE sessionId = 10
 ```
 
-That means this is incomplete:
+The important rule is:
+
+```text
+Create or find the parent first.
+Get the parent's ID.
+Put that ID into the child row.
+```
+
+For this app:
+
+```text
+Find or create Patient first.
+Use patientId to create Session.
+Use sessionId to create Measurement.
+Use sessionId to create Result.
+```
+
+In ViewModel code, the same ID flow might look like this:
 
 ```kotlin
-MeasurementEntity(
-    value = 2.43
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
+```
+
+```kotlin
+fun onPatientCodeChange(value: String) {
+    uiState = uiState.copy(
+        patientCode = value
+    )
+}
+
+fun onSessionNameChange(value: String) {
+    uiState = uiState.copy(
+        sessionName = value
+    )
+}
+
+fun createSessionForSelectedPatient() {
+    viewModelScope.launch { // necessary to use viewModelScope.launch because createSessionForPatient is a suspend function
+        val patient = repository.getPatientByCode(
+            uiState.patientCode
+        )
+
+        if (patient == null) {
+            uiState = uiState.copy(
+                message = "Patient not found"
+            )
+            return@launch
+        }
+
+        val sessionId = repository.createSessionForPatient(
+            patientId = patient.id,
+            sessionName = uiState.sessionName
+        )
+
+        uiState = uiState.copy(
+            currentPatientId = patient.id,
+            currentSessionId = sessionId,
+            message = "Session created"
+        )
+    }
+}
+```
+
+Then saving a measurement uses `currentSessionId`:
+
+```kotlin
+fun saveCurrentMeasurement(value: Double) {
+    val sessionId = uiState.currentSessionId
+
+    if (sessionId == null) {
+        uiState = uiState.copy(
+            message = "Create a session first"
+        )
+        return
+    }
+
+    viewModelScope.launch {
+        repository.saveMeasurement(
+            sessionId = sessionId,
+            repetition = uiState.measurements.size + 1,
+            value = value
+        )
+
+        val updatedMeasurements =
+            repository.getMeasurementsForSession(sessionId)
+
+        uiState = uiState.copy(
+            measurements = updatedMeasurements,
+            latestValue = value,
+            message = "Measurement saved"
+        )
+    }
+}
+```
+
+This is the practical Android version of:
+
+```text
+Find parent.
+Get parent ID.
+Create child with parent ID.
+```
+
+### Why check `sessionId == null` here?
+
+This check is a ViewModel/UI-state check:
+
+```kotlin
+if (sessionId == null) {
+    uiState = uiState.copy(
+        message = "Create a session first"
+    )
+    return
+}
+```
+
+It answers this question:
+
+```text
+Does the app currently know which session is active?
+```
+
+It does not answer this deeper database question:
+
+```text
+Does this sessionId definitely exist in the sessions table?
+```
+
+In the normal app flow, `currentSessionId` is set only after Room successfully creates or selects a session:
+
+```kotlin
+val sessionId = repository.createSessionForPatient(
+    patientId = patient.id,
+    sessionName = uiState.sessionName
+)
+
+uiState = uiState.copy(
+    currentSessionId = sessionId
 )
 ```
 
-This is meaningful:
+So if `currentSessionId` is not null, we usually trust that it came from the database.
+
+There are two different safety levels:
+
+```text
+Level 1: ViewModel safety check
+    Do we have an active session ID in UI state?
+
+Level 2: Database integrity check
+    Does that session ID really exist in the sessions table?
+```
+
+The ViewModel check is:
 
 ```kotlin
-val sessionId = currentSessionId ?: return
+if (sessionId == null)
+```
 
-MeasurementEntity(
-    sessionId = sessionId,
-    repetition = 1,
-    value = 2.43
+The database integrity check is the `ForeignKey` constraint:
+
+```kotlin
+ForeignKey(
+    entity = SessionEntity::class,
+    parentColumns = ["id"],
+    childColumns = ["sessionId"],
+    onDelete = ForeignKey.CASCADE
 )
 ```
+
+With the foreign key, Room/SQLite can reject a measurement if its `sessionId` does not match an existing `sessions.id`.
+
+So the short version is:
+
+```text
+ViewModel checks whether a session is currently selected.
+ForeignKey checks whether the selected session really exists in the database.
+```
+
+You could manually query the session table before every measurement insert, but usually this is unnecessary if:
+
+```text
+currentSessionId came from Room
+and
+the child table uses a ForeignKey constraint
+```
+
 
 ## 11. The full Room thinking loop
 

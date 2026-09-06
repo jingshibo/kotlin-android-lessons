@@ -34,7 +34,11 @@ DeviceDataSource
 Fake / Bluetooth / Wi-Fi / USB device
 ```
 
-This follows the same practical direction as the original tutorial: first build the app with fake/random data, then later replace fake data with real device input. The file explicitly introduced this idea earlier by generating random values first and replacing them with real device input after the app works. fileciteturn0file0L140-L144
+This follows the same practical direction as the original tutorial: 
+
+First build the app with fake/random data, then later replace fake data with real device input. 
+
+The file explicitly introduced this idea earlier by generating random values first and replacing them with real device input after the app works. fileciteturn0file0L140-L144
 
 ---
 
