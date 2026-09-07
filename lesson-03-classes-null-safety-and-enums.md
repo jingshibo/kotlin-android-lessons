@@ -1451,6 +1451,8 @@ Later:
 state = DeviceState.CONNECTED
 ```
 
+Note: Each enum entry is an object instance. An enum class automatically creates a fixed instance for each listed entry. You can access these entries directly through the enum class, without needing to instantiate an object first.
+
 ## 28. Enum constants are not strings
 
 The items in an enum class are enum constants of type `DeviceState`, not `String` values.
