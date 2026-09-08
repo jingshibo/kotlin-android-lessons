@@ -723,9 +723,140 @@ Examples:
 Delete this session?
 Discard unsaved changes?
 Export complete. Open file?
+Reset all measurements?
+Save patient with duplicate code?
 ```
 
-In Compose, you might show an `AlertDialog` based on state:
+For this, Compose provides `AlertDialog`.
+
+An `AlertDialog` is a temporary pop-up window on top of the current screen.
+
+It does not replace the whole screen.
+
+It asks the user to confirm or cancel an action.
+
+You need:
+
+```kotlin
+import androidx.compose.material3.AlertDialog
+```
+
+### Basic AlertDialog idea
+
+Like other Compose UI, an `AlertDialog` is controlled by state.
+
+First create a Boolean state:
+
+```kotlin
+var showResetDialog by remember {
+    mutableStateOf(false)
+}
+```
+
+Then a button can turn the dialog on:
+
+```kotlin
+Button(
+    onClick = {
+        showResetDialog = true
+    }
+) {
+    Text("Reset")
+}
+```
+
+Then show the dialog only when `showResetDialog` is true:
+
+```kotlin
+if (showResetDialog) {
+    AlertDialog(
+        onDismissRequest = {
+            showResetDialog = false
+        },
+        title = {
+            Text("Reset measurements?")
+        },
+        text = {
+            Text("This will clear the current measurement value and count.")
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    measurementValue = null
+                    measurementCount = 0
+                    showResetDialog = false
+                }
+            ) {
+                Text("Reset")
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = {
+                    showResetDialog = false
+                }
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+```
+
+The important pieces are:
+
+```text
+showResetDialog
+    controls whether the dialog is visible
+
+onDismissRequest
+    runs when the user dismisses the dialog
+
+title
+    main dialog heading
+
+text
+    explanation inside the dialog
+
+confirmButton
+    button for the dangerous or important action
+
+dismissButton
+    button for canceling
+```
+
+The mental model is:
+
+```text
+Button click
+    -> set showResetDialog = true
+    -> AlertDialog appears
+    -> user chooses Reset or Cancel
+    -> set showResetDialog = false
+    -> AlertDialog disappears
+```
+
+This is very similar to a warning-message pattern:
+
+```kotlin
+if (sampleId.isBlank()) {
+    Text("Please enter a sample ID.")
+}
+```
+
+but the purpose is different:
+
+```text
+Warning Text
+    show information directly on the screen
+
+AlertDialog
+    interrupt briefly and ask the user to decide
+```
+
+For research apps, `AlertDialog` is useful before destructive actions, such as deleting a session or clearing measurements.
+
+Here is another example for deleting a session:
 
 ```kotlin
 if (showDeleteDialog) {
@@ -762,6 +893,67 @@ if (showDeleteDialog) {
 A dialog is not a full navigation destination.
 
 It is a temporary overlay on top of the current screen.
+
+### AlertDialog versus normal screen switching
+
+In this tutorial, what you might casually call a window switch usually means a full screen switch or navigation destination.
+
+A normal screen switch means the app moves from one full screen to another.
+
+For example:
+
+```text
+PatientListScreen
+    -> PatientDetailScreen
+```
+
+or:
+
+```text
+PatientDetailScreen
+    -> MeasurementScreen
+```
+
+This usually uses Navigation Compose:
+
+```kotlin
+navController.navigate("${Routes.PATIENT_DETAIL}/$patientId")
+```
+
+Then `NavHost` displays a different screen route.
+
+An `AlertDialog` is different.
+
+It does not ask `NavHost` to open a new screen.
+
+It stays on the same screen and temporarily draws a small decision window above it.
+
+The control is usually just a Boolean state:
+
+```kotlin
+var showDeleteDialog by remember {
+    mutableStateOf(false)
+}
+```
+
+The button changes this state to `true`, and the dialog changes it back to `false` after the user confirms, cancels, or dismisses it.
+
+So the comparison is:
+
+| UI pattern | What changes? | Controlled by | Good for |
+|---|---|---|---|
+| Normal screen switch | The whole screen changes | `navController` and `NavHost` | moving to patient detail, measurement, result, settings |
+| `AlertDialog` | A temporary window appears above the current screen | Boolean state such as `showDeleteDialog` | confirm delete, confirm reset, warn before discarding changes |
+
+Simple rule:
+
+```text
+If the user is moving to a different task or page,
+use navigation.
+
+If the user should stay on the same screen and answer a quick question,
+use AlertDialog.
+```
 
 ## 13. Full Screen Versus Temporary UI
 

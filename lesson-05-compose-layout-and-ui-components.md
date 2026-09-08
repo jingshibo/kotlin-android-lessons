@@ -1493,4 +1493,3 @@ calculating mean/min/max
 ```
 
 That will make the app feel much closer to an actual data-collection tool.
-
