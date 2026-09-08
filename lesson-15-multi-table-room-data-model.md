@@ -404,9 +404,11 @@ But the database should usually link tables using:
 patientId = 1
 ```
 
-**Note that the patientCode should be unique for each patientid.** 
+If two patient records should never share the same readable code, `patientCode` should have a uniqueness rule.
 
+For good user experience, the ViewModel or repository can check whether `P001` already exists before saving.
 
+For data safety, Room/SQLite can also enforce uniqueness with a database rule.
 
 So when the users select a patientCode, the app flow is: 
 

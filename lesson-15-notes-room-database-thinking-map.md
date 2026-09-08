@@ -321,6 +321,189 @@ So `id` is still the primary key.
 
 The unique index is an extra database rule that prevents duplicate `patientId + deviceId + recordingDay` combinations.
 
+### Where should duplicate checks happen?
+
+Suppose the user tries to create a patient with this code:
+
+```text
+patientCode = "P001"
+```
+
+and `P001` already exists.
+
+A common question is:
+
+```text
+Should the app check first?
+Or should we just let Room fail and catch the error?
+```
+
+In a good Android app, the answer is usually:
+
+```text
+Use both.
+```
+
+Think of it as three layers:
+
+```text
+Layer 1: UI
+    show readable feedback to the user
+
+Layer 2: ViewModel / Repository
+    check the business rule before saving
+
+Layer 3: Room / SQLite
+    enforce the database rule as the final safety net
+```
+
+Layer 1 and Layer 2 are mainly for user experience. 
+
+It gives immediate Feedback: The user gets red error text (⚠️ Patient already exists) immediately as they type, before filling out other fields and hitting submit.
+
+For example, the ViewModel can check whether the patient already exists before inserting:
+
+```kotlin
+fun createPatient() {
+    viewModelScope.launch {
+        val existingPatient = repository.getPatientByCode(
+            uiState.patientCode
+        )
+
+        if (existingPatient != null) {
+            uiState = uiState.copy(
+                message = "Patient code already exists"
+            )
+            return@launch
+        }
+
+        val patientId = repository.createPatient(
+            patientCode = uiState.patientCode
+        )
+
+        uiState = uiState.copy(
+            currentPatientId = patientId,
+            message = "Patient created"
+        )
+    }
+}
+```
+
+This gives a clear message before the user gets confused.
+
+But this check alone is not enough.
+
+The database should also protect the data.
+
+In this tutorial, we usually use an auto-generated `id` as the primary key:
+
+```kotlin
+@PrimaryKey(autoGenerate = true)
+val id: Long = 0
+```
+
+So if `patientCode` should not repeat, add a unique index:
+
+```kotlin
+import androidx.room3.Entity
+import androidx.room3.Index
+import androidx.room3.PrimaryKey
+```
+
+```kotlin
+@Entity(
+    tableName = "patients",
+    indices = [
+        Index(
+            value = ["patientCode"],
+            unique = true
+        )
+    ]
+)
+data class PatientEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
+    val patientCode: String,
+    val notes: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+```
+
+Now SQLite will reject duplicate `patientCode` values even if something unexpected bypasses the ViewModel check.
+
+For example, this can happen if:
+
+- two background operations try to insert the same code at almost the same time
+- a future sync feature writes data into the database
+- another part of the app forgets to call the pre-check
+
+The repository can still catch the database error and return a clean result:
+
+```kotlin
+import android.database.sqlite.SQLiteConstraintException
+```
+
+```kotlin
+suspend fun createPatientSafely(
+    patientCode: String
+): Boolean {
+    return try {
+        patientDao.insertPatient(
+            PatientEntity(
+                patientCode = patientCode
+            )
+        )
+        true
+    } catch (e: SQLiteConstraintException) {
+        false
+    }
+}
+```
+
+Then the ViewModel can show a friendly message:
+
+```kotlin
+val created = repository.createPatientSafely(
+    patientCode = uiState.patientCode
+)
+
+uiState = if (created) {
+    uiState.copy(
+        message = "Patient created"
+    )
+} else {
+    uiState.copy(
+        message = "Patient code already exists"
+    )
+}
+```
+
+The important idea:
+
+```text
+Pre-check in ViewModel/Repository:
+    better user experience
+
+Unique constraint in Room/SQLite:
+    stronger data safety
+
+Catch database exception:
+    fallback for unexpected duplicate insert attempts
+```
+
+So do not rely only on catching Room database exceptions for normal user mistakes.
+
+You can catch SQLiteConstraintException when saving, but relying only on database exceptions has a few downsides:
+
+1. Late Feedback: The user only finds out P001 is taken after filling out the whole form and clicking Submit.
+   
+2. Database Overhead: Triggering an unsuccessful SQLite transaction attempt and handling JVM exception stack traces is slower than checking an in-memory list or quick SELECT query.
+   
+3. Generic Error Messages: SQLite constraint exceptions can be cryptic to translate into clean UI error messages compared to a simple boolean check in code.
+
+Use a pre-check for friendly feedback, and use the database constraint as the final guarantee.
+
 ## 4. Think about relationships between tables
 
 A relationship answers:
