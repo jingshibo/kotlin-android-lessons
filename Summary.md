@@ -390,6 +390,7 @@ Lesson 9 introduces an optional modern ViewModel state implementation using `Mut
 Covered:
 
 - why StateFlow appears in many Android ViewModel examples
+- what Flow means: values over time
 - previous `var uiState by mutableStateOf(...)` implementation
 - new private `_uiState` plus public `uiState` implementation
 - why `_uiState` is mutable and private
@@ -401,22 +402,6 @@ Covered:
 - side-by-side code comparison
 - pros and cons of `mutableStateOf` versus `StateFlow`
 - common StateFlow mistakes
-
-### Lesson 9 note - StateFlow ViewModel style
-
-Short summary:
-This companion note explains the `MutableStateFlow` / `StateFlow` ViewModel state style that appears in many Android examples, and compares it with the simpler `mutableStateOf` style used in Lesson 8.
-
-Covered:
-
-- why Lesson 8 starts with `mutableStateOf`
-- what `_uiState` and public `uiState` mean
-- why `StateFlow` is not a different architecture layer
-- how `_uiState.update { currentState -> currentState.copy(...) }` works
-- how `collectAsState()` and `collectAsStateWithLifecycle()` connect StateFlow to Compose
-- code comparison between `mutableStateOf` and `StateFlow`
-- pros and cons of each ViewModel state style
-- when StateFlow becomes useful in larger Android apps
 
 ### Lesson 10 - Simple data persistence: auto-save and reload previous session
 

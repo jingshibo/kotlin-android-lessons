@@ -1,10 +1,86 @@
 # Lesson 9 - StateFlow ViewModel State
 
+Before comparing the two ViewModel state styles, remember the state object itself.
+
+In Lesson 8, the screen state was grouped into one data class:
+
+```kotlin
+data class ResearchUiState(
+    val sampleId: String = "",
+    val isConnected: Boolean = false,
+    val measurements: List<Measurement> = emptyList(),
+    val exportMessage: String = ""
+)
+```
+
+And each measurement row used this data class:
+
+```kotlin
+data class Measurement(
+    val sampleId: String,
+    val repetition: Int,
+    val value: Double,
+    val timestamp: Long
+)
+```
+
+So when you see:
+
+```kotlin
+ResearchUiState()
+```
+
+read it as:
+
+```text
+Create the first/default screen state.
+```
+
 In Lesson 8, the app used this ViewModel state style:
 
 ```kotlin
 var uiState by mutableStateOf(ResearchUiState())
     private set
+```
+
+The screen used that state like this:
+
+```kotlin
+@Composable
+fun ResearchRoute(
+    viewModel: ResearchViewModel = viewModel()
+) {
+    val uiState = viewModel.uiState
+
+    ResearchScreenContent(
+        uiState = uiState,
+        onSampleIdChange = viewModel::updateSampleId,
+        onConnectClick = viewModel::toggleConnection,
+        onMeasureClick = viewModel::addMeasurement,
+        onClearClick = viewModel::clearMeasurements
+    )
+}
+```
+
+And the ViewModel changed that state like this:
+
+```kotlin
+fun updateSampleId(newSampleId: String) {
+    uiState = uiState.copy(
+        sampleId = newSampleId,
+        exportMessage = ""
+    )
+}
+```
+
+So the full old pattern was:
+
+```text
+ViewModel owns uiState.
+Screen reads viewModel.uiState.
+Screen calls ViewModel functions.
+ViewModel replaces uiState with uiState.copy(...).
+Compose notices and redraws.
 ```
 
 That is a valid Compose-friendly state pattern.
@@ -88,7 +164,142 @@ UI redraws.
 
 ---
 
-## 2. Previous ViewModel style
+## 2. What Flow means
+
+Before learning `StateFlow`, it helps to understand the word `Flow`.
+
+In Kotlin, a `Flow` is:
+
+```text
+a stream of values over time.
+```
+
+A normal variable usually gives you one value:
+
+```kotlin
+val sampleId = "S001"
+```
+
+A `Flow` can give you many values over time:
+
+```text
+"S001"
+"S002"
+"S003"
+```
+
+For example, imagine the selected sample changes while the app is running:
+
+```text
+first value:  no sample selected
+next value:   S001
+next value:   S002
+next value:   S003
+```
+
+That is a flow of values.
+
+The code that listens to a Flow is said to:
+
+```text
+collect the Flow.
+```
+
+In general coroutine code, collecting can look like this:
+
+```kotlin
+viewModel.uiState.collect { latestState ->
+    // react to latestState
+}
+```
+
+means:
+
+```text
+Start listening to uiState.
+Every time uiState emits a new ResearchUiState,
+put that new value into latestState,
+then run the code inside the block.
+```
+
+But this raw `collect { ... }` example is only here to explain the word `collect`.
+
+In the Compose screen for this lesson, we normally do not write raw `collect { ... }`.
+
+Instead, the screen uses:
+
+```kotlin
+val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+```
+
+That is the Compose-friendly way to collect ViewModel state.
+
+For ViewModel state, this is useful because the screen state changes many times:
+
+```text
+sample ID changes
+connection state changes
+new measurement is added
+export message changes
+loading state changes
+```
+
+So a Flow is not a new app layer.
+
+It is a way to represent:
+
+```text
+values that can change over time.
+```
+
+### Flow versus StateFlow
+
+`StateFlow` is a special kind of Flow.
+
+A regular `Flow` is mainly:
+
+```text
+values over time.
+```
+
+A `StateFlow` is:
+
+```text
+current value + future values over time.
+```
+
+That current value is important for UI state.
+
+The UI needs to know:
+
+```text
+What should I show right now?
+```
+
+So this:
+
+```kotlin
+val uiState: StateFlow<ResearchUiState>
+```
+
+means:
+
+```text
+uiState has the current ResearchUiState.
+uiState can also emit new ResearchUiState values later.
+```
+
+For this lesson, the simple mental model is:
+
+```text
+Flow = values over time
+StateFlow = current state + future state updates
+collect = listen to those updates
+```
+
+---
+
+## 3. Previous ViewModel style
 
 The previous tutorial style looked like this:
 
@@ -143,7 +354,7 @@ Compose notices and redraws the composable that read `uiState`.
 
 ---
 
-## 3. StateFlow ViewModel style
+## 4. StateFlow ViewModel style
 
 The StateFlow version looks like this:
 
@@ -156,9 +367,9 @@ import kotlinx.coroutines.flow.update
 
 class ResearchViewModel : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ResearchUiState())
+    private val _uiState = MutableStateFlow(ResearchUiState()) // visible to ViewModel only
 
-    val uiState: StateFlow<ResearchUiState> =
+    val uiState: StateFlow<ResearchUiState> = // exposed outside for reading only
         _uiState.asStateFlow()
 
     fun updateSampleId(newSampleId: String) {
@@ -181,7 +392,7 @@ uiState
 
 They are intentionally different.
 
-| Property | Who uses it | Can it be changed? |
+| Property | Who sees it | Can it be changed? |
 |---|---|---|
 | `_uiState` | ViewModel only | Yes |
 | `uiState` | UI and other outside code | No, read-only |
@@ -194,44 +405,39 @@ private set
 
 The ViewModel can update the state.
 
-The UI can observe the state.
+The UI can observe the state but cannot directly replace the state.
 
-The UI cannot directly replace the state.
-
----
-
-## 4. Why the underscore exists
-
-This line creates the real mutable state holder:
-
-```kotlin
-private val _uiState = MutableStateFlow(ResearchUiState())
-```
-
-The underscore is a common naming convention.
-
-It means:
+Another way to read it:
 
 ```text
-This is the private mutable version.
-Do not expose this directly to the UI.
+_uiState is the private mutable version.
+uiState is the public read-only version.
 ```
 
-Then this line exposes a read-only version:
+Only the ViewModel should use `_uiState`.
+
+The UI should only use `uiState`.
+
+So this:
 
 ```kotlin
-val uiState: StateFlow<ResearchUiState> =
-    _uiState.asStateFlow()
+private val _uiState = MutableStateFlow(...)
+val uiState = _uiState.asStateFlow()
 ```
 
-So the ViewModel says:
+has the same protective purpose as:
+
+```kotlin
+var uiState by mutableStateOf(...)
+    private set
+```
+
+Both mean:
 
 ```text
-Inside this class, I can change _uiState.
-Outside this class, you can only observe uiState.
+The UI can read state.
+Only the ViewModel can change state.
 ```
-
-That protects the app flow.
 
 The screen should call:
 
@@ -397,7 +603,7 @@ Use the same lifecycle version family already used by your project when possible
 With the old style, the ViewModel could read:
 
 ```kotlin
-val sampleId = uiState.sampleId.trim()
+val sampleId = uiState.sampleId
 ```
 
 With StateFlow, `uiState` is now a `StateFlow`.
@@ -405,14 +611,14 @@ With StateFlow, `uiState` is now a `StateFlow`.
 So inside the ViewModel, read the current value like this:
 
 ```kotlin
-val sampleId = _uiState.value.sampleId.trim()
+val sampleId = _uiState.value.sampleId
 ```
 
 or:
 
 ```kotlin
 val currentState = _uiState.value
-val sampleId = currentState.sampleId.trim()
+val sampleId = currentState.sampleId
 ```
 
 For example:
@@ -422,10 +628,12 @@ import kotlin.random.Random
 
 fun addMeasurement() {
     val currentState = _uiState.value
-    val sampleId = currentState.sampleId.trim()
+    val sampleId = currentState.sampleId
 
     if (sampleId.isBlank() || !currentState.isConnected) {
         _uiState.update { currentState ->
+            // This currentState is a new lambda parameter from update.
+            // It is not the same variable as val currentState = _uiState.value and !currentState.isConnected above.
             currentState.copy(
                 exportMessage = "Enter a sample ID and connect first"
             )
@@ -491,6 +699,18 @@ fun updateSampleId(newSampleId: String) {
 }
 ```
 
+Reading current state inside the ViewModel. Previous style:
+
+```kotlin
+val sampleId = uiState.sampleId
+```
+
+Reading current state inside the ViewModel. StateFlow style:
+
+```kotlin
+val sampleId = _uiState.value.sampleId
+```
+
 Screen reading, previous style:
 
 ```kotlin
@@ -503,6 +723,17 @@ Screen reading, StateFlow style:
 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 ```
 
+
+### Tiny translation guide
+
+| Previous Lesson 8 code | StateFlow version |
+|---|---|
+| `var uiState by mutableStateOf(...)` | `private val _uiState = MutableStateFlow(...)` |
+| `private set` | expose `val uiState = _uiState.asStateFlow()` |
+| `uiState = uiState.copy(...)` | `_uiState.update { it.copy(...) }` |
+| `val uiState = viewModel.uiState` | `val uiState by viewModel.uiState.collectAsStateWithLifecycle()` |
+| `uiState.sampleId` inside ViewModel | `_uiState.value.sampleId` inside ViewModel |
+
 Same mental model:
 
 ```text
@@ -512,10 +743,10 @@ ViewModel updates uiState
 -> UI redraws
 
 new:
-ViewModel updates _uiState
--> StateFlow emits new value
--> Compose collects StateFlow
--> UI redraws
+ViewModel updates private _uiState 
+-> StateFlow exposes this _uiState value via read-only uiState to Compose
+-> Compose collects viewModel.uiState
+-> UI redraws based on updated uiState
 ```
 
 ---
@@ -536,11 +767,30 @@ it teaches the architecture with less syntax.
 StateFlow is useful once the app starts to have:
 
 ```text
-Room flows
-repository streams
-background work
+Room data streams
+repository functions returning Flow
+background loading
 multiple screens observing shared state
-more advanced testing
+larger ViewModels
+tests that observe state changes
+```
+
+For example, later your app may want to observe patients from Room:
+
+```kotlin
+repository.observePatients()
+```
+
+If that returns a Flow, then a StateFlow-based ViewModel fits naturally.
+
+The data can flow like this:
+
+```text
+Room Flow
+-> Repository Flow
+-> ViewModel StateFlow
+-> Compose collectAsStateWithLifecycle()
+-> UI
 ```
 
 ---
@@ -689,8 +939,56 @@ ViewModel has Compose-observable state.
 StateFlow style:
 
 ```text
-ViewModel has coroutine-observable state.
+ViewModel has Flow-observable state.
 Compose collects it and turns it into Compose state.
+```
+
+We can also think of it as:
+
+```text
+ViewModel has coroutine-observable state.
+```
+
+That wording may be a little unclear.
+
+What it means is:
+
+```text
+The ViewModel state is stored in a Kotlin Flow object, so coroutine/Flow code can observe changes to it.
+```
+
+More specifically, `StateFlow` belongs to Kotlin coroutines/Flow APIs:
+
+```kotlin
+private val _uiState = MutableStateFlow(ResearchUiState())
+val uiState: StateFlow<ResearchUiState> = _uiState.asStateFlow()
+```
+
+To collect the value, in a non-Compose coroutine code, it is like this:
+
+```kotlin
+viewModel.uiState.collect { latestState ->
+    // react to new state
+}
+```
+
+But this is not the main screen pattern in this lesson.
+
+In Compose, we usually collect it like this:
+
+```kotlin
+val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+```
+
+So the meaning is:
+
+```text
+mutableStateOf style:
+ViewModel has Compose-observable state.
+
+StateFlow style:
+ViewModel has Flow-observable state.
+Compose collects that Flow and turns it into Compose state.
 ```
 
 So when you see:
@@ -717,6 +1015,12 @@ read it as:
 
 ```text
 The ViewModel is publishing a new screen state.
+```
+
+Final mental model:
+
+```text
+StateFlow is a more advanced state holder; the state is still ViewModel state.
 ```
 
 Same architecture.
