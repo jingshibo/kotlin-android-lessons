@@ -367,8 +367,12 @@ import kotlinx.coroutines.flow.update
 
 class ResearchViewModel : ViewModel() {
 
+    // 1. PRIVATE & MUTABLE (Editable)
+    // The '_' prefix means private. ONLY DataViewModel can change this!
     private val _uiState = MutableStateFlow(ResearchUiState()) // visible to ViewModel only
 
+    // 2. PUBLIC & IMMUTABLE (Read-Only)
+    // Exposed to the UI screen. The UI can ONLY READ this stream!
     val uiState: StateFlow<ResearchUiState> = // exposed outside for reading only
         _uiState.asStateFlow()
 
@@ -564,6 +568,15 @@ val uiState by viewModel.uiState.collectAsState()
 That also converts a `StateFlow` into Compose-readable state.
 
 For Android screens, `collectAsStateWithLifecycle()` is usually preferred because it is lifecycle-aware.
+
+Why `collectAsState()` is essential:
+
+StateFlow belongs to Kotlin, but Compose is a UI framework. Compose doesn't know how to read Kotlin StateFlow directly.
+
+`collectAsState()` acts as the bridge:
+1. It subscribes to `viewModel.uiState`.
+2. Every time a new DataUiState is produced, `collectAsState()` notifies Compose.
+3. Compose detects the change and automatically re-draws (recomposes) the exact UI composables that read state.
 
 ---
 
