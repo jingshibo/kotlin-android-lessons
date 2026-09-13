@@ -1,6 +1,6 @@
-# Lesson 28 — Adding Signal Processing
+# Lesson 29 — Adding Signal Processing
 
-In Lesson 27, we added the fake device source.
+In Lesson 28, we added the fake device source.
 
 The repository can now:
 
@@ -14,7 +14,7 @@ create MeasurementEntity
 save to Room
 ```
 
-But in Lesson 27, we temporarily used this:
+But in Lesson 28, we temporarily used this:
 
 ```kotlin
 processedValue = rawValue
@@ -30,7 +30,7 @@ This corresponds to **Step A6** in Direction A:
 Add simple signal processing
 ```
 
-The goal of Lesson 28 is to connect the repository to a `SignalProcessor`.
+The goal of Lesson 29 is to connect the repository to a `SignalProcessor`.
 
 After this lesson, the data flow becomes:
 
@@ -127,7 +127,7 @@ The repository uses the processor when creating measurements.
 
 ## 3. Create the `processing` package
 
-From Lesson 23, we planned this folder:
+From Lesson 24, we planned this folder:
 
 ```text
 processing
@@ -425,7 +425,7 @@ This uses Kotlin null safety.
 
 ## 10. Update the repository constructor
 
-In Lesson 27, `MeasurementRepository` had:
+In Lesson 28, `MeasurementRepository` had:
 
 ```kotlin
 class MeasurementRepository(
@@ -508,7 +508,7 @@ But keep it simple for now.
 
 ## 12. Update `createMeasurementFromDevice()`
 
-In Lesson 27, we had:
+In Lesson 28, we had:
 
 ```kotlin
 suspend fun createMeasurementFromDevice(
@@ -575,7 +575,7 @@ create MeasurementEntity
 
 ## 13. What changed?
 
-Before Lesson 28:
+Before Lesson 29:
 
 ```text
 rawValue = fake device value
@@ -583,7 +583,7 @@ processedValue = rawValue
 status = OK
 ```
 
-After Lesson 28:
+After Lesson 29:
 
 ```text
 rawValue = fake device value
@@ -655,7 +655,7 @@ Later, the app can decide whether invalid values are used for inference or expor
 
 ## 15. Update `readAndSaveMeasurement()`
 
-The function from Lesson 27 was:
+The function from Lesson 28 was:
 
 ```kotlin
 suspend fun readAndSaveMeasurement(
@@ -742,7 +742,7 @@ result:
 2.3, 2.4, 2.5
 ```
 
-This prepares us for Lesson 29.
+This prepares us for Lesson 30.
 
 ---
 
@@ -784,7 +784,7 @@ return SignalFeatures or null
 
 This is important for ML.
 
-The fake model in Lesson 29 will use:
+The fake model in Lesson 30 will use:
 
 ```text
 SignalFeatures
@@ -862,7 +862,7 @@ import com.example.researchapp.processing.SignalProcessor
 
 ---
 
-## 20. Updated repository core after Lesson 28
+## 20. Updated repository core after Lesson 29
 
 The important updated parts of `MeasurementRepository` are:
 
@@ -965,7 +965,7 @@ class MeasurementRepository(
     }
 
     // The patient/session/measurement/result database functions
-    // from Lesson 26 stay below.
+    // from Lesson 27 stay below.
 }
 ```
 
@@ -973,7 +973,7 @@ This is not the full repository file.
 
 It shows the important new processing-related parts.
 
-The database functions from Lesson 26 should remain.
+The database functions from Lesson 27 should remain.
 
 ---
 
@@ -1016,7 +1016,7 @@ save smoothed value
 
 But that needs a buffer, and we have not introduced a proper streaming buffer yet.
 
-So for Lesson 28:
+So for Lesson 29:
 
 ```text
 keep movingAverage() available
@@ -1108,7 +1108,7 @@ This helps the researcher understand what is happening.
 
 ## 24. Why this structure is useful
 
-After Lesson 28, the repository uses three different things:
+After Lesson 29, the repository uses three different things:
 
 ```text
 Room database
@@ -1149,7 +1149,7 @@ This is the core of a real research acquisition pipeline.
 
 ---
 
-## 25. Current architecture after Lesson 28
+## 25. Current architecture after Lesson 29
 
 The fake acquisition path is now:
 
@@ -1195,7 +1195,7 @@ This is a major improvement over simply saving random numbers.
 
 ---
 
-## 26. Current files after Lesson 28
+## 26. Current files after Lesson 29
 
 After this lesson, the project should include:
 
@@ -1247,7 +1247,7 @@ processing layer
 
 ---
 
-## 27. What you learned in Lesson 28
+## 27. What you learned in Lesson 29
 
 You created:
 
@@ -1319,9 +1319,9 @@ This prepares the app for ML inference because ML should usually receive process
 
 ---
 
-## 28. Lesson 29 preview
+## 28. Lesson 30 preview
 
-In Lesson 29, we will add fake ML inference into the real project.
+In Lesson 30, we will add fake ML inference into the real project.
 
 We will implement:
 

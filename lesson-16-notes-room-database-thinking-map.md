@@ -1,4 +1,4 @@
-# Lesson 15 Notes - Room Database Thinking Map
+# Lesson 16 Notes - Room Database Thinking Map
 
 This note explains how to think when building and using a Room database.
 
@@ -84,7 +84,7 @@ One session can have many measurements.
 One session can have one or more results.
 ```
 
-That is why Lesson 15 uses multiple tables instead of one giant measurement table.
+That is why Lesson 16 uses multiple tables instead of one giant measurement table.
 
 In Android project terms, this usually becomes several Kotlin files:
 
@@ -801,7 +801,7 @@ Repository method:
     What app-level workflow uses those DAO actions?
 ```
 
-For Lesson 15, use this beginner rule:
+For Lesson 16, use this beginner rule:
 
 ```text
 Use one DAO per table for basic insert/query/update/delete.
@@ -887,7 +887,7 @@ The database class answers:
 Which tables and DAOs belong to this Room database?
 ```
 
-For Lesson 15:
+For Lesson 16:
 
 ```kotlin
 @Database(

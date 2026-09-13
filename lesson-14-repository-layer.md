@@ -1,6 +1,6 @@
-# Lesson 13 — Repository Layer: Separating Data Logic
+# Lesson 14 — Repository Layer: Separating Data Logic
 
-In Lesson 12, we improved the app state model.
+In Lesson 13, we improved the app state model.
 
 Instead of only using:
 
@@ -52,7 +52,7 @@ error messages
 
 This is okay for learning, but as the app grows, the ViewModel can become too large.
 
-So in Lesson 13, we introduce a new idea:
+So in Lesson 14, we introduce a new idea:
 
 ```text
 Repository layer
@@ -170,7 +170,7 @@ ML inference result storage
 
 But not yet.
 
-We keep Lesson 13 simple.
+We keep Lesson 14 simple.
 
 ---
 
@@ -253,7 +253,7 @@ This is cleaner.
 
 ## 5. Add save and load to the repository
 
-In Lesson 9, we saved and loaded measurements from internal storage. The uploaded tutorial specifically introduced internal storage as a beginner-friendly auto-save method. fileciteturn1file0L397-L405
+In Lesson 10, we saved and loaded measurements from internal storage. The uploaded tutorial specifically introduced internal storage as a beginner-friendly auto-save method. fileciteturn1file0L397-L405
 
 Now we move those calls into the repository.
 
@@ -364,7 +364,7 @@ This means:
 Run file input/output work on the IO dispatcher.
 ```
 
-This follows the idea from Lesson 10:
+This follows the idea from Lesson 11:
 
 ```text
 Do not block the UI with file saving or loading.
@@ -412,7 +412,7 @@ Later, when the app becomes more professional, we may use dependency injection. 
 
 ## 8. Update `addSimulatedMeasurement()`
 
-Before Lesson 13, the ViewModel created fake data directly:
+Before Lesson 14, the ViewModel created fake data directly:
 
 ```kotlin
 private fun addSimulatedMeasurement(context: Context) {
@@ -802,9 +802,9 @@ loading
 
 ---
 
-## 12. Current architecture after Lesson 13
+## 12. Current architecture after Lesson 14
 
-Before Lesson 13:
+Before Lesson 14:
 
 ```text
 ResearchScreen
@@ -817,7 +817,7 @@ ResearchViewModel
  └── file loading
 ```
 
-After Lesson 13:
+After Lesson 14:
 
 ```text
 ResearchScreen
@@ -987,7 +987,7 @@ Later, a more professional version may use:
 
 But not yet.
 
-## 17. What You Learned in Lesson 13
+## 17. What You Learned in Lesson 14
 
 The key idea is:
 
@@ -1045,9 +1045,9 @@ For a research app, this is important because the app will later become more com
 
 A repository gives us a place to manage that complexity without making the UI or ViewModel messy.
 
-## Lesson 14 Preview
+## Lesson 15 Preview
 
-In Lesson 14, we should introduce:
+In Lesson 15, we should introduce:
 
 **Room database**
 
@@ -1060,9 +1060,9 @@ That is useful for learning, but a serious research app may need structured data
 - Measurement
 - Result
 
-Another drawback of the Lesson 13 file-based approach is that saving one new measurement means saving the whole list again.
+Another drawback of the Lesson 14 file-based approach is that saving one new measurement means saving the whole list again.
 
-In Lesson 13, after creating a measurement, we saved the whole list:
+In Lesson 14, after creating a measurement, we saved the whole list:
 
 ```text
 create new measurement
@@ -1087,7 +1087,7 @@ save entire list to file
 ```
 
 Room will help us store this kind of structured data locally on the Android tablet.
-In Lesson 14, we will cover:
+In Lesson 15, we will cover:
 
 - why Room is useful
 - Entity

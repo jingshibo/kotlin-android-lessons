@@ -1,6 +1,6 @@
-# Lesson 22 — Final Research App Architecture Review
+# Lesson 23 — Final Research App Architecture Review
 
-In Lesson 21, we completed the main research-app workflow:
+In Lesson 22, we completed the main research-app workflow:
 
 ```text
 Patient
@@ -18,7 +18,7 @@ Result
 Export
 ```
 
-Now Lesson 22 is a review lesson.
+Now Lesson 23 is a review lesson.
 
 The goal is to connect everything we have built so far into one clear mental model.
 
@@ -552,7 +552,7 @@ confidence score
 ResultEntity
 ```
 
-A very important warning from Lesson 20 was:
+A very important warning from Lesson 21 was:
 
 ```text
 Android preprocessing must match Python training preprocessing.
@@ -893,7 +893,7 @@ It protects the app from becoming impossible to maintain when the research proje
 
 ## 17. What is still simplified?
 
-Even after Lesson 22, the app is still a learning version.
+Even after Lesson 23, the app is still a learning version.
 
 Important simplifications include:
 
@@ -1008,7 +1008,7 @@ The original tutorial previewed coroutines/background work for exactly this reas
 
 ---
 
-## 20. What you learned in Lesson 22
+## 20. What you learned in 22 Lessons
 
 You learned how all previous lessons fit together:
 
@@ -1074,7 +1074,7 @@ This is the complete main path for building your Android research app.
 
 # Next step
 
-After Lesson 22, the core tutorial path is complete.
+After Lesson 23, the core tutorial path is complete.
 
 From here, there are two possible directions:
 
@@ -1089,7 +1089,7 @@ continue advanced lessons, such as real Bluetooth/Wi-Fi, Room relationships, Lit
 For your research app, the most practical next advanced lesson would be:
 
 ```text
-Lesson 23 — Turning the Architecture into a Clean Android Project Structure
+Lesson 24 — Turning the Architecture into a Clean Android Project Structure
 ```
 
 That would take the architecture from this lesson and map it into real files, packages, and implementation order.

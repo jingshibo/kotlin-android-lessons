@@ -1,6 +1,6 @@
-# Lesson 17 — Permissions and Real Device Communication Overview
+# Lesson 18 — Permissions and Real Device Communication Overview
 
-In Lesson 16, we moved from one large screen to a multi-screen research app structure:
+In Lesson 17, we moved from one large screen to a multi-screen research app structure:
 
 ```text
 Patient List Screen
@@ -243,7 +243,7 @@ That is different from Bluetooth permissions.
 
 ## 6. Add permission state to UI state
 
-In Lesson 12, we already had:
+In Lesson 13, we already had:
 
 ```kotlin
 enum class DeviceConnectionState {
@@ -554,7 +554,7 @@ Button(
 }
 ```
 
-This is the same state-driven UI idea from Lesson 12.
+This is the same state-driven UI idea from Lesson 13.
 
 The UI does not randomly enable all buttons.
 
@@ -936,7 +936,7 @@ Then later choose an implementation:
 - `WifiDeviceDataSource`
 - `UsbDeviceDataSource`
 
-This is why Lesson 13’s Repository layer was important.
+This is why Lesson 14’s Repository layer was important.
 
 ## 21. Real Data Is Usually Bytes or Strings
 
@@ -1067,7 +1067,7 @@ View Result
 
 This is the main path toward your research app.
 
-## 24. What You Learned in Lesson 17
+## 24. What You Learned in Lesson 18
 
 The key concepts are:
 
@@ -1119,9 +1119,9 @@ Bluetooth / Wi-Fi / USB / fake data
 
 For a research app, this is important because real device communication can fail, permissions can be denied, and raw data may need parsing before it becomes a valid measurement.
 
-## Lesson 18 Preview
+## Lesson 19 Preview
 
-In Lesson 18, we should move from permission preparation to the actual data-source abstraction.
+In Lesson 19, we should move from permission preparation to the actual data-source abstraction.
 We will build the app around:
 
 **DeviceDataSource**
@@ -1137,4 +1137,4 @@ with:
 ```kotlin
 deviceDataSource.readValue()
 ```
-Lesson 18 will still use a fake data source first, but it will be structured so that a real Bluetooth or Wi-Fi data source can be inserted later without rewriting the UI.
+Lesson 19 will still use a fake data source first, but it will be structured so that a real Bluetooth or Wi-Fi data source can be inserted later without rewriting the UI.

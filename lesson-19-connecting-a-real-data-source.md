@@ -1,6 +1,6 @@
-# Lesson 18 — Connecting a Real Data Source
+# Lesson 19 — Connecting a Real Data Source
 
-In Lesson 17, we prepared the app for real device communication.
+In Lesson 18, we prepared the app for real device communication.
 
 We discussed:
 
@@ -105,7 +105,7 @@ without changing the screen much.
 
 ---
 
-## 2. Main idea of Lesson 18
+## 2. Main idea of Lesson 19
 
 We will introduce this interface:
 
@@ -388,7 +388,7 @@ This is a good habit for real research apps.
 
 ## 10. Update repository to use `DeviceDataSource`
 
-In Lesson 15, our repository created fake measurements directly using `Random`.
+In Lesson 16, our repository created fake measurements directly using `Random`.
 
 Now we change that.
 
@@ -592,7 +592,7 @@ createMeasurementFromDevice()
 
 ## 14. Update ViewModel `connectDevice()`
 
-In Lesson 17, `connectDevice()` simulated connection directly inside the ViewModel:
+In Lesson 18, `connectDevice()` simulated connection directly inside the ViewModel:
 
 ```kotlin
 viewModelScope.launch {
@@ -702,7 +702,7 @@ This is safer than simply changing the UI state without actually disconnecting t
 
 ## 16. Update measurement acquisition
 
-In Lesson 15, we used:
+In Lesson 16, we used:
 
 ```kotlin
 measurementRepository.createSimulatedMeasurement(...)
@@ -766,7 +766,7 @@ Even though the current data source is still fake, the architecture now looks re
 
 ## 17. Update acquisition loop
 
-In Lesson 15, `startAcquisition()` called:
+In Lesson 16, `startAcquisition()` called:
 
 ```kotlin
 addSimulatedMeasurement(sessionId)
@@ -819,7 +819,7 @@ fun startAcquisition() {
 
 Notice something important.
 
-In Lesson 11, we had:
+In Lesson 12, we had:
 
 ```kotlin
 delay(1000)
@@ -864,7 +864,7 @@ viewModelScope.launch {
 
 That means we may accidentally start many coroutines.
 
-For Lesson 18, a cleaner version is to make `addMeasurementFromDevice()` a `suspend` function.
+For Lesson 19, a cleaner version is to make `addMeasurementFromDevice()` a `suspend` function.
 
 So instead of:
 
@@ -932,7 +932,7 @@ Do not create a new coroutine for every single value unless you need to.
 
 ## 19. Cleaner `startAcquisition()` version
 
-So the better Lesson 18 version is:
+So the better Lesson 19 version is:
 
 ```kotlin
 fun startAcquisition() {
@@ -1073,7 +1073,7 @@ class BluetoothDeviceDataSource : DeviceDataSource {
 ```
 
 Do not implement this yet.
-The point of Lesson 18 is to prepare the app so that this class can be added later.
+The point of Lesson 19 is to prepare the app so that this class can be added later.
 The rest of the app should not need to know the Bluetooth details.
 
 ## 22. Real Data May Need Parsing
@@ -1270,7 +1270,7 @@ UI
 
 we can change the lower layers without rewriting the screen.
 
-## 26. Current Architecture After Lesson 18
+## 26. Current Architecture After Lesson 19
 
 After this lesson, the app structure becomes:
 
@@ -1313,7 +1313,7 @@ UI state updates
 
 This is much closer to a real research app.
 
-## 27. What You Learned in Lesson 18
+## 27. What You Learned in Lesson 19
 
 The key new interface is:
 
@@ -1363,9 +1363,9 @@ That doorway is:
 
 This lets us build the app with fake data now, then replace the data source later.
 
-## Lesson 19 Preview
+## Lesson 20 Preview
 
-In Lesson 19, we should add a simple signal-processing pipeline.
+In Lesson 20, we should add a simple signal-processing pipeline.
 Right now, the device data source returns one value and we save it directly.
 But many research apps need:
 
@@ -1381,7 +1381,7 @@ feature extraction
 classification or result
 ```
 
-So Lesson 19 should introduce:
+So Lesson 20 should introduce:
 
 - raw data vs processed data
 - simple processing functions

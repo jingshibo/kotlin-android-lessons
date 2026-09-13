@@ -1,6 +1,6 @@
-# Lesson 27 — Adding the Fake Device Source
+# Lesson 28 — Adding the Fake Device Source
 
-In Lesson 26, we built the Repository layer.
+In Lesson 27, we built the Repository layer.
 
 The repository can now talk to Room through the DAOs:
 
@@ -89,7 +89,7 @@ real later
 
 ## 2. Where the fake device code belongs
 
-In Lesson 23, we planned this folder:
+In Lesson 24, we planned this folder:
 
 ```text
 device
@@ -391,7 +391,7 @@ A real app should not silently pretend data exists when the device is disconnect
 
 Now we connect the fake device source to the repository.
 
-In Lesson 26, the repository started like this:
+In Lesson 27, the repository started like this:
 
 ```kotlin
 class MeasurementRepository(
@@ -527,9 +527,9 @@ Why?
 
 Because we have not connected `SignalProcessor` yet.
 
-That will happen in Lesson 28.
+That will happen in Lesson 29.
 
-For Lesson 27, the goal is only:
+For Lesson 28, the goal is only:
 
 ```text
 read fake value
@@ -796,9 +796,9 @@ This is becoming a real app data layer.
 
 ---
 
-## 15. What changed from Lesson 26?
+## 15. What changed from Lesson 27?
 
-In Lesson 26, the repository only worked with Room.
+In Lesson 27, the repository only worked with Room.
 
 ```text
 Repository
@@ -806,7 +806,7 @@ Repository
 Room database
 ```
 
-After Lesson 27, the repository also works with a device source.
+After Lesson 28, the repository also works with a device source.
 
 ```text
 Repository
@@ -945,7 +945,7 @@ This is convenient.
 
 ## 19. Why `processedValue` is not really processed yet
 
-In Lesson 27, we set:
+In Lesson 28, we set:
 
 ```kotlin
 processedValue = rawValue
@@ -953,7 +953,7 @@ processedValue = rawValue
 
 This is temporary.
 
-The real processing will come in Lesson 28.
+The real processing will come in Lesson 29.
 
 For now:
 
@@ -962,7 +962,7 @@ rawValue = fake device value
 processedValue = same fake device value
 ```
 
-After Lesson 28:
+After Lesson 29:
 
 ```text
 rawValue = fake device value
@@ -1087,9 +1087,9 @@ The ViewModel can decide what message to show.
 
 ---
 
-## 23. Current architecture after Lesson 27
+## 23. Current architecture after Lesson 28
 
-After Lesson 27, the app architecture becomes:
+After Lesson 28, the app architecture becomes:
 
 ```text
 ResearchViewModel
@@ -1125,7 +1125,7 @@ This is the first working acquisition structure.
 
 ---
 
-## 24. Current files after Lesson 27
+## 24. Current files after Lesson 28
 
 After this lesson, the project should include:
 
@@ -1165,7 +1165,7 @@ com.example.researchapp
 
 ---
 
-## 25. What you learned in Lesson 27
+## 25. What you learned in Lesson 28
 
 You created:
 
@@ -1222,9 +1222,9 @@ This keeps device communication separate from research data storage.
 
 ---
 
-## 26. Lesson 28 preview
+## 26. Lesson 29 preview
 
-In Lesson 28, we will connect the signal-processing layer.
+In Lesson 29, we will connect the signal-processing layer.
 
 Right now:
 
@@ -1234,7 +1234,7 @@ processedValue = rawValue
 
 That is temporary.
 
-In Lesson 28, we will use:
+In Lesson 29, we will use:
 
 ```text
 SignalProcessor

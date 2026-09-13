@@ -1,6 +1,6 @@
-# Lesson 21 — Exporting Complete Research Data
+# Lesson 22 — Exporting Complete Research Data
 
-In Lesson 20, the app became more like an **edge-AI research app**:
+In Lesson 21, the app became more like an **edge-AI research app**:
 
 ```text
 Patient
@@ -29,7 +29,7 @@ Measurement
 Result
 ```
 
-So Lesson 21 is about exporting **complete research data**, not only a flat measurement list.
+So Lesson 22 is about exporting **complete research data**, not only a flat measurement list.
 
 ---
 
@@ -174,7 +174,7 @@ Patient
 
 Kotlin’s official serialization documentation describes `kotlinx.serialization` as the Kotlin library used to serialize objects to JSON, which is useful if you later want cleaner JSON export code. citeturn902638search4
 
-For Lesson 21, we will start with CSV because it is simpler and very useful for research analysis.
+For Lesson 22, we will start with CSV because it is simpler and very useful for research analysis.
 
 ---
 
@@ -1084,7 +1084,7 @@ For a research app with ML inference, the export should eventually include:
 - processed values
 - final result
 
-In Lesson 20, we mentioned that saving the model version is important.
+In Lesson 21, we mentioned that saving the model version is important.
 A future ResultEntity may become:
 
 ```kotlin
@@ -1107,7 +1107,7 @@ But the research habit is:
 
 > Export enough information to understand how the result was produced.
 
-## 21. Export Flow After Lesson 21
+## 21. Export Flow After Lesson 22
 
 The complete export flow is now:
 
@@ -1135,7 +1135,7 @@ App shows "Export saved"
 
 This is a practical and realistic app workflow.
 
-## 22. Current Architecture After Lesson 21
+## 22. Current Architecture After Lesson 22
 
 The architecture is now:
 
@@ -1181,7 +1181,7 @@ This is now a complete research-app path:
 - export
 - analyse outside app
 
-## 23. What You Learned in Lesson 21
+## 23. What You Learned in Lesson 22
 
 The key idea is:
 
@@ -1242,9 +1242,9 @@ Export
 Python / Excel / statistics / reporting
 ```
 
-## Lesson 22 Preview
+## Lesson 23 Preview
 
-In Lesson 22, we should step back and review the complete research app architecture.
+In Lesson 23, we should step back and review the complete research app architecture.
 We will connect all previous lessons into one clear mental model:
 
 - Presentation layer

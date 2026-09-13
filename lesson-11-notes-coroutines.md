@@ -1,6 +1,6 @@
-# Lesson 10 Notes - Coroutines, Threads, and Dispatchers
+# Lesson 11 Notes - Coroutines, Threads, and Dispatchers
 
-This note explains how to think about the coroutine pattern used in Lesson 10.
+This note explains how to think about the coroutine pattern used in Lesson 11.
 
 The main pattern is:
 
@@ -59,7 +59,7 @@ ML inference
 long loops
 ```
 
-So the goal of Lesson 10 is:
+So the goal of Lesson 11 is:
 
 ```text
 Keep quick UI state updates on Main.
@@ -68,7 +68,7 @@ Return the result to Main.
 Update uiState after the work finishes.
 ```
 
-## 2. The Main Pattern in Lesson 10
+## 2. The Main Pattern in Lesson 11
 
 Start with the actual code shape:
 
@@ -283,7 +283,7 @@ the thread where the coroutine is running at this exact line
 
 ## 5. Why `suspend` Appears
 
-In Lesson 10, `suspend` appears because we start using coroutine-only functions.
+In Lesson 11, `suspend` appears because we start using coroutine-only functions.
 
 This section comes after dispatcher switching because `suspend` is easier to understand after you have seen where it is needed.
 
@@ -586,7 +586,7 @@ A coroutine can suspend without blocking a thread.
 But blocking code inside a coroutine still blocks whichever thread it runs on.
 ```
 
-That is why Lesson 10 uses `Dispatchers.IO` for file work.
+That is why Lesson 11 uses `Dispatchers.IO` for file work.
 
 It does not make normal file writing magically non-blocking.
 
@@ -803,7 +803,7 @@ saveMeasurementsInBackground is a suspend function.
 It hides the Dispatchers.IO detail inside itself.
 ```
 
-Lesson 10 starts with Style A because it makes the dispatcher visible.
+Lesson 11 starts with Style A because it makes the dispatcher visible.
 
 Then it moves toward Style B because the ViewModel code becomes easier to read.
 

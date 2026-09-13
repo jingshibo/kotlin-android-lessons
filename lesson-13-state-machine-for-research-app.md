@@ -1,6 +1,6 @@
-# Lesson 12 — Device Connection State and Acquisition Flow
+# Lesson 13 — Device Connection State and Acquisition Flow
 
-In Lesson 11, we changed the app from:
+In Lesson 12, we changed the app from:
 
 ```text
 User clicks once
@@ -56,7 +56,7 @@ Clear UI status messages
 
 ## 1. Why `isAcquiring` is not enough
 
-In Lesson 11, we had:
+In Lesson 12, we had:
 
 ```kotlin
 val isAcquiring: Boolean = false
@@ -231,7 +231,7 @@ recording condition
 
 ## 5. Update `ResearchUiState`
 
-In Lesson 11, our UI state looked like this:
+In Lesson 12, our UI state looked like this:
 
 ```kotlin
 data class ResearchUiState(
@@ -351,7 +351,7 @@ We still do not connect a real device yet.
 
 Instead, we simulate connection.
 
-This follows the same idea as Lesson 11:
+This follows the same idea as Lesson 12:
 
 ```text
 First build the app logic with fake behaviour.
@@ -518,7 +518,7 @@ If the app is already idle or stopped, pressing Stop should do nothing.
 
 ## 11. Add simulated measurement
 
-This function is similar to Lesson 11:
+This function is similar to Lesson 12:
 
 ```kotlin
 private fun addSimulatedMeasurement(context: Context) {
@@ -756,7 +756,7 @@ data class Measurement(
 
 ---
 
-## 15. Full ViewModel pattern for Lesson 12
+## 15. Full ViewModel pattern for Lesson 13
 
 This is the main ViewModel logic.
 
@@ -1041,7 +1041,7 @@ This is especially important when collecting experimental data, because the app 
 
 ---
 
-## 19. What you learned in Lesson 12
+## 19. What you learned in Lesson 13
 
 The key new patterns are:
 
@@ -1093,9 +1093,9 @@ clear allowed actions
 safer research data collection
 ```
 
-## Lesson 13 Preview
+## Lesson 14 Preview
 
-In Lesson 13, we should improve the structure again.
+In Lesson 14, we should improve the structure again.
 
 Right now, the ViewModel still does many things:
 
@@ -1107,7 +1107,7 @@ Right now, the ViewModel still does many things:
 
 This is okay for learning, but as the app grows, the ViewModel will become too large.
 
-So Lesson 13 should introduce the:
+So Lesson 14 should introduce the:
 
 **Repository layer**
 

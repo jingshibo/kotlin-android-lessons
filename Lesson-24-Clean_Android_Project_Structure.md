@@ -1,6 +1,6 @@
-# Lesson 23 — Turning the Architecture into a Clean Android Project Structure
+# Lesson 24 — Turning the Architecture into a Clean Android Project Structure
 
-In Lessons 1–22, we built the **conceptual foundation** of the Android research app.
+In Lessons 1-23, we built the **conceptual foundation** of the Android research app.
 
 The tutorial started with the idea that we should not learn all Kotlin/Android theory first, but should learn the subset needed to build a practical research app. fileciteturn0file0L6-L8
 
@@ -10,7 +10,7 @@ Now we start **Direction A**:
 Build a clean Android project from this architecture.
 ```
 
-So Lesson 23 is not about adding a new feature yet.
+So Lesson 24 is not about adding a new feature yet.
 
 It is about turning the architecture into a real project structure.
 
@@ -18,7 +18,7 @@ It is about turning the architecture into a real project structure.
 
 ## 1. Where we are now
 
-After Lesson 22, the full app architecture looked like this:
+After Lesson 23, the full app architecture looked like this:
 
 ```text
 Presentation layer
@@ -59,7 +59,7 @@ Now we need to decide:
 Where should these files live in the Android Studio project?
 ```
 
-That is the purpose of Lesson 23.
+That is the purpose of Lesson 24.
 
 ---
 
@@ -525,9 +525,9 @@ This is where Room-related code will go.
 
 For now, we only create the files.
 
-We do not need to fully implement Room in Lesson 23.
+We do not need to fully implement Room in Lesson 24.
 
-That will be Lesson 25.
+That will be Lesson 26.
 
 ---
 
@@ -565,7 +565,7 @@ ResultEntity
 results table
 ```
 
-We will implement these properly in Lesson 24.
+We will implement these properly in Lesson 25.
 
 For now, the important idea is:
 
@@ -668,7 +668,7 @@ device
 
 ### `DeviceDataSource.kt`
 
-This is the interface from Lesson 18:
+This is the interface from Lesson 19:
 
 ```kotlin
 package com.example.researchapp.device
@@ -934,7 +934,7 @@ A good Direction A order is:
 12. Test the complete fake workflow
 ```
 
-Lesson 23 focuses mostly on step 1 and the file structure.
+Lesson 24 focuses mostly on step 1 and the file structure.
 
 ---
 
@@ -1065,9 +1065,9 @@ That means the UI, ViewModel, Repository, and Result screen can be tested before
 
 ---
 
-## 23. Current skeleton after Lesson 23
+## 23. Current skeleton after Lesson 24
 
-After Lesson 23, your project should have this shape:
+After Lesson 24, your project should have this shape:
 
 ```text
 com.example.researchapp
@@ -1087,13 +1087,13 @@ It may only show placeholder screens.
 
 That is okay.
 
-The goal of Lesson 23 is not to finish the app.
+The goal of Lesson 24 is not to finish the app.
 
 The goal is to create a clean foundation.
 
 ---
 
-## 24. What you learned in Lesson 23
+## 24. What you learned in Lesson 24
 
 You learned how to map the architecture into real Android project folders:
 
@@ -1151,9 +1151,9 @@ This is how we prevent the app from becoming messy.
 
 ---
 
-# Lesson 24 preview
+# Lesson 25 preview
 
-In Lesson 24, we will start implementing the real project files.
+In Lesson 25, we will start implementing the real project files.
 
 The next step is:
 
@@ -1172,4 +1172,4 @@ ResultEntity
 
 and explain exactly what each field means.
 
-This will turn the research data model from Lesson 15 into real Kotlin files inside the new project structure.
+This will turn the research data model from Lesson 16 into real Kotlin files inside the new project structure.

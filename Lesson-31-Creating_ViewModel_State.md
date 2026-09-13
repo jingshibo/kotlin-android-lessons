@@ -1,6 +1,6 @@
-# Lesson 30 — Building the Compose Screens
+# Lesson 31 — Building the Compose Screens
 
-In Lesson 29, we completed the main backend/data pipeline for the fake research app.
+In Lesson 30, we completed the main backend/data pipeline for the fake research app.
 
 The app now has:
 
@@ -40,7 +40,7 @@ This corresponds to **Step A8** in Direction A:
 Build Compose screens
 ```
 
-The goal of Lesson 30 is to create the main screen files:
+The goal of Lesson 31 is to create the main screen files:
 
 ```text
 PatientListScreen.kt
@@ -51,13 +51,13 @@ ResultScreen.kt
 
 At this stage, we focus on screen structure and callbacks.
 
-We will not fully connect the screens to the ViewModel yet. That will come in Lesson 31.
+We will not fully connect the screens to the ViewModel yet. That will come in Lesson 32.
 
 ---
 
 ## 1. Where we are in the project structure
 
-From Lesson 23, we planned this folder:
+From Lesson 24, we planned this folder:
 
 ```text
 ui
@@ -1028,7 +1028,7 @@ Started: 2026-08-26 14:30
 Ended: 2026-08-26 14:35
 ```
 
-But that is not necessary for Lesson 30.
+But that is not necessary for Lesson 31.
 
 ---
 
@@ -1108,7 +1108,7 @@ This makes the app easier to maintain.
 
 ---
 
-## 22. Current UI files after Lesson 30
+## 22. Current UI files after Lesson 31
 
 After this lesson, your `ui` folder should contain:
 
@@ -1143,7 +1143,7 @@ That comes next.
 
 ---
 
-## 23. Current architecture after Lesson 30
+## 23. Current architecture after Lesson 31
 
 The architecture now looks like this:
 
@@ -1180,7 +1180,7 @@ The repository currently defines:
 what the app can do with data
 ```
 
-Lesson 31 will connect them.
+Lesson 32 will connect them.
 
 ---
 
@@ -1246,7 +1246,7 @@ So each important user action should have a callback.
 
 ---
 
-## 26. What you learned in Lesson 30
+## 26. What you learned in Lesson 31
 
 You created the main Compose screen files:
 
@@ -1306,9 +1306,9 @@ view result
 
 ---
 
-## 27. Lesson 31 preview
+## 27. Lesson 32 preview
 
-In Lesson 31, we will connect the screens to navigation and ViewModel state.
+In Lesson 32, we will connect the screens to navigation and ViewModel state.
 
 We will work on:
 

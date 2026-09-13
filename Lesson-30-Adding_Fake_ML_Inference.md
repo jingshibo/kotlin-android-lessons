@@ -1,6 +1,6 @@
-# Lesson 29 — Adding Fake ML Inference
+# Lesson 30 — Adding Fake ML Inference
 
-In Lesson 28, we connected the signal-processing layer.
+In Lesson 29, we connected the signal-processing layer.
 
 The acquisition path became:
 
@@ -30,7 +30,7 @@ This corresponds to **Step A7** in Direction A:
 Add fake ML model
 ```
 
-The goal of Lesson 29 is to let the app produce a fake prediction before we connect a real LiteRT/TFLite model.
+The goal of Lesson 30 is to let the app produce a fake prediction before we connect a real LiteRT/TFLite model.
 
 After this lesson, the data flow becomes:
 
@@ -110,7 +110,7 @@ real device/model later
 
 ## 2. Where ML code belongs
 
-In Lesson 23, we planned this folder:
+In Lesson 24, we planned this folder:
 
 ```text
 ml
@@ -453,7 +453,7 @@ But for now, simple features are enough.
 
 ## 9. Update `MeasurementRepository`
 
-In Lesson 28, the repository constructor looked like this:
+In Lesson 29, the repository constructor looked like this:
 
 ```kotlin
 class MeasurementRepository(
@@ -499,7 +499,7 @@ Room database
 
 ## 10. Add inference function to repository
 
-In Lesson 28, we added:
+In Lesson 29, we added:
 
 ```kotlin
 suspend fun extractFeaturesForSession(
@@ -619,7 +619,7 @@ We already have:
 ResultEntity
 ```
 
-from Lesson 24:
+from Lesson 25:
 
 ```kotlin
 @Entity(tableName = "results")
@@ -766,7 +766,7 @@ The repository is now becoming the central coordinator for the research pipeline
 
 ---
 
-## 15. Full inference path after Lesson 29
+## 15. Full inference path after Lesson 30
 
 After this lesson, inference works like this:
 
@@ -846,7 +846,7 @@ That matches our architecture.
 
 ## 17. Should invalid measurements be used?
 
-In Lesson 28, I suggested this version:
+In Lesson 29, I suggested this version:
 
 ```kotlin
 return measurements
@@ -993,7 +993,7 @@ Confidence: 0.90
 
 We will connect this in a later screen/ViewModel lesson.
 
-Lesson 29 focuses on the repository and ML layer.
+Lesson 30 focuses on the repository and ML layer.
 
 ---
 
@@ -1090,9 +1090,9 @@ without rewriting the repository logic too much.
 
 ---
 
-## 23. What changed from Lesson 28?
+## 23. What changed from Lesson 29?
 
-In Lesson 28, the repository used:
+In Lesson 29, the repository used:
 
 ```text
 DeviceDataSource
@@ -1100,7 +1100,7 @@ SignalProcessor
 Room database
 ```
 
-After Lesson 29, it also uses:
+After Lesson 30, it also uses:
 
 ```text
 ModelRunner
@@ -1131,7 +1131,7 @@ This is now a complete fake research pipeline.
 
 ---
 
-## 24. Current architecture after Lesson 29
+## 24. Current architecture after Lesson 30
 
 After this lesson, the app architecture becomes:
 
@@ -1187,7 +1187,7 @@ This is a strong foundation for the app.
 
 ---
 
-## 25. Current files after Lesson 29
+## 25. Current files after Lesson 30
 
 After this lesson, the project should include:
 
@@ -1247,7 +1247,7 @@ fake ML layer
 
 ---
 
-## 26. What you learned in Lesson 29
+## 26. What you learned in Lesson 30
 
 You created:
 
@@ -1318,9 +1318,9 @@ This prepares the app for a real LiteRT/TFLite model later.
 
 ---
 
-# Lesson 30 preview
+# Lesson 31 preview
 
-In Lesson 30, we will start building the Compose screens for the Direction A app skeleton.
+In Lesson 31, we will start building the Compose screens for the Direction A app skeleton.
 We will create the main UI screens:
 
 ```text

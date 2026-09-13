@@ -1,6 +1,6 @@
-﻿# Lesson 16 - Multi-Screen App Navigation
+# Lesson 17 - Multi-Screen App Navigation
 
-In Lesson 15, we changed the app from a simple measurement logger into a more realistic research data model:
+In Lesson 16, we changed the app from a simple measurement logger into a more realistic research data model:
 
 ```text
 Patient
@@ -22,7 +22,7 @@ But now we have a new problem.
 
 One screen is no longer enough.
 
-So in Lesson 16, we move from:
+So in Lesson 17, we move from:
 
 ```text
 one large ResearchScreen
@@ -41,7 +41,7 @@ Extra note:
 ```text
 If you want the broader picture of Surface, Scaffold, NavHost,
 bottom navigation, snackbar, toast, dialog, and full-screen layout,
-read lesson-16-notes-screen-layout-architecture.md.
+read lesson-17-notes-screen-layout-architecture.md.
 ```
 
 ---
@@ -103,7 +103,7 @@ Open app
  -> View result
 ```
 
-This matches the data model from Lesson 15.
+This matches the data model from Lesson 16.
 
 ---
 
@@ -1005,7 +1005,7 @@ MeasurementScreen needs sessionId.
 
 Why?
 
-Because in Lesson 15, we decided that measurements should belong to a session.
+Because in Lesson 16, we decided that measurements should belong to a session.
 
 So the measurement screen must know:
 
@@ -1157,7 +1157,7 @@ export button
 session metadata
 ```
 
-But for Lesson 16, the goal is navigation.
+But for Lesson 17, the goal is navigation.
 
 ---
 
@@ -1277,7 +1277,7 @@ modifier = Modifier.padding(innerPadding)
 
 That means the screen content is drawn inside the content area managed by `Scaffold`.
 
-This is the core of Lesson 16.
+This is the core of Lesson 17.
 
 The app now has multiple screens.
 
@@ -1658,7 +1658,7 @@ Later, when screens become more complex, we can split it.
 A practical path is:
 
 ```text
-Lesson 16:
+Lesson 17:
 focus on navigation only
 
 Later:
@@ -1718,7 +1718,7 @@ The next screen can use the ID to load the required data from Room.
 
 ---
 
-## 25. Current architecture after Lesson 16
+## 25. Current architecture after Lesson 17
 
 After this lesson, the app structure becomes:
 
@@ -1787,7 +1787,7 @@ Result Screen
 
 This is much better than putting everything into one very large screen.
 
-## 27. What You Learned in Lesson 16
+## 27. What You Learned in Lesson 17
 
 The key patterns are:
 
@@ -1833,7 +1833,7 @@ The most important research-app idea is:
 - Use navigation to move through the research workflow.
 - Use IDs to connect screens to database records.
 
-After Lesson 16, the app is no longer just one screen.
+After Lesson 17, the app is no longer just one screen.
 It now has the shape of a real research tablet app:
 
 ```text
@@ -1843,9 +1843,9 @@ Patient list
  -> Result
 ```
 
-## Lesson 17 Preview
+## Lesson 18 Preview
 
-In Lesson 17, we should prepare for real device communication.
+In Lesson 18, we should prepare for real device communication.
 So far, the app still uses simulated data.
 Next, we need to understand:
 
@@ -1856,7 +1856,7 @@ Next, we need to understand:
 - device connection flow
 - where real device communication code belongs
 
-The goal of Lesson 17 will not be to fully implement Bluetooth yet.
+The goal of Lesson 18 will not be to fully implement Bluetooth yet.
 The goal will be to understand the permission and device-communication structure, so later we can replace simulated data with real device input safely.
 
 

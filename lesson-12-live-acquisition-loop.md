@@ -1,6 +1,6 @@
-# Lesson 11 — Simulated Live Data Stream
+# Lesson 12 — Simulated Live Data Stream
 
-In Lesson 10, we learned the basic idea of **coroutines and background work**.
+In Lesson 11, we learned the basic idea of **coroutines and background work**.
 
 The most important idea was:
 
@@ -98,7 +98,7 @@ continuous fake values
 
 ---
 
-## 2. What we want to build in Lesson 11
+## 2. What we want to build in Lesson 12
 
 By the end of this lesson, the app should behave like this:
 
@@ -240,7 +240,7 @@ val latestValueText = uiState.latestValue?.toString() ?: "No data yet"
 
 ## 5. The coroutine loop idea
 
-In Lesson 10, we saw this pattern:
+In Lesson 11, we saw this pattern:
 
 ```kotlin
 viewModelScope.launch {
@@ -527,7 +527,7 @@ using Room database
 using streaming file writing
 ```
 
-But for Lesson 11, we keep the simple approach.
+But for Lesson 12, we keep the simple approach.
 
 The goal now is to understand live acquisition logic.
 
@@ -654,11 +654,11 @@ This prevents invalid actions.
 
 ---
 
-## 14. Full ViewModel pattern for Lesson 11
+## 14. Full ViewModel pattern for Lesson 12
 
 Here is the main ViewModel logic.
 
-This builds on Lesson 10.
+This builds on Lesson 11.
 
 ```kotlin
 class ResearchViewModel : ViewModel() {
@@ -989,7 +989,7 @@ This is a very important app-design idea.
 
 ---
 
-## 20. What you learned in Lesson 11
+## 20. What you learned in Lesson 12
 
 The key new patterns are:
 
@@ -1047,9 +1047,9 @@ before dealing with real device communication.
 
 ---
 
-# Lesson 12 preview
+# Lesson 13 preview
 
-In Lesson 12, we should improve the app state model.
+In Lesson 13, we should improve the app state model.
 
 Right now, we only have:
 
@@ -1068,7 +1068,7 @@ Stopped
 Error
 ```
 
-So Lesson 12 should cover:
+So Lesson 13 should cover:
 
 ```text
 Device connection state

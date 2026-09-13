@@ -1,6 +1,6 @@
-# Lesson 15 — Multi-Table Room Data Model
+# Lesson 16 — Multi-Table Room Data Model
 
-In Lesson 14, we introduced **Room database**.
+In Lesson 15, we introduced **Room database**.
 
 The app moved from simple file-based storage toward structured local storage:
 
@@ -34,7 +34,7 @@ When did it end?
 What result or ML prediction was produced?
 ```
 
-So in Lesson 15, we move from:
+So in Lesson 16, we move from:
 
 ```text
 one flat Measurement table
@@ -973,7 +973,7 @@ The structure is now much closer to a real research app.
 
 ## 10. DAOs for each table
 
-In Lesson 14, we only had `MeasurementDao`.
+In Lesson 15, we only had `MeasurementDao`.
 
 Now we can create more DAOs.
 
@@ -1226,7 +1226,7 @@ Measurements should be saved under Session 10
 
 ## 14. Start acquisition should require a session
 
-In Lesson 12, we checked:
+In Lesson 13, we checked:
 
 ```text
 Is the device connected?
@@ -1406,7 +1406,7 @@ quality checking
 
 ---
 
-## 17. Repository after Lesson 15
+## 17. Repository after Lesson 16
 
 The repository now becomes more important.
 
@@ -1595,7 +1595,7 @@ Good app structure helps prevent bad data collection.
 
 ---
 
-## 20. What You Learned in Lesson 15
+## 20. What You Learned in Lesson 16
 
 The key data model is:
 
@@ -1660,7 +1660,7 @@ which session the measurement belongs to
 what result was produced
 ```
 
-After Lesson 15, our architecture is:
+After Lesson 16, our architecture is:
 
 ```text
 ResearchScreen
@@ -1685,9 +1685,9 @@ Patient
       └── Result
 ```
 
-## Lesson 16 Preview
+## Lesson 17 Preview
 
-In Lesson 16, we should move from one large screen to a multi-screen app.
+In Lesson 17, we should move from one large screen to a multi-screen app.
 The app should start to look like this:
 
 ```text
@@ -1700,7 +1700,7 @@ Session / Measurement Screen
 Result Screen
 ```
 
-So Lesson 16 should cover:
+So Lesson 17 should cover:
 
 - basic Compose navigation
 - patient list screen

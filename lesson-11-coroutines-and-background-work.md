@@ -1,6 +1,6 @@
-# Lesson 10 — Coroutines and Background Work
+# Lesson 11 — Coroutines and Background Work
 
-In Lesson 9, our app became more useful because it could:
+In Lesson 10, our app became more useful because it could:
 
 ```text
 App starts
@@ -282,9 +282,9 @@ import kotlinx.coroutines.withContext
 
 ---
 
-## 5. The problem in the Lesson 9 style
+## 5. The problem in the Lesson 10 style
 
-In Lesson 9, the logic was conceptually like this:
+In Lesson 10, the logic was conceptually like this:
 
 ```kotlin
 fun addMeasurement(context: Context) {
@@ -464,7 +464,7 @@ So section 8 will use this idea to create a cleaner save helper.
 For the deeper mental model, see:
 
 ```text
-lesson-10-notes-coroutines.md
+lesson-11-notes-coroutines.md
 ```
 
 ---
@@ -528,7 +528,7 @@ launch background save
 
 ## 9. Background loading
 
-In Lesson 9, we also loaded saved measurements when the app opened.
+In Lesson 10, we also loaded saved measurements when the app opened.
 
 The old idea was:
 
@@ -880,7 +880,7 @@ That is important in research apps because users need confidence that data is be
 
 ---
 
-## 15. Full ViewModel pattern for Lesson 10
+## 15. Full ViewModel pattern for Lesson 11
 
 Here is the important ViewModel pattern from this lesson.
 
@@ -1053,7 +1053,7 @@ viewModelScope.launch {
 }
 ```
 
-So Lesson 10 prepares us for:
+So Lesson 11 prepares us for:
 
 ```text
 live acquisition
@@ -1088,7 +1088,7 @@ viewModelScope.launch {
 }
 ```
 
-We will cover this properly in Lesson 11.
+We will cover this properly in Lesson 12.
 
 For now, remember:
 
@@ -1098,7 +1098,7 @@ Long-running acquisition should not directly block the UI.
 
 ---
 
-## 18. What you learned in Lesson 10
+## 18. What you learned in Lesson 11
 
 The key concepts are:
 
@@ -1156,9 +1156,9 @@ For a research app, this is essential because later we will deal with:
 - signal processing
 - machine-learning inference
 
-## Lesson 11 Preview
+## Lesson 12 Preview
 
-In Lesson 11, we should move from:
+In Lesson 12, we should move from:
 
 ```text
 one random value per button click

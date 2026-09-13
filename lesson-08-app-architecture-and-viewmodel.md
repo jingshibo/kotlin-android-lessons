@@ -1561,16 +1561,13 @@ UI updates
 
 ## Lesson 9 preview
 
-Next, I suggest we cover file/data persistence more properly:
+Next, I suggest we look at another common ViewModel state style:
 
 ```text
-ViewModel is not permanent storage
-    ↓
-save automatically after each measurement
-    ↓
-load previous session
-    ↓
-avoid accidental data loss
+MutableStateFlow
+    -> read-only StateFlow
+    -> collectAsStateWithLifecycle()
+    -> _uiState.update { currentState -> currentState.copy(...) }
 ```
 
-We can start with simple app-specific storage, then later discuss Room database if needed.
+The architecture stays the same, but the ViewModel state implementation becomes closer to what you will see in many modern Android examples.

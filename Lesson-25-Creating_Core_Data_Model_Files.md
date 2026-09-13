@@ -1,6 +1,6 @@
-# Lesson 24 — Creating the Core Data Model Files
+# Lesson 25 — Creating the Core Data Model Files
 
-In Lesson 23, we turned the overall architecture into a clean Android project structure.
+In Lesson 24, we turned the overall architecture into a clean Android project structure.
 
 We created the target package structure:
 
@@ -29,7 +29,7 @@ This corresponds to **Step A2** in Direction A:
 Define core data classes
 ```
 
-The goal of Lesson 24 is to create these files:
+The goal of Lesson 25 is to create these files:
 
 ```text
 PatientEntity.kt
@@ -62,7 +62,7 @@ Measurement
 Result
 ```
 
-This structure was introduced in Lesson 15.
+This structure was introduced in Lesson 16.
 
 The most important rule was:
 
@@ -1064,7 +1064,7 @@ more robust later
 
 ---
 
-## 21. Current files after Lesson 24
+## 21. Current files after Lesson 25
 
 After this lesson, your `entity` folder should contain:
 
@@ -1082,7 +1082,7 @@ The app data model is now real Kotlin code.
 
 ---
 
-## 22. What you learned in Lesson 24
+## 22. What you learned in Lesson 25
 
 You learned how to create the core database entity files:
 
@@ -1154,9 +1154,9 @@ This is the foundation for Room, repository, export, and ML results.
 
 ---
 
-# Lesson 25 preview
+# Lesson 26 preview
 
-In Lesson 25, we will build the Room database layer around these entities.
+In Lesson 26, we will build the Room database layer around these entities.
 
 We will create:
 

@@ -1,6 +1,6 @@
-# Lesson 32 — Adding Session CSV Export
+# Lesson 33 — Adding Session CSV Export
 
-In Lesson 31, we connected the screens, navigation, ViewModel, repository, fake device, processing, fake ML, and Room database.
+In Lesson 32, we connected the screens, navigation, ViewModel, repository, fake device, processing, fake ML, and Room database.
 
 The connected app flow is now:
 
@@ -38,7 +38,7 @@ This corresponds to **Step A9** in Direction A:
 Add export
 ```
 
-The goal of Lesson 32 is to let the app export one complete session as a CSV file.
+The goal of Lesson 33 is to let the app export one complete session as a CSV file.
 
 ---
 
@@ -175,7 +175,7 @@ This keeps export logic separate from UI.
 
 ## 4. Create the `export` package
 
-From Lesson 23, we planned this folder:
+From Lesson 24, we planned this folder:
 
 ```text
 export
@@ -758,7 +758,7 @@ Let the user create a CSV file.
 
 ## 16. Connect the ResultScreen export button
 
-In Lesson 31, the Result route had this placeholder:
+In Lesson 32, the Result route had this placeholder:
 
 ```kotlin
 onExportClick = {
@@ -802,7 +802,7 @@ Now the export button has a real action.
 
 ## 17. Full export flow
 
-After Lesson 32, the export flow is:
+After Lesson 33, the export flow is:
 
 ```text
 User clicks Export Session CSV
@@ -994,7 +994,7 @@ For now, we keep the beginner skeleton simple.
 
 ---
 
-## 23. Current architecture after Lesson 32
+## 23. Current architecture after Lesson 33
 
 After this lesson, the architecture becomes:
 
@@ -1035,7 +1035,7 @@ This completes the main fake research workflow.
 
 ---
 
-## 24. Current files after Lesson 32
+## 24. Current files after Lesson 33
 
 After this lesson, the project should include:
 
@@ -1095,7 +1095,7 @@ com.example.researchapp
 
 ---
 
-## 25. What you learned in Lesson 32
+## 25. What you learned in Lesson 33
 
 You created:
 
@@ -1128,7 +1128,7 @@ Export is part of the research pipeline,
 not just a UI button.
 ```
 
-## 26. Final flow after Lesson 32
+## 26. Final flow after Lesson 33
 
 The clean export flow is:
 
@@ -1168,9 +1168,9 @@ export session CSV
 
 ---
 
-## 27. Lesson 33 preview
+## 27. Lesson 34 preview
 
-In Lesson 33, we will test the whole fake-data workflow.
+In Lesson 34, we will test the whole fake-data workflow.
 
 We will review the expected user path:
 

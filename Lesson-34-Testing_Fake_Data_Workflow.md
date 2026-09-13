@@ -1,6 +1,6 @@
-# Lesson 33 — Testing the Whole Fake-Data Workflow
+# Lesson 34 — Testing the Whole Fake-Data Workflow
 
-In Lesson 32, we added session CSV export.
+In Lesson 33, we added session CSV export.
 
 The app now has all the major parts of the fake research workflow:
 
@@ -22,7 +22,7 @@ Result saving
 CSV export
 ```
 
-Lesson 33 is about testing the whole app as one connected system.
+Lesson 34 is about testing the whole app as one connected system.
 
 This corresponds to **Step A10** in Direction A:
 
@@ -1525,7 +1525,7 @@ But this is not needed for the fake Direction A skeleton.
 
 ## 44. Common logic issue: repetition number
 
-In Lesson 31, repetition was calculated as:
+In Lesson 32, repetition was calculated as:
 
 ```kotlin
 val repetition = uiState.measurements.size + 1
@@ -1722,7 +1722,7 @@ This is a complete fake-data research app pipeline.
 
 ---
 
-## 48. What you learned in Lesson 33
+## 48. What you learned in Lesson 34
 
 You learned how to test the complete fake workflow:
 
@@ -1776,7 +1776,7 @@ This is the correct way to debug a structured Android research app.
 
 Direction A is now complete at the tutorial level.
 
-You have learned how to turn the architecture from Lessons 1–22 into a clean fake-data Android app skeleton.
+You have learned how to turn the architecture from Lessons 1-23 into a clean fake-data Android app skeleton.
 
 The app now has:
 
@@ -1803,13 +1803,13 @@ The next tutorial direction should be Direction B, where we start replacing the 
 A good next lesson would be:
 
 ```text
-Lesson 34 — Preparing the Project for Real Device Communication
+Lesson 35 - Preparing the Project for Real Device Communication
 ```
 
 or:
 
 ```text
-Lesson 34 — From Fake Device to Real Bluetooth/Wi-Fi Device Source
+Lesson 35 - From Fake Device to Real Bluetooth/Wi-Fi Device Source
 ```
 
 That would begin the transition from:

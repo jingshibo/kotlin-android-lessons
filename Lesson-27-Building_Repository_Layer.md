@@ -1,6 +1,6 @@
-# Lesson 26 — Building the Repository Layer
+# Lesson 27 — Building the Repository Layer
 
-In Lesson 25, we built the Room database layer.
+In Lesson 26, we built the Room database layer.
 
 We created:
 
@@ -26,13 +26,13 @@ This corresponds to **Step A4** in Direction A:
 Build Repository
 ```
 
-The goal of Lesson 26 is to create a useful `MeasurementRepository` that connects the rest of the app to the database.
+The goal of Lesson 27 is to create a useful `MeasurementRepository` that connects the rest of the app to the database.
 
 ---
 
 ## 1. Where the repository fits
 
-After Lesson 25, our architecture looks like this:
+After Lesson 26, our architecture looks like this:
 
 ```text
 ResearchViewModel
@@ -115,7 +115,7 @@ The repository hides the lower-level details from the ViewModel.
 
 ## 3. Create `MeasurementRepository.kt`
 
-In the project structure from Lesson 23, create this file:
+In the project structure from Lesson 24, create this file:
 
 ```text
 app/src/main/java/com/example/researchapp/data/MeasurementRepository.kt
@@ -435,7 +435,7 @@ delete measurements for one session
 
 The repository does not yet create measurements from a device.
 
-That will be improved in Lesson 27 and Lesson 28.
+That will be improved in Lesson 28 and Lesson 29.
 
 For now, this layer only saves and loads measurement entities.
 
@@ -946,7 +946,7 @@ fun createPatientAndSession() {
 }
 ```
 
-This function is not the focus of Lesson 26 yet.
+This function is not the focus of Lesson 27 yet.
 
 But this shows the relationship:
 
@@ -999,7 +999,7 @@ The ViewModel decides what message the user sees.
 
 ## 20. Repository and future fake device source
 
-In Lesson 27, we will connect the repository to:
+In Lesson 28, we will connect the repository to:
 
 ```text
 DeviceDataSource
@@ -1029,7 +1029,7 @@ MeasurementEntity
 Room
 ```
 
-But in Lesson 26, we first made the repository work with Room.
+But in Lesson 27, we first made the repository work with Room.
 
 That is the correct order.
 
@@ -1037,7 +1037,7 @@ That is the correct order.
 
 ## 21. Repository and future processing
 
-In Lesson 28, we will connect:
+In Lesson 29, we will connect:
 
 ```text
 SignalProcessor
@@ -1086,7 +1086,7 @@ For now, the repository is the database bridge.
 
 ## 22. Repository and future ML
 
-In Lesson 29, we will connect:
+In Lesson 30, we will connect:
 
 ```text
 ModelRunner
@@ -1123,7 +1123,7 @@ We build gradually.
 
 ## 23. Repository and future export
 
-In Lesson 32, we will connect export logic.
+In Lesson 33, we will connect export logic.
 
 Then the repository may be able to do:
 
@@ -1145,13 +1145,13 @@ suspend fun buildSessionCsvExport(
 }
 ```
 
-But for Lesson 26, we only prepare the repository base.
+But for Lesson 27, we only prepare the repository base.
 
 ---
 
-## 24. Current files after Lesson 26
+## 24. Current files after Lesson 27
 
-After Lesson 26, the important file is:
+After Lesson 27, the important file is:
 
 ```text
 data/MeasurementRepository.kt
@@ -1190,7 +1190,7 @@ That means the data layer is now taking shape.
 
 ---
 
-## 25. What you learned in Lesson 26
+## 25. What you learned in Lesson 27
 
 You learned that the repository is the bridge between:
 
@@ -1244,9 +1244,9 @@ This keeps the ViewModel cleaner and prepares the app for future device, process
 
 ---
 
-## 26. Lesson 27 preview
+## 26. Lesson 28 preview
 
-In Lesson 27, we will add the fake device source into the real project.
+In Lesson 28, we will add the fake device source into the real project.
 
 We will implement:
 

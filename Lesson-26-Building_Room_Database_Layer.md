@@ -1,6 +1,6 @@
-# Lesson 25 — Building the Room Database Layer
+# Lesson 26 — Building the Room Database Layer
 
-In Lesson 24, we created the core entity files:
+In Lesson 25, we created the core entity files:
 
 ```text
 PatientEntity.kt
@@ -29,7 +29,7 @@ This corresponds to **Step A3** in Direction A:
 Build Room database
 ```
 
-The goal of Lesson 25 is to create:
+The goal of Lesson 26 is to create:
 
 ```text
 PatientDao.kt
@@ -47,7 +47,7 @@ Room has three major parts: a database class, data entities, and data access obj
 
 ## 1. Where we are in the project structure
 
-In Lesson 23, we planned this folder structure:
+In Lesson 24, we planned this folder structure:
 
 ```text
 data
@@ -66,7 +66,7 @@ data
       └── ResultDao.kt
 ```
 
-In Lesson 24, we implemented:
+In Lesson 25, we implemented:
 
 ```text
 data/entity
@@ -954,7 +954,7 @@ So the database class is the central Room object.
 
 ## 25. Room package note: `androidx.room3` vs `androidx.room`
 
-In Lesson 24 and Lesson 25, I used imports like:
+In Lesson 25 and Lesson 26, I used imports like:
 
 ```kotlin
 import androidx.room3.Dao
@@ -1003,13 +1003,13 @@ You also need the KSP plugin configured in your Gradle files.
 
 Do not worry if this is not fully clear yet.
 
-For Lesson 25, the main focus is the Kotlin database-layer code.
+For Lesson 26, the main focus is the Kotlin database-layer code.
 
 Gradle setup can be handled when we actually compile the project.
 
 ---
 
-## 27. Current files after Lesson 25
+## 27. Current files after Lesson 26
 
 After this lesson, your `data` folder should contain:
 
@@ -1039,7 +1039,7 @@ That will happen through the repository in the next lesson.
 
 ---
 
-## 28. What you learned in Lesson 25
+## 28. What you learned in Lesson 26
 
 You created four DAO files:
 
@@ -1111,8 +1111,8 @@ But at this stage, the repository is still mostly empty.
 
 ---
 
-## Lesson 26 preview
-In Lesson 26, we will build the Repository layer.
+## Lesson 27 preview
+In Lesson 27, we will build the Repository layer.
 We will create real repository functions such as:
 - createPatient()
 - createSession()

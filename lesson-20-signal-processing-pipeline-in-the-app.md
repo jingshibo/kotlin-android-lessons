@@ -1,6 +1,6 @@
-# Lesson 19 — Signal Processing Pipeline in the App
+# Lesson 20 — Signal Processing Pipeline in the App
 
-In Lesson 18, we introduced a cleaner data-source structure:
+In Lesson 19, we introduced a cleaner data-source structure:
 
 ```text
 MeasurementScreen
@@ -14,13 +14,13 @@ DeviceDataSource
 Fake / Bluetooth / Wi-Fi / USB device
 ```
 
-Before Lesson 18, the measurement value came directly from:
+Before Lesson 19, the measurement value came directly from:
 
 ```kotlin
 Random.nextDouble(0.0, 5.0)
 ```
 
-After Lesson 18, the repository asked a data source:
+After Lesson 19, the repository asked a data source:
 
 ```kotlin
 deviceDataSource.readValue()
@@ -97,7 +97,7 @@ Should we calculate features?
 Should we save raw and processed values?
 ```
 
-So Lesson 19 introduces a simple processing pipeline.
+So Lesson 20 introduces a simple processing pipeline.
 
 ---
 
@@ -187,7 +187,7 @@ measurement history
 
 The processing code should live in a separate class.
 
-For Lesson 19, we can create:
+For Lesson 20, we can create:
 
 ```text
 SignalProcessor
@@ -437,7 +437,7 @@ Do not ignore migrations once real data has been collected.
 
 ## 9. Update repository to use `SignalProcessor`
 
-In Lesson 18, the repository had:
+In Lesson 19, the repository had:
 
 ```kotlin
 class MeasurementRepository(
@@ -609,7 +609,7 @@ This makes the UI more informative.
 
 ## 12. Update ViewModel after saving measurement
 
-In Lesson 18, after adding a measurement, the ViewModel updated:
+In Lesson 19, after adding a measurement, the ViewModel updated:
 
 ```kotlin
 latestValue = newMeasurement.value
@@ -978,7 +978,7 @@ This keeps the app simpler.
 
 ## 20. Add processing status to the app flow
 
-After Lesson 19, the acquisition path becomes:
+After Lesson 20, the acquisition path becomes:
 
 ```text
 Start Acquisition
@@ -1006,7 +1006,7 @@ Still simple, but correctly structured.
 
 ---
 
-## 21. Updated architecture after Lesson 19
+## 21. Updated architecture after Lesson 20
 
 The app now looks like this:
 
@@ -1124,7 +1124,7 @@ But the habit is important.
 
 ---
 
-## 24. What You Learned in Lesson 19
+## 24. What You Learned in Lesson 20
 
 The key new class is:
 
@@ -1192,14 +1192,14 @@ save/export
 
 For a research app, this is essential because the quality of the final result depends not only on the model, but also on how the sensor data is processed.
 
-## Lesson 20 Preview
+## Lesson 21 Preview
 
-In Lesson 20, we should introduce:
+In Lesson 21, we should introduce:
 
 **On-device ML inference**
 
 The next step is to take processed values or extracted features and feed them into a model.
-Lesson 20 should cover:
+Lesson 21 should cover:
 
 - what on-device inference means
 - where the model file goes

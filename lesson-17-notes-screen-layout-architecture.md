@@ -1,4 +1,4 @@
-# Lesson 16 Notes - Screen Layout Architecture
+# Lesson 17 Notes - Screen Layout Architecture
 
 This note explains the bigger picture of Compose screen layout.
 
@@ -16,7 +16,7 @@ Modifier.padding(...)
 
 Those tools arrange content inside one part of the screen.
 
-Lesson 16 adds a higher-level question:
+Lesson 17 adds a higher-level question:
 
 ```text
 How is the whole app screen organized when the app has multiple screens?
@@ -999,7 +999,7 @@ If the user is seeing a temporary message or decision:
 
 ## 14. Two Common App Structures
 
-### Simple Lesson 16 Structure
+### Simple Lesson 17 Structure
 
 This is good while learning navigation:
 

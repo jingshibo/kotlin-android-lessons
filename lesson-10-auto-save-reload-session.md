@@ -1,4 +1,4 @@
-# Lesson 9 — Simple Data Persistence: Auto-Save and Reload Previous Session
+# Lesson 10 — Simple Data Persistence: Auto-Save and Reload Previous Session
 
 In Lesson 7, we exported CSV manually.
 
@@ -20,7 +20,7 @@ For a research app, this matters a lot. You do not want to lose measurements if:
 
 - the user forgets to export CSV
 
-So in Lesson 9, we add a simple auto-save system.
+So in Lesson 10, we add a simple auto-save system.
 
 ## 1. What we will build
 
@@ -373,7 +373,7 @@ You need:
 import androidx.compose.runtime.LaunchedEffect
 ```
 
-## 10. Full Lesson 9 version
+## 10. Full Lesson 10 version
 
 Below is the full version based on Lesson 8, with internal autosave added.
 
@@ -1032,7 +1032,7 @@ Use Room database when you need:
 
 We do not need Room yet, but it is likely useful later if your app becomes a serious data-collection tool.
 
-## 16. What you learned in Lesson 9
+## 16. What you learned in Lesson 10
 
 The key concepts are:
 
@@ -1107,7 +1107,7 @@ if (uiState.loadMessage.isNotBlank()) {
 
 This helps the user know that previous data has been restored.
 
-## Lesson 10 preview
+## Lesson 11 preview
 Next, I suggest we cover coroutines and background work, because real research apps should not block the UI when doing:
 - file saving
 - sensor reading

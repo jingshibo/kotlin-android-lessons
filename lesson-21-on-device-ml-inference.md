@@ -1,6 +1,6 @@
-# Lesson 20 — On-Device ML Inference
+# Lesson 21 — On-Device ML Inference
 
-In Lesson 19, we introduced a simple signal-processing pipeline:
+In Lesson 20, we introduced a simple signal-processing pipeline:
 
 ```text
 DeviceDataSource
@@ -130,7 +130,7 @@ show result immediately
 save result with session
 ```
 
-Lesson 20 moves us toward Level 3.
+Lesson 21 moves us toward Level 3.
 
 ---
 
@@ -288,7 +288,7 @@ LiteRtModelRunner
 use later with real .tflite model
 ```
 
-This follows the same design idea as Lesson 18.
+This follows the same design idea as Lesson 19.
 
 ---
 
@@ -359,7 +359,7 @@ real data later
 
 ## 7. Add model runner to repository
 
-In Lesson 19, the repository used:
+In Lesson 20, the repository used:
 
 ```kotlin
 DeviceDataSource
@@ -486,7 +486,7 @@ This is the first complete ML inference path.
 
 ## 10. Save inference result to Room
 
-In Lesson 15, we created a `ResultEntity`:
+In Lesson 16, we created a `ResultEntity`:
 
 ```kotlin
 @Entity(tableName = "results")
@@ -711,7 +711,7 @@ This gives immediate feedback to the user.
 
 ---
 
-## 15. Result Screen after Lesson 20
+## 15. Result Screen after Lesson 21
 
 The `ResultScreen` can show:
 
@@ -849,7 +849,7 @@ maximum
 range
 ```
 
-From Lesson 19, we had:
+From Lesson 20, we had:
 
 ```kotlin
 data class SignalFeatures(
@@ -1261,7 +1261,7 @@ But the habit is important:
 
 > Prediction result should be linked to the model version.
 
-## 26. Current App Flow After Lesson 20
+## 26. Current App Flow After Lesson 21
 
 The research-app flow now becomes:
 
@@ -1295,7 +1295,7 @@ Show Result Screen
 
 This is now an edge-AI research app structure.
 
-## 27. Architecture After Lesson 20
+## 27. Architecture After Lesson 21
 
 The app now has these main parts:
 
@@ -1348,7 +1348,7 @@ UI
  ↓
 shows status, values, prediction
 ```
-## 28. What You Learned in Lesson 20
+## 28. What You Learned in Lesson 21
 
 The key new interface is:
 
@@ -1423,9 +1423,9 @@ model
 result
 ```
 
-## Lesson 21 Preview
+## Lesson 22 Preview
 
-In Lesson 21, we should improve export.
+In Lesson 22, we should improve export.
 Earlier, the app exported simple measurement CSV files.
 But now the app has richer research data:
 
@@ -1434,7 +1434,7 @@ But now the app has richer research data:
 - Measurement
 - Result
 
-So Lesson 21 should cover:
+So Lesson 22 should cover:
 
 - exporting complete research data
 - exporting measurements with session metadata

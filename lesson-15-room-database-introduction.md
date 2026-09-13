@@ -1,8 +1,8 @@
-# Lesson 14 — Room Database Introduction
+# Lesson 15 — Room Database Introduction
 
-In Lesson 13, we introduced the **Repository layer**.
+In Lesson 14, we introduced the **Repository layer**.
 
-Before Lesson 13, the ViewModel was doing too much:
+Before Lesson 14, the ViewModel was doing too much:
 
 ```text
 ResearchViewModel
@@ -13,7 +13,7 @@ ResearchViewModel
  └── file loading
 ```
 
-After Lesson 13, we started moving data-related work into:
+After Lesson 14, we started moving data-related work into:
 
 ```text
 MeasurementRepository
@@ -667,7 +667,7 @@ suspend fun getAllMeasurements()
 suspend fun deleteAllMeasurements()
 ```
 
-This connects directly to Lesson 10.
+This connects directly to Lesson 11.
 
 Database operations should not block the UI.
 
@@ -849,13 +849,13 @@ context.applicationContext
 
 This is safer than storing an Activity context.
 
-In Lesson 13, we already mentioned that storing Activity-related context in long-lived classes can be problematic. For database creation, using application context is the safer beginner-friendly option.
+In Lesson 14, we already mentioned that storing Activity-related context in long-lived classes can be problematic. For database creation, using application context is the safer beginner-friendly option.
 
 ---
 
-## 13. Important change from Lesson 13
+## 13. Important change from Lesson 14
 
-In Lesson 13, the repository had this style:
+In Lesson 14, the repository had this style:
 
 ```kotlin
 class MeasurementRepository {
@@ -961,7 +961,7 @@ Room database
 
 ## 15. Insert measurement into Room
 
-In Lesson 13, after creating a measurement, we saved the whole list.
+In Lesson 14, after creating a measurement, we saved the whole list.
 
 With Room, we can insert only the new measurement.
 
@@ -1027,7 +1027,7 @@ So we can keep that function in the repository for now.
 
 ## 16. Updated repository with simulation and Room
 
-A simple Lesson 14 repository can look like this:
+A simple Lesson 15 repository can look like this:
 
 ```kotlin
 class MeasurementRepository(
@@ -1149,7 +1149,7 @@ Again, this uses Kotlin null safety.
 
 ## 18. Start acquisition with Room
 
-In Lesson 12, `startAcquisition()` had:
+In Lesson 13, `startAcquisition()` had:
 
 ```kotlin
 fun startAcquisition(context: Context)
@@ -1564,7 +1564,7 @@ Room’s documentation lists streamlined database migration paths as one of its 
 But for this beginner lesson, we will not handle migrations yet.
 For learning, if you change the entity and the app complains, you can often uninstall the app from the emulator/tablet and reinstall it.
 For real research deployment, do not rely on uninstalling the app, because that would delete collected data.
-## 26. Current Architecture After Lesson 14
+## 26. Current Architecture After Lesson 15
 
 After adding Room, our architecture becomes:
 
@@ -1596,7 +1596,7 @@ We now have:
 
 That is much more serious than only having a button that generates a random value.
 
-## 27. What You Learned in Lesson 14
+## 27. What You Learned in Lesson 15
 
 The key concepts are:
 
@@ -1624,9 +1624,9 @@ For a research app:
 - Room stores structured data locally.
 - CSV exports data for analysis outside the app.
 
-## Lesson 15 Preview
+## Lesson 16 Preview
 
-In Lesson 15, we should move from:
+In Lesson 16, we should move from:
 
 ```text
 one flat Measurement table
@@ -1646,7 +1646,7 @@ It should know:
 - when the session started and ended
 - what result or prediction was produced
 
-So Lesson 15 will cover:
+So Lesson 16 will cover:
 
 - Patient data class
 - Session data class

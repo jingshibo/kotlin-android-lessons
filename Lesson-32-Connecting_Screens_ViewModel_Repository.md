@@ -1,6 +1,6 @@
-# Lesson 31 — Connecting Navigation and ViewModel
+# Lesson 32 — Connecting Navigation and ViewModel
 
-In Lesson 30, we created the main Compose screens:
+In Lesson 31, we created the main Compose screens:
 
 ```text
 PatientListScreen
@@ -46,7 +46,7 @@ Room / FakeDevice / SignalProcessor / FakeModelRunner
 
 ---
 
-## 1. What Lesson 31 is trying to solve
+## 1. What Lesson 32 is trying to solve
 
 Right now, our screens can show UI, but they do not know where their data comes from.
 
@@ -68,7 +68,7 @@ measurementCount: Int
 
 but we have not yet connected it to actual acquisition logic.
 
-So Lesson 31 connects:
+So Lesson 32 connects:
 
 ```text
 UI state
@@ -248,7 +248,7 @@ message
 
 ## 5. A note about UI item classes
 
-In Lesson 30, we created:
+In Lesson 31, we created:
 
 ```kotlin
 data class PatientListItem(...)
@@ -1235,7 +1235,7 @@ That will come in a later lesson.
 
 ---
 
-## 23. Full navigation flow after Lesson 31
+## 23. Full navigation flow after Lesson 32
 
 After connecting these routes, the app flow is:
 
@@ -1289,7 +1289,7 @@ That is normal.
 
 ---
 
-## 25. What you learned in Lesson 31
+## 25. What you learned in Lesson 32
 
 You connected:
 
@@ -1343,9 +1343,9 @@ This is the first connected version of the fake-data research app.
 
 ---
 
-## 26. Lesson 32 preview
+## 26. Lesson 33 preview
 
-In Lesson 32, we will add session CSV export.
+In Lesson 33, we will add session CSV export.
 
 We will implement:
 
