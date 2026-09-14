@@ -207,6 +207,30 @@ com.example.researchapp
 
 This is not the only possible structure.
 
+Important addition:
+
+```text
+runtime
+|-- ResearchRuntimeState.kt
+`-- ResearchRuntimeStateHolder.kt
+```
+
+Place `runtime` beside `viewmodel`, `data`, `ui`, `device`, `processing`, `ml`, and `export`.
+
+The updated top-level package list is:
+
+```text
+com.example.researchapp
+|-- ui
+|-- viewmodel
+|-- runtime
+|-- data
+|-- device
+|-- processing
+|-- ml
+`-- export
+```
+
 But it is a good beginner-friendly structure for our current app.
 
 ---
@@ -219,6 +243,7 @@ Each folder has a clear meaning.
 |---|---|
 | `ui` | Compose screens and navigation |
 | `viewmodel` | UI state and app flow |
+| `runtime` | Shared temporary app/session state used across screens or ViewModels |
 | `data` | Room database, DAOs, entities, repository |
 | `device` | Fake or real device communication |
 | `processing` | Signal processing and feature extraction |
@@ -509,7 +534,213 @@ It should manage state and actions.
 
 ---
 
-## 10. `data` folder
+## 10. `runtime` folder
+
+The `runtime` folder contains temporary app state that must be shared across more than one screen or more than one ViewModel.
+
+This is different from `ResearchUiState`.
+
+`ResearchUiState` is mostly for what one screen needs to display.
+
+But some state belongs to the current running research workflow:
+
+```text
+selected patient ID
+selected session ID
+current device connection state
+current acquisition state
+latest live raw value
+latest processed value
+```
+
+If only one screen needs a value, keep it in that screen's ViewModel.
+
+If several screens or ViewModels need the same temporary value, put the real shared value in a runtime state holder.
+
+Suggested files:
+
+```text
+runtime
+|-- ResearchRuntimeState.kt
+`-- ResearchRuntimeStateHolder.kt
+```
+
+### `ResearchRuntimeState.kt`
+
+This file defines shared temporary app/session state.
+
+```kotlin
+package com.example.researchapp.runtime
+
+data class ResearchRuntimeState(
+    val currentPatientId: Long? = null,
+    val currentSessionId: Long? = null,
+    val isDeviceConnected: Boolean = false,
+    val isAcquiring: Boolean = false,
+    val latestRawValue: Double? = null,
+    val latestProcessedValue: Double? = null
+)
+```
+
+### `ResearchRuntimeStateHolder.kt`
+
+This file owns and updates that shared runtime state.
+
+```kotlin
+package com.example.researchapp.runtime
+
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+
+class ResearchRuntimeStateHolder {
+
+    private val _runtimeState =
+        MutableStateFlow(ResearchRuntimeState())
+
+    val runtimeState: StateFlow<ResearchRuntimeState> =
+        _runtimeState.asStateFlow()
+
+    fun selectPatient(patientId: Long) {
+        _runtimeState.update { currentState ->
+            currentState.copy(
+                currentPatientId = patientId,
+                currentSessionId = null
+            )
+        }
+    }
+
+    fun selectSession(sessionId: Long) {
+        _runtimeState.update { currentState ->
+            currentState.copy(
+                currentSessionId = sessionId
+            )
+        }
+    }
+
+    fun setDeviceConnected(isConnected: Boolean) {
+        _runtimeState.update { currentState ->
+            currentState.copy(
+                isDeviceConnected = isConnected
+            )
+        }
+    }
+}
+```
+
+### What functions belong in `ResearchRuntimeStateHolder`?
+
+Now that we have seen the holder, we can ask a better design question:
+
+```text
+Which functions should live inside ResearchRuntimeStateHolder?
+```
+
+The criterion is not only:
+
+```text
+How many screens share this function?
+```
+
+The better criterion is:
+
+```text
+Is this function an operation on ResearchRuntimeState?
+```
+
+If a function directly owns or protects changes to `ResearchRuntimeState`, it can belong in `ResearchRuntimeStateHolder`, even if currently only one ViewModel calls it.
+
+For example:
+
+```kotlin
+fun selectPatient(patientId: Long) {
+    _runtimeState.update { currentState ->
+        currentState.copy(
+            currentPatientId = patientId,
+            currentSessionId = null
+        )
+    }
+}
+```
+
+This belongs in `ResearchRuntimeStateHolder` because it defines how the shared runtime state changes safely.
+
+It protects an important rule:
+
+```text
+When a new patient is selected,
+the previous selected session should be cleared.
+```
+
+That is a rule about `ResearchRuntimeState`, so it belongs near the state it protects.
+
+But a screen workflow function should stay in the ViewModel:
+
+```kotlin
+fun onCreatePatientClick() {
+    // validate text field
+    // call repository
+    // update screen message
+    // ask runtime holder to select the patient if needed
+}
+```
+
+That function is about a screen event, not just about changing `ResearchRuntimeState`.
+
+So the split is:
+
+```text
+ResearchRuntimeStateHolder
+    -> owns ResearchRuntimeState
+    -> updates shared runtime values
+    -> protects shared runtime rules
+
+ViewModel
+    -> handles screen events
+    -> reads screen input
+    -> calls repository
+    -> calls runtime holder when shared runtime state must change
+    -> prepares UI messages/state for that screen
+```
+
+A function can belong in `ResearchRuntimeStateHolder` even if only one ViewModel calls it today.
+
+But it should still be a runtime-state operation, not a full screen workflow.
+
+So the idea is clear:
+
+```
+Put functions in ResearchRuntimeStateHolder if they are operations of ResearchRuntimeState,
+not merely because many screens call them.
+```
+
+But add one nuance:
+
+```
+Do not put screen-specific workflow functions there unless they are truly shared runtime-state rules.
+```
+
+The mental model is:
+
+```text
+ViewModel
+    -> state and actions for one screen
+
+runtime state holder
+    -> temporary state shared across screens/ViewModels
+
+Room/database
+    -> permanent saved research data
+```
+
+For now, we only prepare this folder as an architectural home.
+
+We are not adding dependency injection in this lesson.
+
+---
+
+## 11. `data` folder
 
 The `data` folder contains the local database and repository.
 
@@ -531,7 +762,7 @@ That will be Lesson 26.
 
 ---
 
-## 11. `data/entity` folder
+## 12. `data/entity` folder
 
 This folder contains Room entities:
 
@@ -575,7 +806,7 @@ Entity files describe what data we store.
 
 ---
 
-## 12. `data/dao` folder
+## 13. `data/dao` folder
 
 This folder contains DAO interfaces:
 
@@ -623,7 +854,7 @@ We will implement these later.
 
 ---
 
-## 13. `MeasurementRepository.kt`
+## 14. `MeasurementRepository.kt`
 
 The repository is the bridge between the ViewModel and the data/device/processing/ML layers.
 
@@ -656,7 +887,7 @@ In Direction A, we are setting up the project step by step.
 
 ---
 
-## 14. `device` folder
+## 15. `device` folder
 
 The `device` folder contains:
 
@@ -740,7 +971,7 @@ But not yet.
 
 ---
 
-## 15. `processing` folder
+## 16. `processing` folder
 
 The `processing` folder contains signal-processing logic.
 
@@ -809,7 +1040,7 @@ That is very important.
 
 ---
 
-## 16. `ml` folder
+## 17. `ml` folder
 
 The `ml` folder contains model-related code.
 
@@ -881,7 +1112,7 @@ This gives us a fake ML result before using a real LiteRT/TFLite model.
 
 ---
 
-## 17. `export` folder
+## 18. `export` folder
 
 The `export` folder contains export formatting code.
 
@@ -913,7 +1144,7 @@ The UI should only let the user choose where to save the file.
 
 ---
 
-## 18. What should we implement first?
+## 19. What should we implement first?
 
 Do not implement everything at once.
 
@@ -938,7 +1169,7 @@ Lesson 24 focuses mostly on step 1 and the file structure.
 
 ---
 
-## 19. Why we start with placeholders
+## 20. Why we start with placeholders
 
 You may wonder:
 
@@ -965,7 +1196,7 @@ A clean skeleton gives you a map.
 
 ---
 
-## 20. Common mistake: too much code in UI
+## 21. Common mistake: too much code in UI
 
 A common beginner structure is:
 
@@ -1005,7 +1236,7 @@ That is the architecture we are building.
 
 ---
 
-## 21. Common mistake: starting with real Bluetooth too early
+## 22. Common mistake: starting with real Bluetooth too early
 
 Another common mistake is trying to implement real Bluetooth before the app skeleton exists.
 
@@ -1035,7 +1266,7 @@ This is a safer learning path.
 
 ---
 
-## 22. Common mistake: starting with real ML too early
+## 23. Common mistake: starting with real ML too early
 
 Similarly, do not start with the real model immediately.
 
@@ -1065,7 +1296,7 @@ That means the UI, ViewModel, Repository, and Result screen can be tested before
 
 ---
 
-## 23. Current skeleton after Lesson 24
+## 24. Current skeleton after Lesson 24
 
 After Lesson 24, your project should have this shape:
 
@@ -1083,6 +1314,14 @@ com.example.researchapp
 
 The app may not do much yet.
 
+The skeleton should also include the shared runtime folder:
+
+```text
+runtime
+|-- ResearchRuntimeState.kt
+`-- ResearchRuntimeStateHolder.kt
+```
+
 It may only show placeholder screens.
 
 That is okay.
@@ -1093,7 +1332,7 @@ The goal is to create a clean foundation.
 
 ---
 
-## 24. What you learned in Lesson 24
+## 25. What you learned in Lesson 24
 
 You learned how to map the architecture into real Android project folders:
 
@@ -1105,6 +1344,9 @@ ui
 state and flow
  ↓
 viewmodel
+
+shared temporary runtime state
+ -> runtime
 
 Room and repository
  ↓
@@ -1138,6 +1380,7 @@ When you add new code, ask:
 ```text
 Is this UI code?
 Is this state-management code?
+Is this shared runtime state used across screens/ViewModels?
 Is this database code?
 Is this device code?
 Is this processing code?
@@ -1148,6 +1391,19 @@ Is this export code?
 Then place it in the correct folder.
 
 This is how we prevent the app from becoming messy.
+
+For shared temporary state, use this extra rule:
+
+```text
+If only one screen needs it:
+    keep it in that screen's ViewModel.
+
+If several screens or ViewModels need it:
+    put the real shared value and shared operations in runtime.
+
+If it must survive app restart:
+    save it through Room, DataStore, or files.
+```
 
 ---
 

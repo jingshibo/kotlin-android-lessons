@@ -744,6 +744,7 @@ Covered:
 - package structure under `com.example.researchapp`
 - `ui`
 - `viewmodel`
+- `runtime`
 - `data`
 - `data/entity`
 - `data/dao`
@@ -753,6 +754,7 @@ Covered:
 - `export`
 - keeping `MainActivity.kt` small
 - separating screens into individual files
+- adding a home for shared temporary runtime state
 - starting with placeholders before real Bluetooth or real ML
 - avoiding too much code in the UI
 
@@ -1104,8 +1106,17 @@ The runtime flow is:
 ```text
 Screen
 -> ResearchViewModel
+-> ResearchRuntimeStateHolder for shared temporary state
 -> MeasurementRepository
 -> Room / FakeDeviceDataSource / SignalProcessor / FakeModelRunner / ExportFormatter
+```
+
+If the app uses shared runtime state across screens or ViewModels, include:
+
+```text
+runtime
+|-- ResearchRuntimeState.kt
+`-- ResearchRuntimeStateHolder.kt
 ```
 
 The research data flow is:
