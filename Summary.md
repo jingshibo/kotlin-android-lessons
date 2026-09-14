@@ -194,6 +194,7 @@ Covered:
 - non-null assertion `!!`
 - default parameter values
 - `enum class`
+- enum classes with properties
 - `when` with enums
 
 This lesson introduces structured research data, for example `Measurement(sampleId, value, timestamp)`, and explains why null safety is important in Android because devices, readings, files, and database results may not exist yet.

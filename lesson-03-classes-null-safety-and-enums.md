@@ -38,6 +38,7 @@ We will cover:
 - Elvis operator `?:`
 - non-null assertion `!!`
 - `enum class`
+- enum classes with properties
 - `when` with enums
 
 ## 1. Classes and objects
@@ -1494,6 +1495,92 @@ val displayText = when (state) {
 }
 ```
 
+### Enum classes can have properties
+
+An enum class can also have constructor properties.
+
+This makes the enum feel slightly like a regular class, but with one important difference:
+
+```text
+A regular class can create many new objects.
+An enum class has a fixed set of pre-created objects.
+```
+
+Regular class:
+
+```kotlin
+class ScreenInfo(
+    val navLabel: String,
+    val shortcut: String
+)
+
+val customScreen = ScreenInfo(
+    navLabel = "My Screen",
+    shortcut = "M"
+)
+```
+
+Enum class with properties:
+
+```kotlin
+enum class TabletScreen(
+    val navLabel: String,
+    val shortcut: String
+) {
+    Device("Device", "D"),
+    Data("Data", "A"),
+    Repository("Repository", "R"),
+    Settings("Settings", "S"),
+    AddPatient("Add Patient", "+")
+}
+```
+
+Each enum entry is a pre-created object:
+
+```text
+TabletScreen.Device
+TabletScreen.Data
+TabletScreen.Repository
+TabletScreen.Settings
+TabletScreen.AddPatient
+```
+
+The values in parentheses initialize the properties for that specific enum entry.
+
+So:
+
+```kotlin
+TabletScreen.Device.navLabel
+```
+
+gives:
+
+```text
+Device
+```
+
+And:
+
+```kotlin
+TabletScreen.Device.shortcut
+```
+
+gives:
+
+```text
+D
+```
+
+The key idea is:
+
+```text
+TabletScreen.Device is not just a name.
+It is one fixed object of type TabletScreen.
+That object already has navLabel and shortcut values.
+```
+
+This is useful when each fixed option needs extra information for the UI.
+
 ## 29. when + enum
 
 Enums work beautifully with `when`.
@@ -1731,6 +1818,26 @@ enum class DeviceState {
     MEASURING,
     ERROR
 }
+```
+
+Enum with properties:
+
+```kotlin
+enum class TabletScreen(
+    val navLabel: String,
+    val shortcut: String
+) {
+    Device("Device", "D"),
+    Data("Data", "A"),
+    Repository("Repository", "R")
+}
+```
+
+Access enum properties:
+
+```kotlin
+val label = TabletScreen.Device.navLabel
+val shortcut = TabletScreen.Device.shortcut
 ```
 
 `when` with enum:
