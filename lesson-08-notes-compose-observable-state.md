@@ -27,10 +27,11 @@ This note is organized in this order:
 1. Understand the core rule: UI is driven by observable state.
 2. Compare ordinary variables with `mutableStateOf`.
 3. Learn what `by` does and what `remember` adds.
-4. Compare state stored in a composable, a `ViewModel`, and a state list.
-5. Follow the lesson progression from Lesson 4 to Lesson 8.
-6. Understand `copy()`, `private set`, state down, and events up.
-7. Separate real state from calculated `val` values.
+4. Learn when `rememberSaveable` is useful.
+5. Compare state stored in a composable, a `ViewModel`, and a state list.
+6. Follow the lesson progression from Lesson 4 to Lesson 8.
+7. Understand `copy()`, `private set`, state down, and events up.
+8. Separate real state from calculated `val` values.
 
 ## 1. The Core Idea
 
@@ -244,6 +245,108 @@ Create Compose-observable state.
 Remember it while this composable stays in the composition.
 Use it like a normal variable because of by.
 ```
+
+### What rememberSaveable adds
+
+Sometimes you want local composable state to survive more than recomposition.
+
+For example, the user might type into a text field, rotate the device, and expect the typed value to still be there.
+
+Plain `remember` keeps state across recomposition, but it does not save the value when Android recreates the Activity during a configuration change such as screen rotation.
+
+For small UI state that should be restored, use `rememberSaveable`:
+
+```kotlin
+import androidx.compose.runtime.saveable.rememberSaveable
+
+var currentScreenName by rememberSaveable {
+    mutableStateOf(TabletScreen.Device.name)
+}
+```
+
+This means:
+
+```text
+mutableStateOf
+    -> make this observable state
+
+rememberSaveable
+    -> keep it across recompositions
+    -> also save and restore it when Android can recreate the screen
+```
+
+### Recomposition vs Activity recreation
+
+These two ideas sound similar, but they are different levels of rebuilding.
+
+```text
+Recomposition
+    -> Compose redraws part of the UI
+    -> the Activity is still the same
+
+Activity recreation
+    -> Android throws away the old screen object
+    -> Android creates a new screen object
+    -> the app must restore important small UI state
+```
+
+Short version:
+
+```text
+Recreating the Activity is like closing and rebuilding the screen automatically.
+```
+
+This can happen when Android needs a new version of the screen for a changed condition, such as:
+
+```text
+rotation
+theme change
+language change
+screen size change
+```
+
+So the difference is:
+
+| Code | What it remembers |
+|---|---|
+| `remember { mutableStateOf(...) }` | Keeps state while the composable remains in the current composition |
+| `rememberSaveable { mutableStateOf(...) }` | Keeps state across recomposition and can restore it after Activity recreation |
+
+Good examples for `rememberSaveable` are:
+
+```text
+selected screen name
+typed text
+selected tab
+small lists of IDs
+simple Boolean or number values
+```
+
+For example:
+
+```kotlin
+var registeredPatients by rememberSaveable {
+    mutableStateOf(
+        listOf("P001", "P002", "P003")
+    )
+}
+```
+
+This is reasonable because it stores a small list of strings.
+
+But avoid saving large objects, repositories, database results, or whole patient records with `rememberSaveable`.
+
+For those, save a small ID or key, then load the real data from a repository or ViewModel.
+
+That is why this code should stay as plain `remember`:
+
+```kotlin
+val repository = remember {
+    SessionRepository()
+}
+```
+
+The repository is an object the app uses to do work. It is not small UI state that should be written into Android's saved state.
 
 ## 6. Why ViewModel state does not need remember
 
@@ -810,6 +913,20 @@ var sampleId by remember {
 Ask:
 
 ```text
+Should this small local UI state survive Activity recreation, such as screen rotation?
+```
+
+If yes, use `rememberSaveable`:
+
+```kotlin
+var currentScreenName by rememberSaveable {
+    mutableStateOf(TabletScreen.Device.name)
+}
+```
+
+Ask:
+
+```text
 Is this state stored inside a ViewModel?
 ```
 
@@ -839,6 +956,7 @@ The most important ideas are:
 - `mutableStateOf` creates Compose-observable state.
 - `by` lets you use that state like a normal variable instead of writing `.value`.
 - `remember` keeps state from being recreated during recomposition inside a composable.
+- `rememberSaveable` is like `remember`, but it can also restore small UI state after Activity recreation.
 - A `ViewModel` can hold Compose state without `remember`.
 - `mutableStateListOf` is a Compose-aware mutable list.
 - Calculated values such as `meanText` usually do not need to be state.
@@ -853,6 +971,9 @@ mutableStateOf
 
 remember
     -> keep local composable state across recomposition
+
+rememberSaveable
+    -> keep small local composable state across recomposition and Activity recreation
 
 ViewModel
     -> keep screen state outside the composable
