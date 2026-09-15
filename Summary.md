@@ -755,6 +755,7 @@ Covered:
 - keeping `MainActivity.kt` small
 - separating screens into individual files
 - adding a home for shared temporary runtime state
+- distinguishing runtime managers from repositories
 - starting with placeholders before real Bluetooth or real ML
 - avoiding too much code in the UI
 
@@ -1106,7 +1107,7 @@ The runtime flow is:
 ```text
 Screen
 -> ResearchViewModel
--> ResearchRuntimeStateHolder for shared temporary state
+-> ResearchRuntimeStateManager for shared temporary workflow state
 -> MeasurementRepository
 -> Room / FakeDeviceDataSource / SignalProcessor / FakeModelRunner / ExportFormatter
 ```
@@ -1116,7 +1117,7 @@ If the app uses shared runtime state across screens or ViewModels, include:
 ```text
 runtime
 |-- ResearchRuntimeState.kt
-`-- ResearchRuntimeStateHolder.kt
+`-- ResearchRuntimeStateManager.kt
 ```
 
 The research data flow is:

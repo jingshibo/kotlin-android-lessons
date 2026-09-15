@@ -159,79 +159,84 @@ For this tutorial, use this structure:
 
 ```text
 com.example.researchapp
- ├── MainActivity.kt
- │
- ├── ui
- │    ├── ResearchApp.kt
- │    ├── PatientListScreen.kt
- │    ├── PatientDetailScreen.kt
- │    ├── MeasurementScreen.kt
- │    └── ResultScreen.kt
- │
- ├── viewmodel
- │    ├── ResearchViewModel.kt
- │    └── ResearchUiState.kt
- │
- ├── data
- │    ├── ResearchDatabase.kt
- │    ├── MeasurementRepository.kt
- │    │
- │    ├── entity
- │    │    ├── PatientEntity.kt
- │    │    ├── SessionEntity.kt
- │    │    ├── MeasurementEntity.kt
- │    │    └── ResultEntity.kt
- │    │
- │    └── dao
- │         ├── PatientDao.kt
- │         ├── SessionDao.kt
- │         ├── MeasurementDao.kt
- │         └── ResultDao.kt
- │
- ├── device
- │    ├── DeviceDataSource.kt
- │    └── FakeDeviceDataSource.kt
- │
- ├── processing
- │    ├── SignalProcessor.kt
- │    └── SignalFeatures.kt
- │
- ├── ml
- │    ├── ModelRunner.kt
- │    ├── FakeModelRunner.kt
- │    └── PredictionResult.kt
- │
- └── export
-      └── ExportFormatter.kt
+ |-- MainActivity.kt
+ |
+ |-- ui
+ |   |-- ResearchApp.kt
+ |   |-- PatientListScreen.kt
+ |   |-- PatientDetailScreen.kt
+ |   |-- MeasurementScreen.kt
+ |   `-- ResultScreen.kt
+ |
+ |-- viewmodel
+ |   |-- ResearchViewModel.kt
+ |   `-- ResearchUiState.kt
+ |
+ |-- runtime
+ |   |-- ResearchRuntimeState.kt
+ |   `-- ResearchRuntimeStateManager.kt
+ |
+ |-- data
+ |   |-- ResearchDatabase.kt
+ |   |-- MeasurementRepository.kt
+ |   |
+ |   |-- entity
+ |   |   |-- PatientEntity.kt
+ |   |   |-- SessionEntity.kt
+ |   |   |-- MeasurementEntity.kt
+ |   |   `-- ResultEntity.kt
+ |   |
+ |   `-- dao
+ |       |-- PatientDao.kt
+ |       |-- SessionDao.kt
+ |       |-- MeasurementDao.kt
+ |       `-- ResultDao.kt
+ |
+ |-- device
+ |   |-- DeviceDataSource.kt
+ |   `-- FakeDeviceDataSource.kt
+ |
+ |-- processing
+ |   |-- SignalProcessor.kt
+ |   `-- SignalFeatures.kt
+ |
+ |-- ml
+ |   |-- ModelRunner.kt
+ |   |-- FakeModelRunner.kt
+ |   `-- PredictionResult.kt
+ |
+ `-- export
+     `-- ExportFormatter.kt
 ```
 
 This is not the only possible structure.
 
-Important addition:
+But it is a good beginner-friendly structure for our current app.
+
+The new package here is:
 
 ```text
 runtime
-|-- ResearchRuntimeState.kt
-`-- ResearchRuntimeStateHolder.kt
 ```
 
-Place `runtime` beside `viewmodel`, `data`, `ui`, `device`, `processing`, `ml`, and `export`.
+This package is for temporary workflow state and the operations that safely change that state.
 
-The updated top-level package list is:
+It is separate from `viewmodel` because runtime state is not just one screen's UI state.
+
+It is separate from `data` because runtime state is not permanent database data.
+
+A useful mental model is:
 
 ```text
-com.example.researchapp
-|-- ui
-|-- viewmodel
-|-- runtime
-|-- data
-|-- device
-|-- processing
-|-- ml
-`-- export
-```
+viewmodel
+    -> single screen states and events
 
-But it is a good beginner-friendly structure for our current app.
+runtime
+    -> runtime states and operations across screens
+
+data
+    -> persistent research data and data operations
+```
 
 ---
 
@@ -540,9 +545,9 @@ The `runtime` folder contains temporary app state that must be shared across mor
 
 This is different from `ResearchUiState`.
 
-`ResearchUiState` is mostly for what one screen needs to display.
+`ResearchUiState` is mostly for those states used by only one screen.
 
-But some state belongs to the current running research workflow:
+But some states belongs to a workflow across multiple screens/viewmodels:
 
 ```text
 selected patient ID
@@ -555,14 +560,14 @@ latest processed value
 
 If only one screen needs a value, keep it in that screen's ViewModel.
 
-If several screens or ViewModels need the same temporary value, put the real shared value in a runtime state holder.
+If several screens or ViewModels need the same temporary value, put the real shared value in a runtime state manager.
 
 Suggested files:
 
 ```text
 runtime
 |-- ResearchRuntimeState.kt
-`-- ResearchRuntimeStateHolder.kt
+`-- ResearchRuntimeStateManager.kt
 ```
 
 ### `ResearchRuntimeState.kt`
@@ -582,7 +587,7 @@ data class ResearchRuntimeState(
 )
 ```
 
-### `ResearchRuntimeStateHolder.kt`
+### `ResearchRuntimeStateManager.kt`
 
 This file owns and updates that shared runtime state.
 
@@ -594,7 +599,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-class ResearchRuntimeStateHolder {
+class ResearchRuntimeStateManager {
 
     private val _runtimeState =
         MutableStateFlow(ResearchRuntimeState())
@@ -629,12 +634,81 @@ class ResearchRuntimeStateHolder {
 }
 ```
 
-### What functions belong in `ResearchRuntimeStateHolder`?
+`ResearchRuntimeStateManager` is not just a place to store variables that multiple screens share.
 
-Now that we have seen the holder, we can ask a better design question:
+It also supplies functions that operate on runtime state.
+
+It does two jobs:
 
 ```text
-Which functions should live inside ResearchRuntimeStateHolder?
+1. creates and owns ResearchRuntimeState
+2. provides operations that change that state safely
+```
+
+That is why the name `Manager` is useful.
+
+Therefore, runtime state is not like ViewModel state.
+
+ViewModel state is usually used directly by the ViewModel:
+
+In contrast, runtime state is closer to a repository-style object:
+
+```text
+it has a state data class
+and it provides operations that safely manipulate that state
+```
+
+So the ViewModel does not directly rewrite runtime states by itself.
+
+Instead, the ViewModel calls runtime operations:
+
+```kotlin
+runtimeStateManager.selectPatient(patientId)
+runtimeStateManager.selectSession(sessionId)
+runtimeStateManager.setDeviceConnected(true)
+```
+
+This is similar to how a ViewModel calls a repository:
+
+```kotlin
+measurementRepository.createPatient(...)
+measurementRepository.saveMeasurement(...)
+measurementRepository.exportSessionCsv(...)
+```
+
+Both are objects that a ViewModel can call.
+
+Both hide internal details.
+
+Both own operations.
+
+But they are not the same kind of object:
+
+```text
+ResearchRuntimeStateManager
+    -> temporary in-memory workflow state
+    -> selected patient/session
+    -> current connection/acquisition state
+    -> latest live values
+
+MeasurementRepository
+    -> persistent/data operations
+    -> Room database
+    -> DAOs
+    -> saved measurements/results
+    -> export data
+```
+
+So runtime is not merely "shared ViewModel state."
+
+It is a separate runtime data workflow layer.
+
+### What functions belong in `ResearchRuntimeStateManager`?
+
+Now that we understand the manager idea, we can ask a better design question:
+
+```text
+Which functions should live inside ResearchRuntimeStateManager?
 ```
 
 The criterion is not only:
@@ -649,10 +723,9 @@ The better criterion is:
 Is this function an operation on ResearchRuntimeState?
 ```
 
-其实道理很简单，既然这个状态变量是私有唯一的，而你又需要去修改这个状态变量，那凡是涉及修改这个状态变量的操作函数自然都需要放到这个文件中去，不然怎么看到这个状态变量并进行修改呢。
+其实道理很简单，既然这个状态变量是在ResearchRuntimeStateManager文件中私有且唯一的，而你又需要去修改这个状态变量，那凡是涉及修改这个状态变量的操作函数自然都需要放到这个文件中去，不然怎么看到这个状态变量并进行修改呢。其他的viewmodel则只需要调用这些函数就行了。
 
-
-If a function directly owns or protects changes to `ResearchRuntimeState`, it can belong in `ResearchRuntimeStateHolder`, even if currently only one ViewModel calls it.
+If a function directly owns or protects changes to `ResearchRuntimeState`, it can belong in `ResearchRuntimeStateManager`, even if currently only one ViewModel calls it.
 
 For example:
 
@@ -667,62 +740,64 @@ fun selectPatient(patientId: Long) {
 }
 ```
 
-This belongs in `ResearchRuntimeStateHolder` because it modifies the shared _runtimeState variable safely.
+This belongs in `ResearchRuntimeStateManager` because it modifies the shared `_runtimeState` variable safely.
 
-But a screen workflow function should stay in the ViewModel:
+It also protects a workflow rule:
+
+```text
+When a new patient is selected,
+the previous selected session should be cleared.
+```
+
+That rule belongs to `ResearchRuntimeState`, because it protects the meaning of that state.
+
+In contrast, a screen workflow function should stay in the ViewModel:
 
 ```kotlin
 fun onCreatePatientClick() {
     // validate text field
     // call repository
     // update screen message
-    // ask runtime holder to select the patient if needed
+    // ask runtime manager to select the patient if needed
 }
 ```
 
-That function is about a screen event, not just about changing `ResearchRuntimeState`.
+That function is mainly about a screen event, not just about changing `ResearchRuntimeState`.
 
 So the split is:
 
 ```text
-ResearchRuntimeStateHolder
-    -> owns ResearchRuntimeState
-    -> updates shared runtime values
-    -> protects shared runtime rules
-
 ViewModel
     -> handles screen events
     -> reads screen input
     -> calls repository
-    -> calls runtime holder when shared runtime state must change
+    -> calls runtime manager when runtime states change
     -> prepares UI messages/state for that screen
+
+ResearchRuntimeStateManager
+    -> owns ResearchRuntimeState
+    -> updates temporary workflow values
+    -> protects runtime workflow rules
+
+MeasurementRepository
+    -> owns data operations
+    -> reads/writes persistent research data
+    -> hides Room/DAO/export details from ViewModel
 ```
 
-A function can belong in `ResearchRuntimeStateHolder` even if only one ViewModel calls it today.
-
-So the idea is clear:
-
-```
-Put functions in ResearchRuntimeStateHolder if they are operations of ResearchRuntimeState.
-```
-
-But add one nuance:
-
-```
-Do not put screen-specific workflow functions there unless they are truly modifying shared runtime-states.
-```
+A function can belong in `ResearchRuntimeStateManager` even if only one ViewModel calls it today, as long as it is a runtime-state operation.
 
 The mental model is:
 
 ```text
 ViewModel
-    -> state and actions dedicately for one screen
+    -> state and actions for one screen
 
-runtime state holder
-    -> temporary state shared across screens/ViewModels
+runtime manager
+    -> temporary workflow state and runtime operations
 
-Room/database
-    -> permanent saved research data
+repository/data
+    -> permanent saved data and data operations
 ```
 
 For now, we only prepare this folder as an architectural home.
@@ -739,29 +814,43 @@ and how do the other parts get access to it?
 
 ---
 
-## 11. Shared repository instances
+## 11. Shared app object instances
 
 Some objects should not be created again and again.
 
-For example, if two ViewModels need to know which device is currently selected, they should not each create a separate `DeviceRepository`.
+This applies to both:
+
+```text
+runtime managers
+repositories
+```
+
+For example, if two ViewModels need the same selected patient/session state, they should not each create a separate `ResearchRuntimeStateManager`.
 
 If they did this:
 
 ```kotlin
-val deviceRepository = DeviceRepository()
+val runtimeStateManager = ResearchRuntimeStateManager()
 ```
 
-in two different places, then the app would have two different repository objects.
+in two different places, then the app would have two different runtime managers.
 
 That means:
 
 ```text
-DevicesViewModel changes its DeviceRepository
-DataViewModel reads a different DeviceRepository
-the selected device is not truly shared
+PatientListViewModel changes one ResearchRuntimeStateManager
+MeasurementViewModel reads a different ResearchRuntimeStateManager
+the selected patient/session is not truly shared
 ```
 
-To share state through a repository, both ViewModels must use the same repository object.
+To share runtime state, both ViewModels must use the same runtime manager object.
+
+The same idea applies to repositories:
+
+```text
+If two ViewModels need the same repository-backed data workflow,
+they should use the same repository instance.
+```
 
 There are two common ways to make that happen:
 
@@ -775,23 +864,23 @@ Dependency injection
 
 ### Singleton-style shared instance
 
-Sometimes you may see repository code written like this:
+Sometimes you may see shared-object code written like this:
 
 ```kotlin
-class DeviceRepository {
+class ResearchRuntimeStateManager {
 
     companion object {
-        val instance: DeviceRepository by lazy {
-            DeviceRepository()
+        val instance: ResearchRuntimeStateManager by lazy {
+            ResearchRuntimeStateManager()
         }
     }
 }
 ```
 
-This creates one shared `DeviceRepository` object that can be accessed through the class name:
+This creates one shared `ResearchRuntimeStateManager` object that can be accessed through the class name:
 
 ```kotlin
-val repository = DeviceRepository.instance
+val runtimeStateManager = ResearchRuntimeStateManager.instance
 ```
 
 The pieces mean:
@@ -799,12 +888,12 @@ The pieces mean:
 ```text
 companion object
     -> attach this value to the class itself
-    -> call it with DeviceRepository.instance
+    -> call it with ResearchRuntimeStateManager.instance
 
-val instance: DeviceRepository
-    -> instance is a DeviceRepository value
+val instance: ResearchRuntimeStateManager
+    -> instance is a ResearchRuntimeStateManager value
 
-by lazy { DeviceRepository() }
+by lazy { ResearchRuntimeStateManager() }
     -> do not create the object immediately
     -> create it the first time someone asks for it
     -> return the same object on later calls
@@ -814,14 +903,14 @@ So the flow is:
 
 ```text
 App starts
-    -> DeviceRepository.instance has not created anything yet
+    -> ResearchRuntimeStateManager.instance has not created anything yet
 
-First call to DeviceRepository.instance
+First call to ResearchRuntimeStateManager.instance
     -> lazy block runs
-    -> DeviceRepository() creates the object
+    -> ResearchRuntimeStateManager() creates the object
     -> that object is stored
 
-Later calls to DeviceRepository.instance
+Later calls to ResearchRuntimeStateManager.instance
     -> return the same stored object
 ```
 
@@ -836,26 +925,26 @@ one shared object used from many places
 For example:
 
 ```kotlin
-class DevicesViewModel(
-    private val deviceRepository: DeviceRepository =
-        DeviceRepository.instance
+class PatientListViewModel(
+    private val runtimeStateManager: ResearchRuntimeStateManager =
+        ResearchRuntimeStateManager.instance
 ) : ViewModel()
 ```
 
 and:
 
 ```kotlin
-class DataViewModel(
-    private val deviceRepository: DeviceRepository =
-        DeviceRepository.instance
+class MeasurementViewModel(
+    private val runtimeStateManager: ResearchRuntimeStateManager =
+        ResearchRuntimeStateManager.instance
 ) : ViewModel()
 ```
 
-Both DevicesViewModel and DataViewModel use `DeviceRepository.instance`, so they receive the same shared object.
+Both `PatientListViewModel` and `MeasurementViewModel` use `ResearchRuntimeStateManager.instance`, so they receive the same shared object.
 
-This can be acceptable for a small fake repository or a learning project.
+This can be acceptable for a small fake workflow or a learning project.
 
-But be careful with this pattern in Android if the repository needs:
+But be careful with this pattern in Android if the shared object needs:
 
 ```text
 Context
@@ -865,7 +954,7 @@ coroutines
 lifecycle-aware behavior
 ```
 
-For those cases, a ViewModel, application-level setup, or dependency injection is usually cleaner.
+For those cases, application-level setup or constructor-passed dependencies are usually cleaner.
 
 ### Dependency injection
 
@@ -953,8 +1042,6 @@ Injection
     -> passing that object in from outside
 ```
 
-In larger Android apps, dependency injection is often handled with tools such as Hilt or Dagger.
-
 For this tutorial, the important idea is the constructor pattern:
 
 ```kotlin
@@ -982,14 +1069,14 @@ In this beginner project, either style can work.
 The singleton-style `instance` pattern is simple to understand:
 
 ```text
-Use DeviceRepository.instance whenever you need the shared repository.
+Use ResearchRuntimeStateManager.instance whenever you need the shared runtime manager.
 ```
 
 Dependency injection is the cleaner long-term direction:
 
 ```text
-Create the shared repository outside the ViewModel.
-Pass the same repository object into every ViewModel that needs it.
+Create the shared runtime manager or repository outside the ViewModel.
+Pass the same object into every ViewModel that needs it.
 ```
 
 For Lesson 24, the main goal is not to choose the final tool yet.
@@ -997,7 +1084,8 @@ For Lesson 24, the main goal is not to choose the final tool yet.
 The main goal is to understand this rule:
 
 ```text
-Shared state requires a shared object instance.
+Shared runtime state requires a shared runtime manager instance.
+Shared repository behavior requires a shared repository instance.
 ```
 
 The file structure gives the shared object a home.
@@ -1009,6 +1097,35 @@ The object creation pattern decides how the rest of the app accesses that shared
 ## 12. `data` folder
 
 The `data` folder contains the local database and repository.
+
+This is where the lesson moves from:
+
+```text
+temporary runtime workflow state
+```
+
+to:
+
+```text
+persistent research data
+```
+
+So the difference is:
+
+```text
+runtime
+    -> what is happening in the app right now
+    -> selected patient/session
+    -> connection/acquisition state
+    -> latest live values
+
+data
+    -> what the app stores and loads
+    -> patients
+    -> sessions
+    -> measurements
+    -> results
+```
 
 ```text
 data
@@ -1123,6 +1240,28 @@ We will implement these later.
 ## 15. `MeasurementRepository.kt`
 
 The repository is the bridge between the ViewModel and the data/device/processing/ML layers.
+
+It is similar to `ResearchRuntimeStateManager` in one way:
+
+```text
+ViewModels call both of them.
+```
+
+But their jobs are different:
+
+```text
+ResearchRuntimeStateManager
+    -> manages temporary workflow state
+    -> selected session
+    -> connection/acquisition state
+    -> latest live values
+
+MeasurementRepository
+    -> coordinates data operations
+    -> Room writes and queries
+    -> device reads
+    -> processing/ML/export work
+```
 
 Its final responsibility will be:
 
@@ -1585,7 +1724,7 @@ The skeleton should also include the shared runtime folder:
 ```text
 runtime
 |-- ResearchRuntimeState.kt
-`-- ResearchRuntimeStateHolder.kt
+`-- ResearchRuntimeStateManager.kt
 ```
 
 It may only show placeholder screens.
