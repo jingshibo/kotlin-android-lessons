@@ -649,6 +649,9 @@ The better criterion is:
 Is this function an operation on ResearchRuntimeState?
 ```
 
+其实道理很简单，既然这个状态变量是私有唯一的，而你又需要去修改这个状态变量，那凡是涉及修改这个状态变量的操作函数自然都需要放到这个文件中去，不然怎么看到这个状态变量并进行修改呢。
+
+
 If a function directly owns or protects changes to `ResearchRuntimeState`, it can belong in `ResearchRuntimeStateHolder`, even if currently only one ViewModel calls it.
 
 For example:
@@ -664,16 +667,7 @@ fun selectPatient(patientId: Long) {
 }
 ```
 
-This belongs in `ResearchRuntimeStateHolder` because it defines how the shared runtime state changes safely.
-
-It protects an important rule:
-
-```text
-When a new patient is selected,
-the previous selected session should be cleared.
-```
-
-That is a rule about `ResearchRuntimeState`, so it belongs near the state it protects.
+This belongs in `ResearchRuntimeStateHolder` because it modifies the shared _runtimeState variable safely.
 
 But a screen workflow function should stay in the ViewModel:
 
@@ -706,26 +700,23 @@ ViewModel
 
 A function can belong in `ResearchRuntimeStateHolder` even if only one ViewModel calls it today.
 
-But it should still be a runtime-state operation, not a full screen workflow.
-
 So the idea is clear:
 
 ```
-Put functions in ResearchRuntimeStateHolder if they are operations of ResearchRuntimeState,
-not merely because many screens call them.
+Put functions in ResearchRuntimeStateHolder if they are operations of ResearchRuntimeState.
 ```
 
 But add one nuance:
 
 ```
-Do not put screen-specific workflow functions there unless they are truly shared runtime-state rules.
+Do not put screen-specific workflow functions there unless they are truly modifying shared runtime-states.
 ```
 
 The mental model is:
 
 ```text
 ViewModel
-    -> state and actions for one screen
+    -> state and actions dedicately for one screen
 
 runtime state holder
     -> temporary state shared across screens/ViewModels
@@ -884,6 +875,188 @@ class MeasurementRepository {
 This looks empty, but that is fine.
 
 In Direction A, we are setting up the project step by step.
+
+### A note about shared repository instances
+
+Sometimes you may see repository code written like this:
+
+```kotlin
+class DeviceRepository {
+
+    companion object {
+        val instance: DeviceRepository by lazy {
+            DeviceRepository()
+        }
+    }
+}
+```
+
+This creates one shared `DeviceRepository` object that can be accessed through the class name:
+
+```kotlin
+val repository = DeviceRepository.instance
+```
+
+The pieces mean:
+
+```text
+companion object
+    -> attach this value to the class itself
+    -> call it with DeviceRepository.instance
+
+val instance: DeviceRepository
+    -> instance is a DeviceRepository value
+
+by lazy { DeviceRepository() }
+    -> do not create the object immediately
+    -> create it the first time someone asks for it
+    -> return the same object on later calls
+```
+
+So the flow is:
+
+```text
+App starts
+    -> DeviceRepository.instance has not created anything yet
+
+First call to DeviceRepository.instance
+    -> lazy block runs
+    -> DeviceRepository() creates the object
+    -> that object is stored
+
+Later calls to DeviceRepository.instance
+    -> return the same stored object
+```
+
+This is a simple singleton-style pattern.
+
+Singleton means:
+
+```text
+one shared object used from many places
+```
+
+This can be acceptable for a small fake repository.
+
+But be careful with this pattern in Android if the repository needs:
+
+```text
+Context
+Room database
+device connection state
+coroutines
+lifecycle-aware behavior
+```
+
+For those cases, a ViewModel, application-level setup, or dependency injection is usually cleaner.
+
+### What dependency injection means
+
+Dependency injection sounds advanced, but the basic idea is simple.
+
+A dependency is an object a class needs to do its job.
+
+Injection means giving that object to the class from outside.
+
+Without dependency injection, a repository creates its own dependencies:
+
+```kotlin
+class MeasurementRepository {
+
+    private val deviceDataSource =
+        FakeDeviceDataSource()
+
+    private val signalProcessor =
+        SignalProcessor()
+}
+```
+
+With dependency injection, the repository receives them:
+
+```kotlin
+class MeasurementRepository(
+    private val deviceDataSource: DeviceDataSource,
+    private val signalProcessor: SignalProcessor
+)
+```
+
+Then another part of the app decides what to provide:
+
+```kotlin
+val repository = MeasurementRepository(
+    deviceDataSource = FakeDeviceDataSource(),
+    signalProcessor = SignalProcessor()
+)
+```
+
+The repository no longer says:
+
+```text
+I will build my own device source.
+```
+
+It says:
+
+```text
+I need a device source.
+Please give me one.
+```
+
+This makes the code easier to test.
+
+For example, the real app might use:
+
+```kotlin
+val repository = MeasurementRepository(
+    deviceDataSource = RealBluetoothDeviceDataSource(),
+    signalProcessor = SignalProcessor()
+)
+```
+
+A test might use:
+
+```kotlin
+val repository = MeasurementRepository(
+    deviceDataSource = FakeDeviceDataSource(),
+    signalProcessor = SignalProcessor()
+)
+```
+
+Same repository class.
+
+Different objects passed in.
+
+Short version:
+
+```text
+Dependency
+    -> object this class needs
+
+Injection
+    -> passing that object in from outside
+```
+
+In larger Android apps, dependency injection is often handled with tools such as Hilt or Dagger.
+
+For this tutorial, the important idea is the constructor pattern:
+
+```kotlin
+class MeasurementRepository(
+    private val database: ResearchDatabase,
+    private val deviceDataSource: DeviceDataSource,
+    private val signalProcessor: SignalProcessor,
+    private val modelRunner: ModelRunner
+)
+```
+
+We are not fully adding dependency injection in Lesson 24.
+
+But this is the architecture idea behind it:
+
+```text
+Do not make every class build all of its own tools.
+Give classes the tools they need from the outside.
+```
 
 ---
 
@@ -1369,6 +1542,16 @@ CSV/JSON export
 export
 ```
 
+You also learned two setup ideas that affect how these folders connect:
+
+```text
+companion object + by lazy
+    -> create one shared instance only when it is first used
+
+dependency injection
+    -> pass needed objects in from outside
+```
+
 The most important mental model is:
 
 ```text
@@ -1386,6 +1569,8 @@ Is this device code?
 Is this processing code?
 Is this ML code?
 Is this export code?
+Is this a shared instance that should be created once?
+Is this a dependency that should be passed in from outside?
 ```
 
 Then place it in the correct folder.
