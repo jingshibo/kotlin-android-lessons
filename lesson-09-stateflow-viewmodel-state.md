@@ -248,7 +248,7 @@ Then when you use it:
 
 ```kotlin
 init {
-    viewModelScope.launch {
+    viewModelScope.launch { // 放在一个携程中，一直不停的观察该值变化。
         deviceRepository.deviceState.collect { deviceState ->
             _uiState.update {
                 it.copy(

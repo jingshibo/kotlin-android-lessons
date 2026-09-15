@@ -727,156 +727,53 @@ Room/database
 
 For now, we only prepare this folder as an architectural home.
 
-We are not adding dependency injection in this lesson.
+We are not implementing full dependency injection in this lesson.
 
----
-
-## 11. `data` folder
-
-The `data` folder contains the local database and repository.
+But before we continue into the `data`, `device`, `processing`, and `ml` folders, there is one important architecture question to understand:
 
 ```text
-data
- ├── ResearchDatabase.kt
- ├── MeasurementRepository.kt
- ├── entity
- └── dao
-```
-
-This is where Room-related code will go.
-
-For now, we only create the files.
-
-We do not need to fully implement Room in Lesson 24.
-
-That will be Lesson 26.
-
----
-
-## 12. `data/entity` folder
-
-This folder contains Room entities:
-
-```text
-entity
- ├── PatientEntity.kt
- ├── SessionEntity.kt
- ├── MeasurementEntity.kt
- └── ResultEntity.kt
-```
-
-These files represent database tables.
-
-For example:
-
-```text
-PatientEntity
- ↓
-patients table
-
-SessionEntity
- ↓
-sessions table
-
-MeasurementEntity
- ↓
-measurements table
-
-ResultEntity
- ↓
-results table
-```
-
-We will implement these properly in Lesson 25.
-
-For now, the important idea is:
-
-```text
-Entity files describe what data we store.
+When several parts of the app need the same object,
+who creates that object,
+and how do the other parts get access to it?
 ```
 
 ---
 
-## 13. `data/dao` folder
+## 11. Shared repository instances
 
-This folder contains DAO interfaces:
+Some objects should not be created again and again.
 
-```text
-dao
- ├── PatientDao.kt
- ├── SessionDao.kt
- ├── MeasurementDao.kt
- └── ResultDao.kt
-```
+For example, if two ViewModels need to know which device is currently selected, they should not each create a separate `DeviceRepository`.
 
-DAO means:
-
-```text
-Data Access Object
-```
-
-These files describe how we read and write the database.
-
-For example:
-
-```text
-PatientDao
- ↓
-insert patient
-get all patients
-
-SessionDao
- ↓
-insert session
-get sessions for patient
-
-MeasurementDao
- ↓
-insert measurement
-get measurements for session
-
-ResultDao
- ↓
-insert result
-get results for session
-```
-
-We will implement these later.
-
----
-
-## 14. `MeasurementRepository.kt`
-
-The repository is the bridge between the ViewModel and the data/device/processing/ML layers.
-
-Its final responsibility will be:
-
-```text
-create patient
-create session
-connect device
-read measurement
-process measurement
-save measurement
-run inference
-save result
-build export text
-```
-
-For now, create the file:
+If they did this:
 
 ```kotlin
-package com.example.researchapp.data
-
-class MeasurementRepository {
-}
+val deviceRepository = DeviceRepository()
 ```
 
-This looks empty, but that is fine.
+in two different places, then the app would have two different repository objects.
 
-In Direction A, we are setting up the project step by step.
+That means:
 
-### A note about shared repository instances
+```text
+DevicesViewModel changes its DeviceRepository
+DataViewModel reads a different DeviceRepository
+the selected device is not truly shared
+```
+
+To share state through a repository, both ViewModels must use the same repository object.
+
+There are two common ways to make that happen:
+
+```text
+Singleton-style shared instance
+    -> the class exposes one shared instance itself
+
+Dependency injection
+    -> some outside setup creates the object and passes it in
+```
+
+### Singleton-style shared instance
 
 Sometimes you may see repository code written like this:
 
@@ -936,7 +833,27 @@ Singleton means:
 one shared object used from many places
 ```
 
-This can be acceptable for a small fake repository.
+For example:
+
+```kotlin
+class DevicesViewModel(
+    private val deviceRepository: DeviceRepository =
+        DeviceRepository.instance
+) : ViewModel()
+```
+
+and:
+
+```kotlin
+class DataViewModel(
+    private val deviceRepository: DeviceRepository =
+        DeviceRepository.instance
+) : ViewModel()
+```
+
+Both DevicesViewModel and DataViewModel use `DeviceRepository.instance`, so they receive the same shared object.
+
+This can be acceptable for a small fake repository or a learning project.
 
 But be careful with this pattern in Android if the repository needs:
 
@@ -950,7 +867,7 @@ lifecycle-aware behavior
 
 For those cases, a ViewModel, application-level setup, or dependency injection is usually cleaner.
 
-### What dependency injection means
+### Dependency injection
 
 Dependency injection sounds advanced, but the basic idea is simple.
 
@@ -1058,9 +975,185 @@ Do not make every class build all of its own tools.
 Give classes the tools they need from the outside.
 ```
 
+### Which style are we using for now?
+
+In this beginner project, either style can work.
+
+The singleton-style `instance` pattern is simple to understand:
+
+```text
+Use DeviceRepository.instance whenever you need the shared repository.
+```
+
+Dependency injection is the cleaner long-term direction:
+
+```text
+Create the shared repository outside the ViewModel.
+Pass the same repository object into every ViewModel that needs it.
+```
+
+For Lesson 24, the main goal is not to choose the final tool yet.
+
+The main goal is to understand this rule:
+
+```text
+Shared state requires a shared object instance.
+```
+
+The file structure gives the shared object a home.
+
+The object creation pattern decides how the rest of the app accesses that shared object.
+
 ---
 
-## 15. `device` folder
+## 12. `data` folder
+
+The `data` folder contains the local database and repository.
+
+```text
+data
+ ├── ResearchDatabase.kt
+ ├── MeasurementRepository.kt
+ ├── entity
+ └── dao
+```
+
+This is where Room-related code will go.
+
+For now, we only create the files.
+
+We do not need to fully implement Room in Lesson 24.
+
+That will be Lesson 26.
+
+---
+
+## 13. `data/entity` folder
+
+This folder contains Room entities:
+
+```text
+entity
+ ├── PatientEntity.kt
+ ├── SessionEntity.kt
+ ├── MeasurementEntity.kt
+ └── ResultEntity.kt
+```
+
+These files represent database tables.
+
+For example:
+
+```text
+PatientEntity
+ ↓
+patients table
+
+SessionEntity
+ ↓
+sessions table
+
+MeasurementEntity
+ ↓
+measurements table
+
+ResultEntity
+ ↓
+results table
+```
+
+We will implement these properly in Lesson 25.
+
+For now, the important idea is:
+
+```text
+Entity files describe what data we store.
+```
+
+---
+
+## 14. `data/dao` folder
+
+This folder contains DAO interfaces:
+
+```text
+dao
+ ├── PatientDao.kt
+ ├── SessionDao.kt
+ ├── MeasurementDao.kt
+ └── ResultDao.kt
+```
+
+DAO means:
+
+```text
+Data Access Object
+```
+
+These files describe how we read and write the database.
+
+For example:
+
+```text
+PatientDao
+ ↓
+insert patient
+get all patients
+
+SessionDao
+ ↓
+insert session
+get sessions for patient
+
+MeasurementDao
+ ↓
+insert measurement
+get measurements for session
+
+ResultDao
+ ↓
+insert result
+get results for session
+```
+
+We will implement these later.
+
+---
+
+## 15. `MeasurementRepository.kt`
+
+The repository is the bridge between the ViewModel and the data/device/processing/ML layers.
+
+Its final responsibility will be:
+
+```text
+create patient
+create session
+connect device
+read measurement
+process measurement
+save measurement
+run inference
+save result
+build export text
+```
+
+For now, create the file:
+
+```kotlin
+package com.example.researchapp.data
+
+class MeasurementRepository {
+}
+```
+
+This looks empty, but that is fine.
+
+In Direction A, we are setting up the project step by step.
+
+---
+
+## 16. `device` folder
 
 The `device` folder contains:
 
@@ -1144,7 +1237,7 @@ But not yet.
 
 ---
 
-## 16. `processing` folder
+## 17. `processing` folder
 
 The `processing` folder contains signal-processing logic.
 
@@ -1213,7 +1306,7 @@ That is very important.
 
 ---
 
-## 17. `ml` folder
+## 18. `ml` folder
 
 The `ml` folder contains model-related code.
 
@@ -1285,7 +1378,7 @@ This gives us a fake ML result before using a real LiteRT/TFLite model.
 
 ---
 
-## 18. `export` folder
+## 19. `export` folder
 
 The `export` folder contains export formatting code.
 
@@ -1317,7 +1410,7 @@ The UI should only let the user choose where to save the file.
 
 ---
 
-## 19. What should we implement first?
+## 20. What should we implement first?
 
 Do not implement everything at once.
 
@@ -1342,7 +1435,7 @@ Lesson 24 focuses mostly on step 1 and the file structure.
 
 ---
 
-## 20. Why we start with placeholders
+## 21. Why we start with placeholders
 
 You may wonder:
 
@@ -1369,7 +1462,7 @@ A clean skeleton gives you a map.
 
 ---
 
-## 21. Common mistake: too much code in UI
+## 22. Common mistake: too much code in UI
 
 A common beginner structure is:
 
@@ -1409,7 +1502,7 @@ That is the architecture we are building.
 
 ---
 
-## 22. Common mistake: starting with real Bluetooth too early
+## 23. Common mistake: starting with real Bluetooth too early
 
 Another common mistake is trying to implement real Bluetooth before the app skeleton exists.
 
@@ -1439,7 +1532,7 @@ This is a safer learning path.
 
 ---
 
-## 23. Common mistake: starting with real ML too early
+## 24. Common mistake: starting with real ML too early
 
 Similarly, do not start with the real model immediately.
 
@@ -1469,7 +1562,7 @@ That means the UI, ViewModel, Repository, and Result screen can be tested before
 
 ---
 
-## 24. Current skeleton after Lesson 24
+## 25. Current skeleton after Lesson 24
 
 After Lesson 24, your project should have this shape:
 
@@ -1505,7 +1598,7 @@ The goal is to create a clean foundation.
 
 ---
 
-## 25. What you learned in Lesson 24
+## 26. What you learned in Lesson 24
 
 You learned how to map the architecture into real Android project folders:
 
