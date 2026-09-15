@@ -213,6 +213,8 @@ viewModel.uiState.collect { latestState ->
 }
 ```
 
+这里collect的含义很直接，就是获取 viewModel.uiState的值，这里的latestState指的就是uiState的当前值。然后基于获取的这个值进行后续操作。
+
 means:
 
 ```text
@@ -221,6 +223,47 @@ Every time uiState emits a new ResearchUiState,
 put that new value into latestState,
 then run the code inside the block.
 ```
+
+再给一个例子：
+
+```kotlin
+data class DeviceRuntimeState(
+    val selectedDevice: String = "",
+    val isMeasuring: Boolean = false,
+    val isTransferring: Boolean = false,
+    val isAnalyzing: Boolean = false,
+    val transferInterrupted: Boolean = false
+)
+
+class DeviceRepository {
+    private val _deviceState =
+        MutableStateFlow(DeviceRuntimeState())
+
+    val deviceState: StateFlow<DeviceRuntimeState> =
+        _deviceState.asStateFlow()
+}
+```
+
+Then when you use it: 
+
+```kotlin
+init {
+    viewModelScope.launch {
+        deviceRepository.deviceState.collect { deviceState ->
+            _uiState.update {
+                it.copy(
+                    selectedDevice = deviceState.selectedDevice,
+                    isMeasuring = deviceState.isMeasuring,
+                    isTransferring = deviceState.isTransferring,
+                    isAnalyzing = deviceState.isAnalyzing
+                )
+            }
+        }
+    }
+}
+```
+
+这里的 collect 指的就是获取 deviceRepository.deviceState 的值。然后 deviceState -> 指的就是我们用这个值更新 _uiState。这里的 it 就是用来代指_uiState，非常直接清楚。
 
 But this raw `collect { ... }` example is only here to explain the word `collect`.
 
