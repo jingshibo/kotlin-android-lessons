@@ -610,8 +610,6 @@ val uiState by viewModel.uiState.collectAsState()
 
 That also converts a `StateFlow` into Compose-readable state.
 
-For Android screens, `collectAsStateWithLifecycle()` is usually preferred because it is lifecycle-aware.
-
 Why `collectAsState()` is essential:
 
 StateFlow belongs to Kotlin, but Compose is a UI framework. Compose doesn't know how to read Kotlin StateFlow directly.
@@ -620,6 +618,26 @@ StateFlow belongs to Kotlin, but Compose is a UI framework. Compose doesn't know
 1. It subscribes to `viewModel.uiState`.
 2. Every time a new DataUiState is produced, `collectAsState()` notifies Compose.
 3. Compose detects the change and automatically re-draws (recomposes) the exact UI composables that read state.
+
+For Android screens, `collectAsStateWithLifecycle()` is usually preferred because it is lifecycle-aware.
+
+Differences: `collectAsState()` vs. `collectAsStateWithLifecycle()`
+
+| Feature | `collectAsState()` | `collectAsStateWithLifecycle()` (Best Practice) |
+|---|---|---|
+| Lifecycle Awareness | ❌ None (Keeps collecting in background) | ✅ Lifecycle-Aware (Pauses when app is minimized) |
+| Battery & CPU Usage | Wastes CPU/battery updating UI state when app is hidden | Saves CPU & Battery by pausing background flow collection |
+| Behavior on Minimize | Keeps collecting flow emissions when screen is off | Pauses collection when lifecycle falls below `STARTED`, resumes on foreground |
+| Library Origin | `androidx.compose.runtime` (Base Compose) | `androidx.lifecycle.compose` (Android Lifecycle) |
+
+So in a normal Android screen, prefer:
+
+```kotlin
+val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+```
+
+Use `collectAsState()` only when lifecycle awareness is not needed, or when you are not inside a normal Android lifecycle-aware screen.
+
 
 ---
 
