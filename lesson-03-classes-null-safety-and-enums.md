@@ -719,13 +719,13 @@ val generalViewModel: ViewModel = ResearchViewModel()
 
 because a `ResearchViewModel` is a kind of `ViewModel`.
 
-This is only an inheritance example. It is not the same pattern as the Compose line you will see in Lesson 8:
+This is only an inheritance example. It is not the same pattern as the Compose line you will see in Lesson 9:
 
 ```kotlin
 val researchViewModel: ResearchViewModel = viewModel()
 ```
 
-That Lesson 8 line is mainly about calling a function named `viewModel()`.
+That Lesson 9 line is mainly about calling a function named `viewModel()`.
 
 For now, keep these two ideas separate:
 

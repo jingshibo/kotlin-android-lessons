@@ -1086,7 +1086,7 @@ Button(
 }
 ```
 
-## Lesson 5 preview
+## Lesson 6 preview
 
 Next, I suggest we cover:
 

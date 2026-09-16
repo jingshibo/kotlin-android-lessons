@@ -5,14 +5,14 @@
 This tutorial is easier to understand if it is split into two parts:
 
 ```text
-Part 1: Lessons 1-23
+Part 1: Lessons 1-24
 -> Foundation, concepts, and architecture theory
 
-Part 2: Lessons 24-34
+Part 2: Lessons 25-35
 -> Implementation of the clean fake-data research app skeleton
 ```
 
-So yes: **Lessons 1-23 are mainly the basic theory and learning foundation**, while **Lessons 24-34 are the implementation phase**.
+So yes: **Lessons 1-24 are mainly the basic theory and learning foundation**, while **Lessons 25-35 are the implementation phase**.
 
 The order is logical:
 
@@ -33,6 +33,7 @@ The complete learning route is:
 Part 1:
 -> basic Kotlin
 -> basic Android UI
+-> callback functions and event flow
 -> research measurement screen
 -> measurement history
 -> CSV export
@@ -70,14 +71,14 @@ Part 2:
 This route can be understood in two parts:
 
 ```text
-Part 1: Lessons 1-23
+Part 1: Lessons 1-24
 -> basic Kotlin
 -> Android UI
 -> research app concepts
 -> state, storage, repository, Room, navigation, device, processing, ML, export
 -> final architecture review
 
-Part 2: Lessons 24-34
+Part 2: Lessons 25-35
 -> clean project structure
 -> concrete Kotlin files
 -> fake device, processing, fake ML
@@ -88,8 +89,8 @@ Part 2: Lessons 24-34
 So the relationship is:
 
 ```text
-Lessons 1-23 explain the route.
-Lessons 24-34 start building the route.
+Lessons 1-24 explain the route.
+Lessons 25-35 start building the route.
 ```
 
 
@@ -114,7 +115,7 @@ The final direction is an app that can eventually:
 
 ## Part 1 - Foundation and architecture theory
 
-**Lessons 1-23 explain the concepts before the clean implementation begins.**
+**Lessons 1-24 explain the concepts before the clean implementation begins.**
 
 This part starts with basic Kotlin, moves into Jetpack Compose, then introduces app state, persistence, background work, repository structure, Room, navigation, device abstraction, signal processing, ML inference, export, and the final architecture review.
 
@@ -219,10 +220,36 @@ Covered:
 
 This is where the tutorial moves from pure Kotlin console examples into an actual Android screen.
 
-### Lesson 5 - Compose layout and UI components
+### Lesson 5 - Callback functions, lambdas, and event flow in Jetpack Compose
 
 Short summary:
-Lesson 4 created a basic Compose screen, but the interface is still too plain for a practical tablet research app. Lesson 5 improves the layout with rows, spacing, input fields, status display, and clearer screen organization.
+Lesson 4 uses `onClick`, `onValueChange`, and trailing lambdas, but it does not yet fully explain how functions can be passed to other functions and called later. Lesson 5 develops that foundation before callbacks become a regular part of screens, navigation, export, and ViewModel communication.
+
+Covered:
+
+- named functions, lambdas, function values, and callbacks
+- function types such as `() -> Unit` and `(String) -> Unit`
+- passing a function versus calling it
+- callable references such as `::clearMeasurements`
+- callback arguments and who provides them
+- implicit `it` versus explicit parameter names
+- callback registration versus execution
+- `Button(onClick)` and trailing lambda syntax
+- reusable composables that receive callbacks
+- state hoisting
+- state flowing down and events flowing up
+- forwarding navigation events through several composables
+- nullable callbacks and `?.invoke(...)`
+- using callbacks to keep screens and ViewModels decoupled
+- callbacks compared with StateFlow and coroutines
+- callback execution, state updates, and recomposition
+
+The lesson builds one consistent mental model for `onClick`, `onValueChange`, `onNavigate`, `onResult`, and custom callbacks such as `onDeviceSelect`.
+
+### Lesson 6 - Compose layout and UI components
+
+Short summary:
+Lesson 5 explains the callback machinery behind Compose interactions, but the interface created in Lesson 4 is still too plain for a practical tablet research app. Lesson 6 improves the layout with rows, spacing, input fields, status display, and clearer screen organization.
 
 Covered:
 
@@ -240,10 +267,10 @@ Covered:
 
 The main goal is to make the app layout clearer and closer to a real research data-collection interface.
 
-### Lesson 5 note - Modifier in Jetpack Compose
+### Lesson 6 note - Modifier in Jetpack Compose
 
 Short summary:
-This companion note explains `Modifier` as its own topic, using the examples introduced in Lessons 4 and 5. It focuses on why modifiers are attached to individual composables, why modifier order matters, and why reusable composables should accept a `modifier: Modifier = Modifier` parameter.
+This companion note explains `Modifier` as its own topic, using the examples introduced in Lessons 4 and 6. It focuses on why modifiers are attached to individual composables, why modifier order matters, and why reusable composables should accept a `modifier: Modifier = Modifier` parameter.
 
 Covered:
 
@@ -257,10 +284,10 @@ Covered:
 - using `Spacer` versus `Arrangement.spacedBy`
 - applying a passed `modifier` to the top-level UI element of a reusable composable
 
-### Lesson 6 - Measurement history with data class, MutableList, and LazyColumn
+### Lesson 7 - Measurement history with data class, MutableList, and LazyColumn
 
 Short summary:
-Lesson 5 made the screen clearer, but the app still only focuses on the current value instead of a record of measurements. Lesson 6 adds measurement history, a list display, and simple statistics so the app behaves more like a data-collection tool.
+Lesson 6 made the screen clearer, but the app still only focuses on the current value instead of a record of measurements. Lesson 7 adds measurement history, a list display, and simple statistics so the app behaves more like a data-collection tool.
 
 Covered:
 
@@ -276,7 +303,7 @@ Covered:
 
 This lesson makes the app feel more like a real data-collection tool because it stores the full measurement history.
 
-### Lesson 6 note - val, var, remember, and recomposition
+### Lesson 7 note - val, var, remember, and recomposition
 
 Short summary:
 This companion note explains why calculated values such as `latestMeasurement`, `meanText`, `minText`, and `maxText` use `val`, while editable Compose state such as `sampleId`, `isConnected`, `measurementValue`, and `measurementCount` use `var`.
@@ -291,10 +318,10 @@ Covered:
 - why `val measurementList = remember { mutableStateListOf<Measurement>() }` can still allow list contents to change
 - when to use plain `val`, `val` with `remember`, and `var` with `remember`
 
-### Lesson 7 - Saving and exporting measurements as CSV
+### Lesson 8 - Saving and exporting measurements as CSV
 
 Short summary:
-Lesson 6 keeps a measurement history inside the running app, but that data is not yet useful outside Android. Lesson 7 adds CSV export so measurements can be saved for Excel, Python, backup, and later research analysis.
+Lesson 7 keeps a measurement history inside the running app, but that data is not yet useful outside Android. Lesson 8 adds CSV export so measurements can be saved for Excel, Python, backup, and later research analysis.
 
 Covered:
 
@@ -308,7 +335,7 @@ Covered:
 
 This lesson adds one of the most important research-app functions: exporting data for Excel, Python, backup, or later analysis.
 
-### Lesson 7 note - Export callbacks, temporary state, and recomposition
+### Lesson 8 note - Export callbacks, temporary state, and recomposition
 
 Short summary:
 This companion note explains the subtle state, callback, and timing behavior behind CSV export. It starts from the natural question of why a local `val pendingCsvText` inside `onClick` is not enough, then compares the old `pendingCsvText` method with generating CSV text inside the file-picker `onResult` callback.
@@ -329,10 +356,10 @@ Covered:
 - why `exportMessage` is UI state but `csvText` is temporary data
 - why small exports can be written directly, while larger exports should later use background work
 
-### Lesson 8 - App architecture and ViewModel
+### Lesson 9 - App architecture and ViewModel
 
 Short summary:
-Lesson 7 adds useful export behavior, but too much state and logic still lives directly inside the screen. Lesson 8 introduces ViewModel architecture so the UI can focus on display while app logic and state move into a cleaner layer.
+Lesson 8 adds useful export behavior, but too much state and logic still lives directly inside the screen. Lesson 9 introduces ViewModel architecture so the UI can focus on display while app logic and state move into a cleaner layer.
 
 Covered:
 
@@ -347,7 +374,7 @@ Covered:
 
 This is the first architecture lesson. It introduces the idea that the screen should display state, while the ViewModel manages the state and logic.
 
-### Lesson 8 note - How to think about ViewModel
+### Lesson 9 note - How to think about ViewModel
 
 Short summary:
 This companion note explains how to judge what belongs in a `ViewModel`, what should stay in a composable, and how UI events update screen state through ViewModel functions.
@@ -366,10 +393,10 @@ Covered:
 - how CSV export can be split between ViewModel and composable
 - a checklist for deciding where code belongs
 
-### Lesson 8 note - Compose observable state
+### Lesson 9 note - Compose observable state
 
 Short summary:
-This companion note explains the state pattern that develops from Lesson 4 through Lesson 8: `mutableStateOf` creates Compose-observable state, `remember` keeps state alive inside composables, and `ViewModel` keeps screen state outside composables.
+This companion note explains the state pattern that develops from Lesson 4 through Lesson 9: `mutableStateOf` creates Compose-observable state, `remember` keeps state alive inside composables, and `ViewModel` keeps screen state outside composables.
 
 Covered:
 
@@ -383,10 +410,10 @@ Covered:
 - why `private set` protects ViewModel state
 - the state down, events up architecture pattern
 
-### Lesson 9 - StateFlow ViewModel state
+### Lesson 10 - StateFlow ViewModel state
 
 Short summary:
-Lesson 9 introduces an optional modern ViewModel state implementation using `MutableStateFlow`, read-only `StateFlow`, `update`, and `collectAsStateWithLifecycle()`. It keeps the same architecture as Lesson 8 but shows the implementation style commonly seen in larger Android projects.
+Lesson 10 introduces an optional modern ViewModel state implementation using `MutableStateFlow`, read-only `StateFlow`, `update`, and `collectAsStateWithLifecycle()`. It keeps the same architecture as Lesson 9 but shows the implementation style commonly seen in larger Android projects.
 
 Covered:
 
@@ -404,10 +431,10 @@ Covered:
 - pros and cons of `mutableStateOf` versus `StateFlow`
 - common StateFlow mistakes
 
-### Lesson 10 - Simple data persistence: auto-save and reload previous session
+### Lesson 11 - Simple data persistence: auto-save and reload previous session
 
 Short summary:
-Lesson 9 shows a more modern ViewModel state style, but the app still loses in-memory measurements if it closes before export. Lesson 10 adds internal autosave and reload so data can survive app restarts, while CSV export remains the user-facing analysis file.
+Lesson 10 shows a more modern ViewModel state style, but the app still loses in-memory measurements if it closes before export. Lesson 11 adds internal autosave and reload so data can survive app restarts, while CSV export remains the user-facing analysis file.
 
 Covered:
 
@@ -424,10 +451,10 @@ Covered:
 
 This lesson makes the app more robust because data is not lost if the user forgets to export manually.
 
-### Lesson 11 - Coroutines and background work
+### Lesson 12 - Coroutines and background work
 
 Short summary:
-Lesson 10 adds persistence, but its simple saving approach can block the UI if work becomes heavier. Lesson 11 introduces coroutines and background work so saving, loading, acquisition, device communication, processing, and inference can run without freezing the screen.
+Lesson 11 adds persistence, but its simple saving approach can block the UI if work becomes heavier. Lesson 12 introduces coroutines and background work so saving, loading, acquisition, device communication, processing, and inference can run without freezing the screen.
 
 Covered:
 
@@ -445,10 +472,10 @@ Covered:
 
 This lesson prepares the app for file saving, loading previous sessions, device communication, signal processing, ML inference, and long-running acquisition without freezing the interface.
 
-### Lesson 11 note - Coroutines, threads, and dispatchers
+### Lesson 12 note - Coroutines, threads, and dispatchers
 
 Short summary:
-This companion note explains the mental model behind Lesson 11 by starting from the main `viewModelScope.launch` plus `withContext(Dispatchers.IO)` pattern, then unpacking coroutine, thread, dispatcher, `suspend`, blocking work, and safe ViewModel state updates.
+This companion note explains the mental model behind Lesson 12 by starting from the main `viewModelScope.launch` plus `withContext(Dispatchers.IO)` pattern, then unpacking coroutine, thread, dispatcher, `suspend`, blocking work, and safe ViewModel state updates.
 
 Covered:
 
@@ -457,7 +484,7 @@ Covered:
 - how `withContext(...)` can return a value and how block scope works
 - difference between thread, coroutine, and dispatcher
 - what "current thread" means
-- where `suspend` comes from in Lesson 11
+- where `suspend` comes from in Lesson 12
 - when a helper function needs `suspend`
 - the difference between suspending a coroutine and blocking a thread
 - `delay()` versus `Thread.sleep(...)`
@@ -468,10 +495,10 @@ Covered:
 - when helper functions contain `viewModelScope.launch` versus when callers launch and call suspend helpers
 - when reusable helpers should catch errors and return a success/failure result without updating `uiState` from IO
 
-### Lesson 12 - Simulated live data stream
+### Lesson 13 - Simulated live data stream
 
 Short summary:
-Lesson 11 prepares the app for background tasks, but measurements are still not arriving as a live stream. Lesson 12 adds simulated repeated acquisition so the app can practice start/stop recording before real hardware is connected.
+Lesson 12 prepares the app for background tasks, but measurements are still not arriving as a live stream. Lesson 13 adds simulated repeated acquisition so the app can practice start/stop recording before real hardware is connected.
 
 Covered:
 
@@ -488,10 +515,10 @@ Covered:
 
 This lesson builds the acquisition pattern with fake data first, so the app logic can be tested before real hardware is connected.
 
-### Lesson 13 - Device connection state and acquisition flow
+### Lesson 14 - Device connection state and acquisition flow
 
 Short summary:
-Lesson 12 creates a simulated live stream, but the app still lacks a clear model of connection and recording states. Lesson 13 adds device and acquisition states so buttons, messages, and actions follow a realistic measurement flow.
+Lesson 13 creates a simulated live stream, but the app still lacks a clear model of connection and recording states. Lesson 14 adds device and acquisition states so buttons, messages, and actions follow a realistic measurement flow.
 
 Covered:
 
@@ -506,10 +533,10 @@ Covered:
 
 This lesson makes the app behave more like a real measurement tool by only allowing actions that make sense in the current state.
 
-### Lesson 14 - Repository layer
+### Lesson 15 - Repository layer
 
 Short summary:
-Lesson 13 improves the acquisition flow, but the ViewModel is still at risk of becoming responsible for too much data work. Lesson 14 introduces a repository layer to keep measurement creation, loading, saving, and future data-source logic out of the UI state layer.
+Lesson 14 improves the acquisition flow, but the ViewModel is still at risk of becoming responsible for too much data work. Lesson 15 introduces a repository layer to keep measurement creation, loading, saving, and future data-source logic out of the UI state layer.
 
 Covered:
 
@@ -523,10 +550,10 @@ Covered:
 
 This lesson introduces a cleaner architecture where the UI talks to the ViewModel, and the ViewModel asks the repository to handle data-related work.
 
-### Lesson 15 - Room database introduction
+### Lesson 16 - Room database introduction
 
 Short summary:
-Lesson 14 separates data logic into a repository, but the app still needs more reliable structured storage than simple files for serious research records. Lesson 15 introduces Room with entities, DAOs, and a database.
+Lesson 15 separates data logic into a repository, but the app still needs more reliable structured storage than simple files for serious research records. Lesson 16 introduces Room with entities, DAOs, and a database.
 
 Covered:
 
@@ -542,10 +569,10 @@ Covered:
 
 This lesson explains why a serious research app eventually needs structured database storage instead of only saving one CSV-style file.
 
-### Lesson 16 - Multi-table Room data model
+### Lesson 17 - Multi-table Room data model
 
 Short summary:
-Lesson 15 introduces Room storage, but storing only measurements is not enough research context. Lesson 16 expands the model to patients, sessions, measurements, and results so every value belongs to the correct research record.
+Lesson 16 introduces Room storage, but storing only measurements is not enough research context. Lesson 17 expands the model to patients, sessions, measurements, and results so every value belongs to the correct research record.
 
 Covered:
 
@@ -567,12 +594,12 @@ This lesson turns the app from a simple measurement logger into a more realistic
 
 Related note:
 
-- `lesson-16-notes-room-database-thinking-map.md` explains the developer thinking flow from entity design, to DAO operations, to database class wiring, to repository usage, and finally to multi-table ID relationships.
+- `lesson-17-notes-room-database-thinking-map.md` explains the developer thinking flow from entity design, to DAO operations, to database class wiring, to repository usage, and finally to multi-table ID relationships.
 
-### Lesson 17 - Multi-screen app navigation
+### Lesson 18 - Multi-screen app navigation
 
 Short summary:
-Lesson 16 creates a richer patient/session data model, but one large screen no longer fits the workflow. Lesson 17 splits the app into multiple screens and passes IDs between them so the UI matches the research structure.
+Lesson 17 creates a richer patient/session data model, but one large screen no longer fits the workflow. Lesson 18 splits the app into multiple screens and passes IDs between them so the UI matches the research structure.
 
 Covered:
 
@@ -592,10 +619,10 @@ Covered:
 
 This lesson makes the app structure match the research workflow: choose a patient, open a session, collect measurements, and view results.
 
-### Lesson 18 - Permissions and real device communication overview
+### Lesson 19 - Permissions and real device communication overview
 
 Short summary:
-Lesson 17 gives the app a multi-screen flow, but the measurement screen still is not ready for real device access. Lesson 18 adds the permission and connection overview needed before Bluetooth, Wi-Fi, USB, or sensor communication can be added.
+Lesson 18 gives the app a multi-screen flow, but the measurement screen still is not ready for real device access. Lesson 19 adds the permission and connection overview needed before Bluetooth, Wi-Fi, USB, or sensor communication can be added.
 
 Covered:
 
@@ -612,10 +639,10 @@ Covered:
 
 This lesson prepares the app for real Bluetooth, Wi-Fi, USB, or sensor communication while keeping the first version beginner-friendly.
 
-### Lesson 19 - Connecting a real data source
+### Lesson 20 - Connecting a real data source
 
 Short summary:
-Lesson 18 explains permissions and real-device preparation, but the app still needs a clean way to swap fake data for real input. Lesson 19 introduces a data-source boundary so Bluetooth, Wi-Fi, USB, sensors, or replay data can replace random values later.
+Lesson 19 explains permissions and real-device preparation, but the app still needs a clean way to swap fake data for real input. Lesson 20 introduces a data-source boundary so Bluetooth, Wi-Fi, USB, sensors, or replay data can replace random values later.
 
 Covered:
 
@@ -633,10 +660,10 @@ Covered:
 
 This lesson creates the structure that lets fake data be replaced by real device input without rewriting the whole app.
 
-### Lesson 20 - Signal processing pipeline
+### Lesson 21 - Signal processing pipeline
 
 Short summary:
-Lesson 19 creates a device-data boundary, but raw incoming values are still not being cleaned or transformed before use. Lesson 20 adds a signal-processing layer so raw values, processed values, validity checks, and features are handled separately from the UI.
+Lesson 20 creates a device-data boundary, but raw incoming values are still not being cleaned or transformed before use. Lesson 21 adds a signal-processing layer so raw values, processed values, validity checks, and features are handled separately from the UI.
 
 Covered:
 
@@ -653,10 +680,10 @@ Covered:
 
 This lesson adds the research-data habit of processing values in a separate layer before saving, exporting, or classifying them.
 
-### Lesson 21 - On-device ML inference
+### Lesson 22 - On-device ML inference
 
 Short summary:
-Lesson 20 produces processed values and features, but the app still does not turn them into a prediction or classification result. Lesson 21 introduces the model-runner structure and fake inference so the app can test the full prediction workflow before using a real LiteRT/TFLite model.
+Lesson 21 produces processed values and features, but the app still does not turn them into a prediction or classification result. Lesson 22 introduces the model-runner structure and fake inference so the app can test the full prediction workflow before using a real LiteRT/TFLite model.
 
 Covered:
 
@@ -675,10 +702,10 @@ Covered:
 
 This lesson turns the app toward an edge-AI research workflow while still using fake inference first.
 
-### Lesson 22 - Exporting complete research data
+### Lesson 23 - Exporting complete research data
 
 Short summary:
-Lesson 21 adds prediction results, but the original CSV export idea is now too simple for the full research data model. Lesson 22 expands export to include patient, session, raw measurement, processed value, status, and prediction information.
+Lesson 22 adds prediction results, but the original CSV export idea is now too simple for the full research data model. Lesson 23 expands export to include patient, session, raw measurement, processed value, status, and prediction information.
 
 Covered:
 
@@ -696,10 +723,10 @@ Covered:
 
 This lesson expands export from a simple measurement list into a complete research-data export.
 
-### Lesson 23 - Final research app architecture review
+### Lesson 24 - Final research app architecture review
 
 Short summary:
-Lesson 22 completes the main data path through export, but the tutorial still needs one clear map of how all parts fit together. Lesson 23 reviews the full architecture across UI, ViewModel, repository, data model, device source, processing, inference, storage, and export.
+Lesson 23 completes the main data path through export, but the tutorial still needs one clear map of how all parts fit together. Lesson 24 reviews the full architecture across UI, ViewModel, repository, data model, device source, processing, inference, storage, and export.
 
 Covered:
 
@@ -720,9 +747,9 @@ Covered:
 This lesson connects the whole tutorial into one maintainable research-app architecture.
 ## Part 2 - Implementation of the app skeleton
 
-**Lessons 24-34 implement Direction A.**
+**Lessons 25-35 implement Direction A.**
 
-This part turns the architecture from Lessons 1-23 into actual Android project files and a complete fake-data research workflow.
+This part turns the architecture from Lessons 1-24 into actual Android project files and a complete fake-data research workflow.
 
 The main purpose of Part 2 is to answer:
 
@@ -733,10 +760,10 @@ How do Room, repository, fake device, processing, fake ML, screens, navigation, 
 Can the whole fake workflow run from start to finish?
 ```
 
-### Lesson 24 - Clean Android project structure
+### Lesson 25 - Clean Android project structure
 
 Short summary:
-Lesson 23 reviews the full architecture, but the app still needs a real Android Studio file structure. Lesson 24 turns the architecture into packages and files so the project can be built cleanly.
+Lesson 24 reviews the full architecture, but the app still needs a real Android Studio file structure. Lesson 25 turns the architecture into packages and files so the project can be built cleanly.
 
 Covered:
 
@@ -761,10 +788,10 @@ Covered:
 
 This lesson starts Direction A by turning the architecture into a concrete Android project layout.
 
-### Lesson 25 - Creating the core data model files
+### Lesson 26 - Creating the core data model files
 
 Short summary:
-Lesson 24 creates the folder structure, but the app still needs the actual data objects that Room will store. Lesson 25 creates the core entity files for patients, sessions, measurements, and results.
+Lesson 25 creates the folder structure, but the app still needs the actual data objects that Room will store. Lesson 26 creates the core entity files for patients, sessions, measurements, and results.
 
 Covered:
 
@@ -785,10 +812,10 @@ Covered:
 
 This lesson makes the research data model real Kotlin code.
 
-### Lesson 26 - Building the Room database layer
+### Lesson 27 - Building the Room database layer
 
 Short summary:
-Lesson 25 creates the entities, but the app still needs database access functions. Lesson 26 builds the DAO files and the `ResearchDatabase` class so the app can insert, read, update, and query research data.
+Lesson 26 creates the entities, but the app still needs database access functions. Lesson 27 builds the DAO files and the `ResearchDatabase` class so the app can insert, read, update, and query research data.
 
 Covered:
 
@@ -812,10 +839,10 @@ Covered:
 
 This lesson defines the structured local database layer for the app.
 
-### Lesson 27 - Building the repository layer
+### Lesson 28 - Building the repository layer
 
 Short summary:
-Lesson 26 creates the database layer, but the ViewModel should not call every DAO directly. Lesson 27 builds the repository layer that coordinates database operations and prepares the app for device, processing, ML, and export work.
+Lesson 27 creates the database layer, but the ViewModel should not call every DAO directly. Lesson 28 builds the repository layer that coordinates database operations and prepares the app for device, processing, ML, and export work.
 
 Covered:
 
@@ -837,10 +864,10 @@ Covered:
 
 This lesson connects the database layer to the rest of the app through a cleaner data-coordination layer.
 
-### Lesson 28 - Adding the fake device source
+### Lesson 29 - Adding the fake device source
 
 Short summary:
-Lesson 27 builds the repository, but the app still needs a source of measurement values. Lesson 28 adds a fake device source so acquisition can be tested before real Bluetooth, Wi-Fi, USB, or sensors are added.
+Lesson 28 builds the repository, but the app still needs a source of measurement values. Lesson 29 adds a fake device source so acquisition can be tested before real Bluetooth, Wi-Fi, USB, or sensors are added.
 
 Covered:
 
@@ -862,10 +889,10 @@ Covered:
 
 This lesson lets the app test the acquisition path without real hardware.
 
-### Lesson 29 - Adding signal processing
+### Lesson 30 - Adding signal processing
 
 Short summary:
-Lesson 28 saves fake raw values, but research data usually needs cleaning or transformation before inference or export. Lesson 29 adds a signal-processing layer for baseline correction, validity checks, moving average, and feature extraction.
+Lesson 29 saves fake raw values, but research data usually needs cleaning or transformation before inference or export. Lesson 30 adds a signal-processing layer for baseline correction, validity checks, moving average, and feature extraction.
 
 Covered:
 
@@ -888,10 +915,10 @@ Covered:
 
 This lesson adds the processing stage between device data and saved/inferred research data.
 
-### Lesson 30 - Adding fake ML inference
+### Lesson 31 - Adding fake ML inference
 
 Short summary:
-Lesson 29 extracts processed values and features, but the app still needs a prediction path. Lesson 30 adds fake ML inference so the app can test prediction, confidence, and result saving before a real LiteRT/TFLite model is integrated.
+Lesson 30 extracts processed values and features, but the app still needs a prediction path. Lesson 31 adds fake ML inference so the app can test prediction, confidence, and result saving before a real LiteRT/TFLite model is integrated.
 
 Covered:
 
@@ -914,10 +941,10 @@ Covered:
 
 This lesson completes the first fake inference path from saved measurements to stored result.
 
-### Lesson 31 - Building the Compose screens
+### Lesson 32 - Building the Compose screens
 
 Short summary:
-Lesson 30 completes fake ML logic, but the app still needs separate screens that match the research workflow. Lesson 31 builds the Compose screen files for patient list, patient detail, measurement, and result display.
+Lesson 31 completes fake ML logic, but the app still needs separate screens that match the research workflow. Lesson 32 builds the Compose screen files for patient list, patient detail, measurement, and result display.
 
 Covered:
 
@@ -939,10 +966,10 @@ Covered:
 
 This lesson turns the app structure into visible Compose screens.
 
-### Lesson 32 - Connecting navigation and ViewModel
+### Lesson 33 - Connecting navigation and ViewModel
 
 Short summary:
-Lesson 31 creates the screen files, but the screens still need to be connected to real app state and navigation. Lesson 32 connects Navigation Compose, `ResearchViewModel`, repository functions, device state, acquisition, and fake inference.
+Lesson 32 creates the screen files, but the screens still need to be connected to real app state and navigation. Lesson 33 connects Navigation Compose, `ResearchViewModel`, repository functions, device state, acquisition, and fake inference.
 
 Covered:
 
@@ -969,10 +996,10 @@ Covered:
 
 This lesson connects the screens to the actual fake-data workflow.
 
-### Lesson 33 - Adding session CSV export
+### Lesson 34 - Adding session CSV export
 
 Short summary:
-Lesson 32 connects the app workflow, but the completed session data still needs to leave the app in a researcher-friendly format. Lesson 33 adds session-level CSV export with patient metadata, session metadata, latest result, and measurement rows.
+Lesson 33 connects the app workflow, but the completed session data still needs to leave the app in a researcher-friendly format. Lesson 34 adds session-level CSV export with patient metadata, session metadata, latest result, and measurement rows.
 
 Covered:
 
@@ -996,10 +1023,10 @@ Covered:
 
 This lesson restores export as part of the full Room-backed research workflow.
 
-### Lesson 34 - Testing the whole fake-data workflow
+### Lesson 35 - Testing the whole fake-data workflow
 
 Short summary:
-Lesson 33 adds session CSV export, so the app now has all the main fake workflow parts. Lesson 34 tests the whole connected system from app launch through patient/session creation, fake acquisition, inference, result display, and CSV export.
+Lesson 34 adds session CSV export, so the app now has all the main fake workflow parts. Lesson 35 tests the whole connected system from app launch through patient/session creation, fake acquisition, inference, result display, and CSV export.
 
 Covered:
 
@@ -1051,9 +1078,9 @@ Part 1 teaches the ideas.
 Part 2 turns the ideas into files.
 ```
 
-## Architecture after Lesson 34
+## Architecture after Lesson 35
 
-The app skeleton after Lesson 34 looks like this:
+The app skeleton after Lesson 35 looks like this:
 
 ```text
 com.example.researchapp
@@ -1135,7 +1162,7 @@ Patient
 
 ## Current milestone
 
-By Lesson 34, Direction A is essentially complete.
+By Lesson 35, Direction A is essentially complete.
 
 The tutorial has reached this milestone:
 

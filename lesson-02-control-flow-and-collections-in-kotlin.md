@@ -586,7 +586,7 @@ val calibrated = readings.map {
 
 **Key concept**: `map` creates a NEW list by transforming each element according to the lambda. The original list is unchanged.
 
-This concept will become very useful later for preprocessing, and also in Lessons 6 and 7 when converting measurement objects to text for display or export.
+This concept will become very useful later for preprocessing, and also in Lessons 7 and 8 when converting measurement objects to text for display or export.
 
 ## 17. forEach
 
