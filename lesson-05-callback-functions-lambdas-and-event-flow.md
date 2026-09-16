@@ -108,7 +108,7 @@ val clearAction: () -> Unit = {
 }
 ```
 
-The value inside `{ ... }` is a **lambda**: a function without a declared name.
+The `{ ... }` expression is a **lambda**: a function without a declared name.
 
 You can run the stored function with parentheses:
 
@@ -130,6 +130,80 @@ clearAction.invoke()
 ```
 
 The shorter parentheses form is normally preferred for a non-null function.
+
+### Lambda function introduction
+
+The `clearAction` declaration above stores a lambda in a variable:
+
+```kotlin
+val clearAction: () -> Unit = {
+    println("Measurements cleared")
+}
+```
+
+A **lambda** is a function without a declared name. In this declaration:
+
+- `clearAction` is the name of the variable.
+- `() -> Unit` is the function type of the value stored in that variable.
+- `{ println("Measurements cleared") }` is the lambda.
+
+In `() -> Unit`, `()` means the function takes no arguments, and `Unit` means it returns no useful value.
+
+The variable has a name, but the lambda itself does not declare a name. The whole `{ ... }` expression is the lambda.
+
+This is just one way to write a lambda, where the function type is written explicitly before `=`.
+
+A **lambda** can also be written another way: Kotlin can infer the function type from the lambda itself.
+
+```kotlin
+val square = { x: Int -> x * x }
+```
+
+Here, `square` is also only the name of the variable. The lambda is:
+
+```kotlin
+{ x: Int -> x * x }
+```
+
+Because the function type is not written before `=`, Kotlin must infer it from the lambda:
+
+- `x: Int` tells Kotlin the input type.
+- `x * x` is the last expression, so its result becomes the return value.
+- Because `x * x` produces an `Int`, Kotlin infers the return type as `Int`.
+
+So Kotlin infers this function type:
+
+```text
+(Int) -> Int
+```
+
+The important difference between `clearAction` and `square` is where Kotlin gets the function type:
+
+```text
+clearAction: the function type explicitly:  () -> Unit
+square: Kotlin infer the function type:   (Int) -> Int
+```
+
+There are also two different uses of `->`:
+
+```text
+Function type:  () -> Unit
+Lambda syntax:  x: Int -> x * x
+```
+
+In a function type, `->` separates input types from the return type. In a lambda, `->` separates the lambda's parameters from its body.
+
+Specifically, in `() -> Unit`, the arrow belongs to the function type. In `{ x: Int -> x * x }`, the arrow belongs to the lambda.
+
+Finally, we can also compare `square` lambda with a named function:
+
+```kotlin
+fun square(x: Int): Int {
+    return x * x
+}
+```
+
+The named function declares its own name with `fun square`. The lambda does not. In `val square = { x: Int -> x * x }`, `square` is the variable name, not a name declared by the lambda.
 
 ---
 
