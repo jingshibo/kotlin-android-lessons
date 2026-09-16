@@ -213,7 +213,7 @@ viewModel.uiState.collect { latestState ->
 }
 ```
 
-这里collect的含义很直接，就是获取 viewModel.uiState的值，这里的latestState指的就是uiState的当前值。然后基于获取的这个值进行后续操作。
+è¿™é‡Œcollectçš„å«ä¹‰å¾ˆç›´æŽ¥ï¼Œå°±æ˜¯èŽ·å– viewModel.uiStateçš„å€¼ï¼Œè¿™é‡Œçš„latestStateæŒ‡çš„å°±æ˜¯uiStateçš„å½“å‰å€¼ã€‚ç„¶åŽåŸºäºŽèŽ·å–çš„è¿™ä¸ªå€¼è¿›è¡ŒåŽç»­æ“ä½œã€‚
 
 means:
 
@@ -223,47 +223,6 @@ Every time uiState emits a new ResearchUiState,
 put that new value into latestState,
 then run the code inside the block.
 ```
-
-再给一个例子：
-
-```kotlin
-data class DeviceRuntimeState(
-    val selectedDevice: String = "",
-    val isMeasuring: Boolean = false,
-    val isTransferring: Boolean = false,
-    val isAnalyzing: Boolean = false,
-    val transferInterrupted: Boolean = false
-)
-
-class DeviceRepository {
-    private val _deviceState =
-        MutableStateFlow(DeviceRuntimeState())
-
-    val deviceState: StateFlow<DeviceRuntimeState> =
-        _deviceState.asStateFlow()
-}
-```
-
-Then when you use it: 
-
-```kotlin
-init {
-    viewModelScope.launch { // 放在一个携程中，一直不停的观察该值变化。
-        deviceRepository.deviceState.collect { deviceState ->
-            _uiState.update {
-                it.copy(
-                    selectedDevice = deviceState.selectedDevice,
-                    isMeasuring = deviceState.isMeasuring,
-                    isTransferring = deviceState.isTransferring,
-                    isAnalyzing = deviceState.isAnalyzing
-                )
-            }
-        }
-    }
-}
-```
-
-这里的 collect 指的就是获取 deviceRepository.deviceState 的值。然后 deviceState -> 指的就是我们用这个值更新 _uiState。这里的 it 就是用来代指_uiState，非常直接清楚。
 
 But this raw `collect { ... }` example is only here to explain the word `collect`.
 
@@ -500,9 +459,7 @@ viewModel._uiState.value = ...
 
 In fact, it cannot do that because `_uiState` is private.
 
----
-
-## 5. What update means
+### What update means
 
 This code:
 
@@ -557,122 +514,7 @@ For learning, `currentState` is clearer.
 
 ---
 
-## 6. Reading StateFlow in Compose
-
-With the previous `mutableStateOf` ViewModel style, the screen could do:
-
-```kotlin
-val uiState = viewModel.uiState
-```
-
-With StateFlow, the screen must collect the flow:
-
-```kotlin
-import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-
-@Composable
-fun ResearchRoute(
-    viewModel: ResearchViewModel = viewModel()
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    ResearchScreenContent(
-        uiState = uiState,
-        onSampleIdChange = viewModel::updateSampleId,
-        onConnectClick = viewModel::toggleConnection,
-        onMeasureClick = viewModel::addMeasurement,
-        onClearClick = viewModel::clearMeasurements
-    )
-}
-```
-
-This line:
-
-```kotlin
-val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-```
-
-means:
-
-```text
-Observe the ViewModel's StateFlow.
-Convert its latest value into Compose State.
-Redraw this composable when the value changes.
-Respect the Android lifecycle while collecting.
-```
-
-You may also see:
-
-```kotlin
-val uiState by viewModel.uiState.collectAsState()
-```
-
-That also converts a `StateFlow` into Compose-readable state.
-
-Why `collectAsState()` is essential:
-
-StateFlow belongs to Kotlin, but Compose is a UI framework. Compose doesn't know how to read Kotlin StateFlow directly.
-
-`collectAsState()` acts as the bridge:
-1. It subscribes to `viewModel.uiState`.
-2. Every time a new DataUiState is produced, `collectAsState()` notifies Compose.
-3. Compose detects the change and automatically re-draws (recomposes) the exact UI composables that read state.
-
-For Android screens, `collectAsStateWithLifecycle()` is usually preferred because it is lifecycle-aware.
-
-Differences: `collectAsState()` vs. `collectAsStateWithLifecycle()`
-
-| Feature | `collectAsState()` | `collectAsStateWithLifecycle()` (Best Practice) |
-|---|---|---|
-| Lifecycle Awareness | ❌ None (Keeps collecting in background) | ✅ Lifecycle-Aware (Pauses when app is minimized) |
-| Battery & CPU Usage | Wastes CPU/battery updating UI state when app is hidden | Saves CPU & Battery by pausing background flow collection |
-| Behavior on Minimize | Keeps collecting flow emissions when screen is off | Pauses collection when lifecycle falls below `STARTED`, resumes on foreground |
-| Library Origin | `androidx.compose.runtime` (Base Compose) | `androidx.lifecycle.compose` (Android Lifecycle) |
-
-So in a normal Android screen, prefer:
-
-```kotlin
-val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-```
-
-Use `collectAsState()` only when lifecycle awareness is not needed, or when you are not inside a normal Android lifecycle-aware screen.
-
-
----
-
-## 7. Dependency and imports
-
-For `StateFlow` itself, you need Kotlin coroutines Flow imports:
-
-```kotlin
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-```
-
-For lifecycle-aware Compose collection, use:
-
-```kotlin
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-```
-
-If Android Studio cannot find that import, add the lifecycle runtime Compose dependency:
-
-```kotlin
-dependencies {
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
-}
-```
-
-Your project may use a different lifecycle version.
-
-Use the same lifecycle version family already used by your project when possible.
-
----
-
-## 8. Reading current state inside the ViewModel
+## 5. Reading current state inside the ViewModel
 
 With the old style, the ViewModel could read:
 
@@ -739,7 +581,122 @@ Only the state syntax changed.
 
 ---
 
-## 9. Code comparison
+## 6. Reading StateFlow in Compose
+
+With the previous `mutableStateOf` ViewModel style, the screen could do:
+
+```kotlin
+val uiState = viewModel.uiState
+```
+
+With StateFlow, the screen must collect the flow:
+
+```kotlin
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
+@Composable
+fun ResearchRoute(
+    viewModel: ResearchViewModel = viewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    ResearchScreenContent(
+        uiState = uiState,
+        onSampleIdChange = viewModel::updateSampleId,
+        onConnectClick = viewModel::toggleConnection,
+        onMeasureClick = viewModel::addMeasurement,
+        onClearClick = viewModel::clearMeasurements
+    )
+}
+```
+
+This line:
+
+```kotlin
+val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+```
+
+means:
+
+```text
+Observe the ViewModel's StateFlow.
+Convert its latest value into Compose State.
+Redraw this composable when the value changes.
+Respect the Android lifecycle while collecting.
+```
+
+You may also see:
+
+```kotlin
+val uiState by viewModel.uiState.collectAsState()
+```
+
+That also converts a `StateFlow` into Compose-readable state.
+
+Why `collectAsState()` is essential:
+
+StateFlow belongs to Kotlin, but Compose is a UI framework. Compose doesn't know how to read Kotlin StateFlow directly.
+
+`collectAsState()` acts as the bridge:
+1. It subscribes to `viewModel.uiState`.
+2. Every time a new ResearchUiState is produced, `collectAsState()` notifies Compose.
+3. Compose detects the change and automatically re-draws (recomposes) the exact UI composables that read state.
+
+For Android screens, `collectAsStateWithLifecycle()` is usually preferred because it is lifecycle-aware.
+
+Differences: `collectAsState()` vs. `collectAsStateWithLifecycle()`
+
+| Feature | `collectAsState()` | `collectAsStateWithLifecycle()` (Best Practice) |
+|---|---|---|
+| Lifecycle Awareness | âŒ None (Keeps collecting in background) | âœ… Lifecycle-Aware (Pauses when app is minimized) |
+| Battery & CPU Usage | Wastes CPU/battery updating UI state when app is hidden | Saves CPU & Battery by pausing background flow collection |
+| Behavior on Minimize | Keeps collecting flow emissions when screen is off | Pauses collection when lifecycle falls below `STARTED`, resumes on foreground |
+| Library Origin | `androidx.compose.runtime` (Base Compose) | `androidx.lifecycle.compose` (Android Lifecycle) |
+
+So in a normal Android screen, prefer:
+
+```kotlin
+val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+```
+
+Use `collectAsState()` only when lifecycle awareness is not needed, or when you are not inside a normal Android lifecycle-aware screen.
+
+
+---
+
+## 7. Dependency and imports
+
+For `StateFlow` itself, you need Kotlin coroutines Flow imports:
+
+```kotlin
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+```
+
+For lifecycle-aware Compose collection, use:
+
+```kotlin
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+```
+
+If Android Studio cannot find that import, add the lifecycle runtime Compose dependency:
+
+```kotlin
+dependencies {
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
+}
+```
+
+Your project may use a different lifecycle version.
+
+Use the same lifecycle version family already used by your project when possible.
+
+---
+
+## 8. Code comparison
 
 Here is the same operation in both styles.
 
@@ -825,7 +782,7 @@ ViewModel updates private _uiState
 
 ---
 
-## 10. Pros and cons
+### Pros and cons
 
 | Style | Pros | Cons |
 |---|---|---|
@@ -849,7 +806,42 @@ larger ViewModels
 tests that observe state changes
 ```
 
-For example, later your app may want to observe patients from Room:
+---
+
+## 9. StateFlow outside Compose
+
+The examples above show `StateFlow` in a Compose screen:
+
+```kotlin
+val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+```
+
+That line is a Compose convenience.
+
+It subscribes to the `StateFlow`, converts the latest value into Compose `State`, and lets Compose redraw the UI when the value changes.
+
+But `StateFlow` itself does not belong to Compose.
+
+`StateFlow` is part of Kotlin coroutines Flow APIs:
+
+```kotlin
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+```
+
+So you can use `StateFlow` in normal Kotlin coroutine code too.
+
+The difference is:
+
+```text
+Compose screen:
+collect StateFlow with collectAsStateWithLifecycle()
+
+Regular coroutine code:
+collect StateFlow inside a coroutine
+```
+
+For example, later your app may want to observe patients from a repository or Room:
 
 ```kotlin
 repository.observePatients()
@@ -860,16 +852,147 @@ If that returns a Flow, then a StateFlow-based ViewModel fits naturally.
 The data can flow like this:
 
 ```text
-Room Flow
--> Repository Flow
+Data
+-> Repository / Room Flow
 -> ViewModel StateFlow
 -> Compose collectAsStateWithLifecycle()
 -> UI
 ```
 
+This means the ViewModel may collect a repository Flow and then update its own UI state manually.
+
+For example, inside the repository, we can have runtime state defined as:
+
+```kotlin
+data class DeviceRuntimeState(
+    val selectedDevice: String = "",
+    val isMeasuring: Boolean = false,
+    val isTransferring: Boolean = false,
+    val isAnalyzing: Boolean = false,
+    val transferInterrupted: Boolean = false
+)
+
+class DeviceRepository {
+    private val _deviceState =
+        MutableStateFlow(DeviceRuntimeState())
+
+    val deviceState: StateFlow<DeviceRuntimeState> =
+        _deviceState.asStateFlow()
+}
+```
+
+Then inside the `ViewModel`, we can collect the repository state in `init`:
+
+```kotlin
+class DeviceViewModel(
+    private val deviceRepository: DeviceRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(DeviceUiState())
+    val uiState: StateFlow<DeviceUiState> = _uiState.asStateFlow()
+
+    init { // runs automatically when an object is created.
+        viewModelScope.launch { // 放在一个coroutine中，一直不停的观察值的变化，直到该 viewmodel object is destroyed。
+            deviceRepository.deviceState.collect { deviceState ->
+                _uiState.update {  // 这里的 collect 指的就是获取 deviceRepository.deviceState 的值。然后 deviceState -> 指用这个值更新 _uiState。此处的 it 则是用来代指_uiState，非常直接清楚。
+                    it.copy(
+                        selectedDevice = deviceState.selectedDevice,
+                        isMeasuring = deviceState.isMeasuring,
+                        isTransferring = deviceState.isTransferring,
+                        isAnalyzing = deviceState.isAnalyzing
+                    )
+                } 
+            }
+        }
+    }
+}
+```
+
+Read that as:
+
+```text
+Start a coroutine when the ViewModel is created.
+Listen to deviceRepository.deviceState.
+Every time the repository emits a new deviceState,
+copy the useful fields into this screen's _uiState.
+```
+
+This is different from `collectAsStateWithLifecycle()`.
+
+`collectAsStateWithLifecycle()` is specifically for Compose UI code to easily observe the ViewModel's StateFlow. 
+
+On the other hand, `viewModelScope.launch { flow.collect { ... } }` is the normal  Kotlin coroutines Flow APIs to observe a Flow inside a ViewModel or other Kotlin class.
+
+In fact, `collectAsStateWithLifecycle()` plays a similar collect/listen role to this part in the ViewModel code:
+
+```kotlin
+viewModelScope.launch {
+    someRepository.someFlow.collect { latestValue ->
+        // ViewModel reacts to repository data
+    }
+}
+```
+
+Both mean:
+
+```text
+Listen to a Flow over time.
+React when the Flow emits a new value.
+```
+
+But they are not exactly the same tool.
+
+`collectAsStateWithLifecycle()` also converts the latest Flow value into Compose `State`, so Compose can recompose the UI automatically.
+
+Also notice there are actually two separate operations in the ViewModel code: collect + update (which `collectAsStateWithLifecycle` does not do)
+
+- collect = listen to values from a Flow over time, similar to `collectAsStateWithLifecycle`.
+- update = publish a new value into your own MutableStateFlow, which `collectAsStateWithLifecycle` not have
+
+So this pattern is common and includes these two operations:
+
+```kotlin
+init {
+    viewModelScope.launch {
+        someRepository.someFlow.collect { latestValue ->
+            _uiState.update { currentState ->
+                currentState.copy(
+                    sampleId = latestValue.sampleId
+                )
+            }
+        }
+    }
+}
+```
+
+But if you only want to set one fixed value once, you do not need `collect`:
+
+```kotlin
+init {
+    _uiState.update { currentState ->
+        currentState.copy(
+            sampleId = "S001"
+        )
+    }
+}
+```
+
+Use `collect` when another Flow is producing values over time.
+
+Use `update` when this ViewModel wants to change its own `MutableStateFlow`.
+
+This example shows the full chain:
+
+```text
+Repository has StateFlow.
+ViewModel collects repository StateFlow.
+ViewModel publishes updated UI state.
+Compose collects ViewModel StateFlow.
+```
+
 ---
 
-## 11. Is StateFlow a different layer?
+## 10. Is StateFlow a different layer?
 
 No.
 
@@ -905,7 +1028,7 @@ Only the state holder changes.
 
 ---
 
-## 12. Common mistakes
+## 11. Common mistakes
 
 ### Mistake 1: Exposing MutableStateFlow directly
 
@@ -972,7 +1095,7 @@ That is the same idea used in the earlier lessons.
 
 ---
 
-## 13. Which one should you use?
+## 12. Which one should you use?
 
 For early learning:
 
@@ -1002,7 +1125,7 @@ If you understand that, both implementations make sense.
 
 ---
 
-## 14. Final mental model
+## 13. Final mental model
 
 Previous lesson style:
 
