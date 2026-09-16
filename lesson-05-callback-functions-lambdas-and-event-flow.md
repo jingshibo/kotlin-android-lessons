@@ -131,7 +131,9 @@ clearAction.invoke()
 
 The shorter parentheses form is normally preferred for a non-null function.
 
-### Lambda function introduction
+---
+
+## 4. Lambda function introduction
 
 The `clearAction` declaration above stores a lambda in a variable:
 
@@ -177,6 +179,8 @@ So Kotlin infers this function type:
 (Int) -> Int
 ```
 
+### Comparison of the two lambda styles
+
 The important difference between `clearAction` and `square` is where Kotlin gets the function type:
 
 ```text
@@ -207,7 +211,7 @@ The named function declares its own name with `fun square`. The lambda does not.
 
 ---
 
-## 4. Lambda and callback do not mean the same thing
+## 5. Lambda and callback do not mean the same thing
 
 These words are related, but they describe different things.
 
@@ -251,7 +255,7 @@ A function that receives another function or returns a function is called a **hi
 
 ---
 
-## 5. Reading Kotlin function types
+## 6. Reading Kotlin function types
 
 A function type describes the inputs and output of a function.
 
@@ -325,7 +329,7 @@ val isValidMeasurement: (Double) -> Boolean = { value ->
 }
 ```
 
-Most Compose event callbacks return `Unit` because they report that something happened. A callback can return another type, but that return is immediate and synchronous. It should not be confused with a result that arrives later from asynchronous work.
+Most Compose event callbacks return `Unit` because they are mainly used to do something instead of calculating or returning a value. A callback can return another type, and that return is immediate and synchronous. 
 
 ### Function-type reference
 
@@ -340,7 +344,7 @@ Most Compose event callbacks return `Unit` because they report that something ha
 
 ---
 
-## 6. Passing a function versus calling it
+## 7. Passing a function versus calling it
 
 This is the most important syntax distinction in the lesson.
 
@@ -428,15 +432,16 @@ Or when the callback needs an argument:
 Button(
     onClick = {
         onDeviceSelect("BT-Sensor-01")
-    }
+    } 
 ) {
     Text("Select device")
 }
+// here you cannot write it as: onClick = onDeviceSelect("BT-Sensor-01"), which executes the function immediately instead of passing it.
 ```
 
 ---
 
-## 7. Passing a named function with `::`
+## 8. Passing a named function with `::`
 
 Suppose you have a normal named function:
 
@@ -500,7 +505,7 @@ Inside this function, pass `onClear`, not `::onClear`.
 
 ---
 
-## 8. Who provides the callback argument?
+## 9. Who provides the callback argument?
 
 Consider this composable parameter:
 
@@ -557,7 +562,7 @@ The child knows **what happened**. The parent usually knows **what that event sh
 
 ---
 
-## 9. Understanding `it`
+## 10. Understanding `it`
 
 When a lambda has exactly one parameter, Kotlin lets you use the implicit name `it`.
 
@@ -613,7 +618,7 @@ onSelectSessionForData = { selectedSession ->
 
 ---
 
-## 10. A callback parameter may be ignored
+## 11. A callback parameter may be ignored
 
 The producer may provide a value even when one particular consumer does not need it.
 
@@ -646,7 +651,7 @@ Do not remove useful event data from the child merely because one current consum
 
 ---
 
-## 11. Callback registration and callback execution happen at different times
+## 12. Callback registration and callback execution happen at different times
 
 Consider:
 
@@ -690,7 +695,7 @@ Callbacks are often called later, but "callback" does not mathematically guarant
 
 ---
 
-## 12. `onClick` is a callback
+## 13. `onClick` is a callback
 
 The simplified shape of `Button` is similar to:
 
@@ -730,7 +735,7 @@ The `Text("Measure")` block is not the click behavior. It is the button's UI con
 
 ---
 
-## 13. Trailing lambda syntax
+## 14. Trailing lambda syntax
 
 Kotlin allows the final lambda argument to be placed outside the parentheses.
 
@@ -807,7 +812,7 @@ content()
 
 ---
 
-## 14. Creating a reusable composable with callbacks
+## 15. Creating a reusable composable with callbacks
 
 A reusable UI component should usually receive the data it displays and callbacks for the events it can produce.
 
@@ -861,7 +866,7 @@ callback to report an event
 
 ---
 
-## 15. State flows down and events flow up
+## 16. State flows down and events flow up
 
 The previous example follows a central Compose pattern:
 
@@ -900,7 +905,7 @@ The callback itself usually does not "flow upward" as data. The parent passes th
 
 ---
 
-## 16. State hoisting
+## 17. State hoisting
 
 **State hoisting** means moving state to the nearest parent that needs to control or share it.
 
@@ -968,7 +973,7 @@ This makes the child reusable, previewable, and easy to test.
 
 ---
 
-## 17. A complete navigation callback path
+## 18. A complete navigation callback path
 
 Now follow a callback through several levels.
 
@@ -1106,7 +1111,7 @@ ResearchTabletApp owns navigation state and decides what to display.
 
 ---
 
-## 18. Nullable callbacks
+## 19. Nullable callbacks
 
 You may encounter:
 
@@ -1184,7 +1189,7 @@ DeviceScreen(
 
 ---
 
-## 19. Callbacks help keep screens independent
+## 20. Callbacks help keep screens independent
 
 Imagine that selecting a device must clear another screen's temporary data.
 
@@ -1252,7 +1257,7 @@ Callbacks are not a reason to put all coordination in `MainActivity`. As an app 
 
 ---
 
-## 20. Callbacks and ViewModels
+## 21. Callbacks and ViewModels
 
 In a ViewModel-based screen, state usually flows down from the ViewModel and events call ViewModel operations.
 
@@ -1315,7 +1320,7 @@ Lesson 9 introduces ViewModels in detail. Lesson 10 then shows the same state pa
 
 ---
 
-## 21. Callbacks and recomposition
+## 22. Callbacks and recomposition
 
 Suppose a callback updates Compose state:
 
@@ -1364,7 +1369,7 @@ Later coroutine lessons show how to move slow work away from the main thread.
 
 ---
 
-## 22. Lambdas can capture surrounding values
+## 23. Lambdas can capture surrounding values
 
 A lambda can use values declared outside it:
 
@@ -1401,7 +1406,7 @@ Callbacks may run after the surrounding function has finished. Kotlin keeps the 
 
 ---
 
-## 23. Callback versus StateFlow versus coroutine
+## 24. Callback versus StateFlow versus coroutine
 
 These concepts solve different problems.
 
@@ -1435,7 +1440,7 @@ One does not replace the others.
 
 ---
 
-## 24. A callback result that arrives later
+## 25. A callback result that arrives later
 
 Some APIs use one callback to start work and another callback to report the eventual result.
 
@@ -1480,7 +1485,7 @@ Lesson 8 applies this idea to CSV export and explains the file-picker timeline i
 
 ---
 
-## 25. Callback naming conventions
+## 26. Callback naming conventions
 
 Callback parameter names commonly describe events:
 
@@ -1518,7 +1523,7 @@ The child should report the event. The parent decides what the event means for t
 
 ---
 
-## 26. Common mistakes
+## 27. Common mistakes
 
 ### Mistake 1: calling the function while passing it
 
@@ -1622,7 +1627,7 @@ onSelectSessionForData = { selectedSession ->
 
 ---
 
-## 27. Complete mini-example
+## 28. Complete mini-example
 
 This example combines state, a reusable child composable, a callback carrying data, and recomposition.
 
@@ -1701,7 +1706,7 @@ The child produces events, but the parent owns the state.
 
 ---
 
-## 28. Practice exercises
+## 29. Practice exercises
 
 ### Exercise 1: read the type
 
@@ -1759,7 +1764,7 @@ Write a large export file without blocking the UI.
 
 ---
 
-## 29. Exercise answers
+## 30. Exercise answers
 
 ### Answer 1
 
@@ -1816,7 +1821,7 @@ Large non-blocking file operation -> coroutine
 
 ---
 
-## 30. Final mental model
+## 31. Final mental model
 
 When you encounter callback code, ask five questions:
 
