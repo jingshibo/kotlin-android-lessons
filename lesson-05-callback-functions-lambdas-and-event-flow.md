@@ -1047,6 +1047,29 @@ fun DeviceList() {
 }
 ```
 
+The same `DeviceRow` can be reused by another parent that handles `onSelect` differently, even if that parent does not need the selected name:
+
+```kotlin
+@Composable
+fun DeviceRefreshPanel() {
+    var statusMessage by remember {
+        mutableStateOf("Waiting")
+    }
+
+    DeviceRow(
+        deviceName = "BT-Sensor-01",
+        isSelected = false,
+        onSelect = {
+            statusMessage = "Device selection changed"
+        }
+    )
+
+    Text(statusMessage)
+}
+```
+
+In `DeviceList`, `onSelect` uses the selected name to change which row is selected. In `DeviceRefreshPanel`, `onSelect` ignores the selected name and only records that a selection happened. The child composable is reusable because it reports useful event data, but each parent decides whether it needs that data.
+
 The child does not need to know where state is stored. It only needs:
 
 ```text
