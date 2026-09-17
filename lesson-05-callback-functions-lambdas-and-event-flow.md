@@ -533,16 +533,21 @@ fun DeviceButton(
 
 Here, `DeviceButton` knows which device was clicked, so it supplies `deviceName`.
 
-The parent defines what to do with the supplied value:
+The parent provides the callback function and defines what to do with the supplied string value:
 
 ```kotlin
-DeviceButton(
-    deviceName = "BT-Sensor-01",
-    onDeviceSelect = { selectedName ->
-        println("Parent received $selectedName")
-    }
-)
+@Composable
+fun DeviceParent() {
+    DeviceButton(
+        deviceName = "BT-Sensor-01",
+        onDeviceSelect = { selectedName ->
+            println("Parent received $selectedName")
+        }
+    )
+}
 ```
+
+Here, `DeviceParent` is the parent composable. It passes the callback down to `DeviceButton`.
 
 The roles are:
 
@@ -562,7 +567,52 @@ The child knows **what happened**. The parent usually knows **what that event sh
 
 ---
 
-## 10. Understanding `it`
+## 10. A callback parameter may be ignored
+
+The producer may provide a value even when one particular consumer does not need it.
+
+Suppose the child composable `DeviceScreen` emits the selected device name:
+
+```kotlin
+onDeviceSelect("BT-Sensor-01")
+```
+
+Both examples below are parent composables that call `DeviceScreen`.
+
+One parent may use the value:
+
+```kotlin
+@Composable
+fun DeviceParentThatUsesName(dataViewModel: DataViewModel) {
+    DeviceScreen(
+        onDeviceSelect = { selectedDeviceName ->
+            println("Selected: $selectedDeviceName")
+            dataViewModel.clearDataScreen()
+        }
+    )
+}
+```
+
+Another parent may care only that the selection changed:
+
+```kotlin
+@Composable
+fun DeviceParentThatIgnoresName(dataViewModel: DataViewModel) {
+    DeviceScreen(
+        onDeviceSelect = {
+            dataViewModel.clearDataScreen()
+        }
+    )
+}
+```
+
+The second lambda still matches `(String) -> Unit`. Kotlin knows it receives one `String`, but the lambda body does not use that parameter.
+
+Do not remove useful event data from the child merely because one current consumer ignores it. Another consumer or future requirement may need it.
+
+---
+
+## 11. Understanding `it`
 
 When a lambda has exactly one parameter, Kotlin lets you use the implicit name `it`.
 
@@ -618,40 +668,180 @@ onSelectSessionForData = { selectedSession ->
 
 ---
 
-## 11. A callback parameter may be ignored
+## 12. Lambda parameters are read-only
 
-The producer may provide a value even when one particular consumer does not need it.
+A lambda parameter works like a normal function parameter: the parameter variable itself is read-only.
 
-Suppose `DeviceScreen` emits the selected device name:
-
-```kotlin
-onDeviceSelect("BT-Sensor-01")
-```
-
-One parent may use the value:
+This is not allowed:
 
 ```kotlin
-onDeviceSelect = { selectedDeviceName ->
-    println("Selected: $selectedDeviceName")
-    dataViewModel.clearDataScreen()
+val increase: (Int) -> Unit = { count ->
+    count++
 }
 ```
 
-Another parent may care only that the selection changed:
+`count` is a lambda parameter, so Kotlin treats it like a `val`. To create a changed number, return a new value:
 
 ```kotlin
-onDeviceSelect = {
-    dataViewModel.clearDataScreen()
+val increase: (Int) -> Int = { count ->
+    count + 1
 }
 ```
 
-The second lambda still matches `(String) -> Unit`. Kotlin knows it receives one `String`, but the lambda body does not use that parameter.
+However, if the parameter refers to a mutable object, the object itself can still be changed:
 
-Do not remove useful event data from the child merely because one current consumer ignores it. Another consumer or future requirement may need it.
+```kotlin
+val addDevice: (MutableList<String>) -> Unit = { devices ->
+    devices.add("BT-Sensor-01")
+}
+```
+
+Here, `devices` cannot be reassigned to a different list, but the `MutableList` object can be changed in place.
+
+### The same rule applies inside callbacks
+
+A callback parameter is still a lambda parameter, so it is read-only too.
+
+Suppose a child composable reports the current count to its parent:
+
+```kotlin
+@Composable
+fun CountButton(
+    measurementCount: Int,
+    onCountChange: (Int) -> Unit
+) {
+    Button(
+        onClick = {
+            onCountChange(measurementCount)
+        }
+    ) {
+        Text("Measure")
+    }
+}
+```
+
+The parent provides the callback:
+
+```kotlin
+@Composable
+fun MeasurementScreen() {
+    var measurementCount by remember { mutableStateOf(0) }
+
+    CountButton(
+        measurementCount = measurementCount,
+        onCountChange = { count ->
+            count++
+        }
+    )
+}
+```
+
+This does not work. `count` is the callback parameter, so it cannot be incremented.
+
+The parent should update its own state instead:
+
+```kotlin
+@Composable
+fun MeasurementScreen() {
+    var measurementCount by remember { mutableStateOf(0) }
+
+    CountButton(
+        measurementCount = measurementCount,
+        onCountChange = { count ->
+            measurementCount = count + 1
+        }
+    )
+}
+```
+
+Here, `count` is only the value received from the child. The change happens by assigning a new value to the parent state variable `measurementCount`.
+
+#### Mutable objects inside callback parameters
+
+If the callback parameter is a mutable object, the callback can mutate the object:
+
+```kotlin
+@Composable
+fun MutableMeasurementListButton(
+    measurements: MutableList<Int>,
+    onMeasurementsChange: (MutableList<Int>) -> Unit
+) {
+    Button(
+        onClick = {
+            onMeasurementsChange(measurements)
+        }
+    ) {
+        Text("Measure")
+    }
+}
+```
+
+The parent callback can change the list in place:
+
+```kotlin
+@Composable
+fun MeasurementScreen() {
+    val measurements = remember { mutableListOf(1, 2, 3) }
+
+    MutableMeasurementListButton(
+        measurements = measurements,
+        onMeasurementsChange = { list ->
+            list.add(4)
+        }
+    )
+}
+```
+
+This is allowed by Kotlin. The parameter `list` is read-only, but the `MutableList` object can still be changed.
+
+However, this is usually not the best Compose state pattern. If a plain `MutableList` is changed in place, Compose may not notice that the UI should recompose.
+
+A safer Compose pattern is to keep an immutable list in state and replace it with a new list. The child receives a read-only `List`:
+
+```kotlin
+@Composable
+fun ReadOnlyMeasurementListButton(
+    measurements: List<Int>,
+    onMeasurementsChange: (List<Int>) -> Unit
+) {
+    Button(
+        onClick = {
+            onMeasurementsChange(measurements)
+        }
+    ) {
+        Text("Measure")
+    }
+}
+```
+
+Then the parent replaces the state value with a new list:
+
+```kotlin
+@Composable
+fun MeasurementScreen() {
+    var measurements by remember { mutableStateOf(listOf(1, 2, 3)) }
+
+    ReadOnlyMeasurementListButton(
+        measurements = measurements,
+        onMeasurementsChange = { list ->
+            measurements = list + 4
+        }
+    )
+}
+```
+
+With this pattern, the state variable receives a new list value, so Compose can observe the state change.
+
+The rule is:
+
+```text
+You cannot reassign or increment the lambda parameter itself.
+You can mutate the object it refers to, if that object is mutable.
+```
 
 ---
 
-## 12. Callback registration and callback execution happen at different times
+## 13. Callback registration and callback execution happen at different times
 
 Consider:
 
@@ -695,7 +885,7 @@ Callbacks are often called later, but "callback" does not mathematically guarant
 
 ---
 
-## 13. `onClick` is a callback
+## 14. `onClick` is a callback
 
 The simplified shape of `Button` is similar to:
 
@@ -735,7 +925,7 @@ The `Text("Measure")` block is not the click behavior. It is the button's UI con
 
 ---
 
-## 14. Trailing lambda syntax
+## 15. Trailing lambda syntax
 
 Kotlin allows the final lambda argument to be placed outside the parentheses.
 
@@ -812,7 +1002,7 @@ content()
 
 ---
 
-## 15. Creating a reusable composable with callbacks
+## 16. Creating a reusable composable with callbacks
 
 A reusable UI component should usually receive the data it displays and callbacks for the events it can produce.
 
@@ -866,7 +1056,7 @@ callback to report an event
 
 ---
 
-## 16. State flows down and events flow up
+## 17. State flows down and events flow up
 
 The previous example follows a central Compose pattern:
 
@@ -905,7 +1095,7 @@ The callback itself usually does not "flow upward" as data. The parent passes th
 
 ---
 
-## 17. State hoisting
+## 18. State hoisting
 
 **State hoisting** means moving state to the nearest parent that needs to control or share it.
 
@@ -973,7 +1163,7 @@ This makes the child reusable, previewable, and easy to test.
 
 ---
 
-## 18. A complete navigation callback path
+## 19. A complete navigation callback path
 
 Now follow a callback through several levels.
 
@@ -1111,7 +1301,7 @@ ResearchTabletApp owns navigation state and decides what to display.
 
 ---
 
-## 19. Nullable callbacks
+## 20. Nullable callbacks
 
 You may encounter:
 
@@ -1189,7 +1379,7 @@ DeviceScreen(
 
 ---
 
-## 20. Callbacks help keep screens independent
+## 21. Callbacks help keep screens independent
 
 Imagine that selecting a device must clear another screen's temporary data.
 
@@ -1257,7 +1447,7 @@ Callbacks are not a reason to put all coordination in `MainActivity`. As an app 
 
 ---
 
-## 21. Callbacks and ViewModels
+## 22. Callbacks and ViewModels
 
 In a ViewModel-based screen, state usually flows down from the ViewModel and events call ViewModel operations.
 
@@ -1320,7 +1510,7 @@ Lesson 9 introduces ViewModels in detail. Lesson 10 then shows the same state pa
 
 ---
 
-## 22. Callbacks and recomposition
+## 23. Callbacks and recomposition
 
 Suppose a callback updates Compose state:
 
@@ -1369,7 +1559,7 @@ Later coroutine lessons show how to move slow work away from the main thread.
 
 ---
 
-## 23. Lambdas can capture surrounding values
+## 24. Lambdas can capture surrounding values
 
 A lambda can use values declared outside it:
 
@@ -1406,7 +1596,7 @@ Callbacks may run after the surrounding function has finished. Kotlin keeps the 
 
 ---
 
-## 24. Callback versus StateFlow versus coroutine
+## 25. Callback versus StateFlow versus coroutine
 
 These concepts solve different problems.
 
@@ -1440,7 +1630,7 @@ One does not replace the others.
 
 ---
 
-## 25. A callback result that arrives later
+## 26. A callback result that arrives later
 
 Some APIs use one callback to start work and another callback to report the eventual result.
 
@@ -1485,7 +1675,7 @@ Lesson 8 applies this idea to CSV export and explains the file-picker timeline i
 
 ---
 
-## 26. Callback naming conventions
+## 27. Callback naming conventions
 
 Callback parameter names commonly describe events:
 
@@ -1523,7 +1713,7 @@ The child should report the event. The parent decides what the event means for t
 
 ---
 
-## 27. Common mistakes
+## 28. Common mistakes
 
 ### Mistake 1: calling the function while passing it
 
@@ -1627,7 +1817,7 @@ onSelectSessionForData = { selectedSession ->
 
 ---
 
-## 28. Complete mini-example
+## 29. Complete mini-example
 
 This example combines state, a reusable child composable, a callback carrying data, and recomposition.
 
@@ -1706,7 +1896,7 @@ The child produces events, but the parent owns the state.
 
 ---
 
-## 29. Practice exercises
+## 30. Practice exercises
 
 ### Exercise 1: read the type
 
@@ -1764,7 +1954,7 @@ Write a large export file without blocking the UI.
 
 ---
 
-## 30. Exercise answers
+## 31. Exercise answers
 
 ### Answer 1
 
@@ -1821,7 +2011,7 @@ Large non-blocking file operation -> coroutine
 
 ---
 
-## 31. Final mental model
+## 32. Final mental model
 
 When you encounter callback code, ask five questions:
 

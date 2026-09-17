@@ -403,6 +403,24 @@ Call:
 printMeasurement(2.45)
 ```
 
+Function inputs are called **parameters**. 
+
+Note that parameters always behave like a `val` inside the function body, so it cannot be reassigned:
+
+```kotlin
+fun printMeasurement(value: Double) {
+    value = 3.0 // Error
+}
+```
+
+This is why Kotlin function parameters are written without `val` or `var`:
+
+```kotlin
+fun printMeasurement(value: Double)
+```
+
+You write the parameter name and its type. Kotlin already treats the parameter name as val (read-only) inside the function.
+
 ## 8. Returning values
 
 The return type appears after the parameters.
