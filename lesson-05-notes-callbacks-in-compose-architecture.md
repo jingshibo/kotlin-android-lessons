@@ -10,7 +10,8 @@ We start with one parent and one child, explain why state may belong in the pare
 
 ### 1.1 The parent owns state; the child receives values and a callback
 
-A **parent** composable calls a **child** composable. Here, `DeviceList` is the parent because it calls `DeviceRow`.
+A **parent** composable calls a **child** composable. 
+Here, `DeviceList` is the parent and it calls the child `DeviceRow`.
 
 State is information that can change and affect what the UI displays. In this example, it is the selected device name:
 
