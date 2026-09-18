@@ -351,7 +351,107 @@ The distinction in the last step matters: running composable code again can crea
 References: [Compose state and state hoisting](https://developer.android.com/develop/ui/compose/state), [Kotlin closures](https://kotlinlang.org/docs/lambdas.html#closures), and [Compose's execution and recomposition model](https://developer.android.com/develop/ui/compose/mental-model).
 
 ---
-## 4. Nullable callbacks
+
+## 4. Does every click cause recomposition?
+
+**No. Invoking a callback does not, by itself, request recomposition of your screen.** What matters is what the callback does.
+
+### 4.1 Logging an event versus changing observed state
+
+Suppose we replace the navigation callback from Section 3 with this body:
+
+```kotlin
+onNavigate = { selectedScreen ->
+    println("Tab clicked: ${selectedScreen.name}")
+}
+```
+
+The click still reaches the callback, and the message is printed to developer output (typically Logcat on Android). But this body does not change navigation state, so it does not request a new screen or a new selected tab. `println` does not display text in the app's UI.
+
+Compare that with:
+
+```kotlin
+onNavigate = { selectedScreen ->
+    currentScreenName = selectedScreen.name
+}
+```
+
+In Section 3, `currentScreenName` uses `mutableStateOf`, and the parent reads it during composition to choose the screen. Changing it from `"Device"` to `"Data"` schedules recomposition of the code that observed that state.
+
+Compose tracks state reads during composition. A change to an observed state holder tells Compose which composition scopes need updating. Assigning to a plain, non-state variable does not send that notification. See [Compose state tracking](https://developer.android.com/develop/ui/compose/state#state-in-composables).
+
+Two details keep this rule precise:
+
+- With the default `mutableStateOf` behavior, assigning an equal value does not schedule recomposition through that state holder. Selecting Data when `currentScreenName` is already `"Data"` still invokes the callback, but that assignment adds no state change. See the [MutableState reference](https://developer.android.com/reference/kotlin/androidx/compose/runtime/MutableState).
+- A logging-only callback does not mean the entire UI becomes inactive. A button can still show press feedback, and other state changes can independently cause UI updates. Interaction feedback may involve drawing updates without recomposing your screen. See [Compose interaction handling](https://developer.android.com/develop/ui/compose/touch-input/user-interactions/handling-interactions).
+
+### 4.2 Displaying the clicked tab message on screen
+
+To show a changing message in the UI, store it as observable state and read it in a `Text` composable. Here is a replacement for `ResearchTabletApp` from Section 3, using the same `TabletShell` and screen components:
+
+```kotlin
+@Composable
+fun ResearchTabletApp() {
+    var currentScreenName by rememberSaveable {
+        mutableStateOf(TabletScreen.Device.name)
+    }
+    var clickedTabMessage by remember {
+        mutableStateOf("No tab clicked yet")
+    }
+
+    val currentScreen = TabletScreen.valueOf(currentScreenName)
+
+    TabletShell(
+        activeScreen = currentScreen,
+        onNavigate = { selectedScreen ->
+            currentScreenName = selectedScreen.name
+            clickedTabMessage = "You clicked the '${selectedScreen.navLabel}' tab!"
+        }
+    ) {
+        Column {
+            Text(text = clickedTabMessage)
+
+            when (currentScreen) {
+                TabletScreen.Device -> DeviceScreen()
+                TabletScreen.Data -> DataScreen()
+                TabletScreen.Repository -> RepositoryScreen()
+                TabletScreen.Settings -> SettingsScreen()
+            }
+        }
+    }
+}
+```
+
+The two state values control different UI details: `currentScreenName` controls navigation, and `clickedTabMessage` controls the visible message. The callback captures access to both holders, just as Section 3.4 described.
+
+When the user selects Data:
+
+1. The child invokes `onNavigate(TabletScreen.Data)`.
+2. The callback updates the navigation state and message state.
+3. Compose schedules the affected UI to recompose using those updated values. Each assignment does not require a separate immediate recomposition.
+4. The content displays `You clicked the 'Data' tab!` and `DataScreen()`.
+
+The callback updates the message; `Text` displays it when the UI is composed. You do not call `Text(...)` inside the ordinary click callback.
+
+### 4.3 Showing a message without changing screens
+
+To report the click on screen while keeping the current screen selected, replace only the callback body in the example above:
+
+```kotlin
+onNavigate = { selectedScreen ->
+    clickedTabMessage = "You clicked the '${selectedScreen.navLabel}' tab!"
+}
+```
+
+Now `currentScreenName` stays unchanged. A changed `clickedTabMessage` still causes the UI that reads the message to recompose. The message can say Data was clicked while the Device screen remains selected and displayed.
+
+Clicking the same tab again produces the same message string, so that assignment does not request another recomposition. The callback still runs on every click. If the UI should visibly record every click, store additional state such as a click count and include it in the displayed text.
+
+`mutableStateOf` is a simple way to make this message observable. Later lessons also show state supplied by a ViewModel or collected from a flow; the state does not have to be declared locally beside `Text`.
+
+---
+
+## 5. Nullable callbacks
 
 You may encounter:
 
@@ -429,7 +529,7 @@ DeviceScreen(
 
 ---
 
-## 5. Callbacks help keep screens independent
+## 6. Callbacks help keep screens independent
 
 Imagine that selecting a device must clear another screen's temporary data.
 
@@ -499,7 +599,7 @@ Callbacks are not a reason to put all coordination in `MainActivity`. As an app 
 
 ---
 
-## 6. Callbacks and ViewModels
+## 7. Callbacks and ViewModels
 
 In a ViewModel-based screen, state usually flows down from the ViewModel and events call ViewModel operations.
 
@@ -562,7 +662,7 @@ Lesson 9 introduces ViewModels in detail. Lesson 10 then shows the same state pa
 
 ---
 
-## 7. Callbacks and recomposition
+## 8. Callbacks and recomposition
 
 Suppose a callback updates Compose state:
 
@@ -611,7 +711,7 @@ Later coroutine lessons show how to move slow work away from the main thread.
 
 ---
 
-## 8. Callback versus StateFlow versus coroutine
+## 9. Callback versus StateFlow versus coroutine
 
 These concepts solve different problems.
 
@@ -645,7 +745,7 @@ One does not replace the others.
 
 ---
 
-## 9. A callback result that arrives later
+## 10. A callback result that arrives later
 
 Some APIs use one callback to start work and another callback to report the eventual result.
 
@@ -690,7 +790,7 @@ Lesson 8 applies this idea to CSV export and explains the file-picker timeline i
 
 ---
 
-## 10. Common architecture mistakes
+## 11. Common architecture mistakes
 
 ### Mistake 1: passing an unrelated ViewModel into a child screen
 
@@ -706,7 +806,7 @@ Callbacks on the main thread should stay short. Let a ViewModel and coroutine co
 
 ---
 
-## 11. Practice exercises
+## 12. Practice exercises
 
 ### Exercise 1: hoist the state
 
@@ -729,7 +829,7 @@ Write a large export file without blocking the UI.
 
 ---
 
-## 12. Exercise answers
+## 13. Exercise answers
 
 ### Answer 1
 
