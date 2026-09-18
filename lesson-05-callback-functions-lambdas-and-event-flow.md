@@ -91,16 +91,22 @@ Run this function now.
 The function takes no arguments and returns no useful result. Its function type can be written as:
 
 ```kotlin
-() -> Unit
+() -> Unit // Input -> Output
 ```
 
 We will unpack that syntax shortly.
 
 ---
 
-## 3. A function can also be a value
+## 3. Lambda functions: storing a function in a variable
 
-Kotlin allows a function to be stored in a variable:
+A **lambda** is a function without a declared name.
+
+Kotlin allows a lambda to be stored in a variable. That means a function can also be a value.
+
+### 3.1 A lambda with no arguments
+
+Here is a lambda stored in a variable:
 
 ```kotlin
 val clearAction: () -> Unit = {
@@ -108,7 +114,15 @@ val clearAction: () -> Unit = {
 }
 ```
 
-The `{ ... }` expression is a **lambda**: a function without a declared name.
+**In this declaration**:
+
+- `clearAction` is the name of the variable.
+- `() -> Unit` is the function type of the value stored in that variable.
+- `{ println("Measurements cleared") }` is the lambda.
+
+The variable has a name, but the lambda itself does not declare a name. The whole `{ ... }` expression is the lambda.
+
+In `() -> Unit`, `()` means the function takes no arguments, and `Unit` means it returns no useful value.
 
 You can run the stored function with parentheses:
 
@@ -131,31 +145,56 @@ clearAction.invoke()
 
 The shorter parentheses form is normally preferred for a non-null function.
 
----
+### 3.2 A lambda with one argument
 
-## 4. Lambda function introduction
-
-The `clearAction` declaration above stores a lambda in a variable:
+Now compare `clearAction` with a lambda that takes one argument:
 
 ```kotlin
-val clearAction: () -> Unit = {
-    println("Measurements cleared")
+val selectDeviceAction: (String) -> Unit = { deviceName ->
+    println("Selected device: $deviceName")
 }
 ```
 
-A **lambda** is a function without a declared name. In this declaration:
+The type is:
 
-- `clearAction` is the name of the variable.
-- `() -> Unit` is the function type of the value stored in that variable.
-- `{ println("Measurements cleared") }` is the lambda.
+```kotlin
+(String) -> Unit
+```
 
-In `() -> Unit`, `()` means the function takes no arguments, and `Unit` means it returns no useful value.
+That means:
 
-The variable has a name, but the lambda itself does not declare a name. The whole `{ ... }` expression is the lambda.
+```text
+This function needs one String argument.
+It does something with that String.
+It returns no useful result.
+```
 
-This is just one way to write a lambda, where the function type is written explicitly before `=`.
+You run it by passing a `String` inside the parentheses:
 
-A **lambda** can also be written another way: Kotlin can infer the function type from the lambda itself.
+```kotlin
+selectDeviceAction("BT-Sensor-01")
+```
+
+You can also use `invoke`:
+
+```kotlin
+selectDeviceAction.invoke("BT-Sensor-01")
+```
+
+Again, these mean the same thing:
+
+```text
+selectDeviceAction("BT-Sensor-01")
+selectDeviceAction.invoke("BT-Sensor-01")
+```
+
+The important difference is that `clearAction` does not need any input, but `selectDeviceAction` must be given a `String` when it runs.
+
+### 3.3 Lambda type inference
+
+The `clearAction` and `selectDeviceAction` examples write the function type explicitly before `=`.
+
+Kotlin can also infer the function type from the lambda itself:
 
 ```kotlin
 val square = { x: Int -> x * x }
@@ -179,13 +218,13 @@ So Kotlin infers this function type:
 (Int) -> Int
 ```
 
-### Comparison of the two lambda styles
+### 3.4 Comparison of the two lambda styles
 
 The important difference between `clearAction` and `square` is where Kotlin gets the function type:
 
 ```text
 clearAction: the function type explicitly:  () -> Unit
-square: Kotlin infer the function type:   (Int) -> Int
+square: Kotlin infers the function type:   (Int) -> Int
 ```
 
 There are also two different uses of `->`:
@@ -199,6 +238,8 @@ In a function type, `->` separates input types from the return type. In a lambda
 
 Specifically, in `() -> Unit`, the arrow belongs to the function type. In `{ x: Int -> x * x }`, the arrow belongs to the lambda.
 
+### 3.5 Lambda compared with a named function
+
 Finally, we can also compare `square` lambda with a named function:
 
 ```kotlin
@@ -211,7 +252,7 @@ The named function declares its own name with `fun square`. The lambda does not.
 
 ---
 
-## 5. Lambda and callback do not mean the same thing
+## 4. Lambda and callback do not mean the same thing
 
 These words are related, but they describe different things.
 
@@ -255,7 +296,7 @@ A function that receives another function or returns a function is called a **hi
 
 ---
 
-## 6. Reading Kotlin function types
+## 5. Reading Kotlin function types
 
 A function type describes the inputs and output of a function.
 
@@ -344,7 +385,7 @@ Most Compose event callbacks return `Unit` because they are mainly used to do so
 
 ---
 
-## 7. Passing a function versus calling it
+## 6. Passing a function versus calling it
 
 This is the most important syntax distinction in the lesson.
 
@@ -441,7 +482,7 @@ Button(
 
 ---
 
-## 8. Passing a named function with `::`
+## 7. Passing a named function with `::`
 
 Suppose you have a normal named function:
 
@@ -505,7 +546,7 @@ Inside this function, pass `onClear`, not `::onClear`.
 
 ---
 
-## 9. Who provides the callback argument?
+## 8. Who provides the callback argument?
 
 Consider this composable parameter:
 
@@ -567,7 +608,7 @@ The child knows **what happened**. The parent usually knows **what that event sh
 
 ---
 
-## 10. A callback parameter may be ignored
+## 9. A callback parameter may be ignored
 
 The producer may provide a value even when one particular consumer does not need it.
 
@@ -612,7 +653,7 @@ Do not remove useful event data from the child merely because one current consum
 
 ---
 
-## 11. Understanding `it`
+## 10. Understanding `it`
 
 When a lambda has exactly one parameter, Kotlin lets you use the implicit name `it`.
 
@@ -668,7 +709,7 @@ onSelectSessionForData = { selectedSession ->
 
 ---
 
-## 12. Lambda parameters are read-only
+## 11. Lambda parameters are read-only
 
 A lambda parameter works like a normal function parameter: the parameter variable itself is read-only.
 
@@ -841,7 +882,7 @@ You can mutate the object it refers to, if that object is mutable.
 
 ---
 
-## 13. Callback registration and callback execution happen at different times
+## 12. Callback registration and callback execution happen at different times
 
 Consider:
 
@@ -885,7 +926,7 @@ Callbacks are often called later, but "callback" does not mathematically guarant
 
 ---
 
-## 14. `onClick` is a callback
+## 13. `onClick` is a callback
 
 The simplified shape of `Button` is similar to:
 
@@ -925,7 +966,7 @@ The `Text("Measure")` block is not the click behavior. It is the button's UI con
 
 ---
 
-## 15. Trailing lambda syntax
+## 14. Trailing lambda syntax
 
 Kotlin allows the final lambda argument to be placed outside the parentheses.
 
@@ -1002,7 +1043,7 @@ content()
 
 ---
 
-## 16. Creating a reusable composable with callbacks
+## 15. Creating a reusable composable with callbacks
 
 A reusable UI component should usually receive the data it displays and callbacks for the events it can produce.
 
@@ -1079,7 +1120,7 @@ callback to report an event
 
 ---
 
-## 17. Lambdas can capture surrounding values
+## 16. Lambdas can capture surrounding values
 
 A lambda can use values declared outside it:
 
@@ -1112,11 +1153,46 @@ items.forEach { item ->
 
 Each callback captures the `item` for its own iteration.
 
-Callbacks may run after the surrounding function has finished. Kotlin keeps the captured values available to the callback. In Compose, recomposition can create newer callback instances that capture newer state. You usually do not need to manage this manually for simple event handlers, but it explains why callback timing and state ownership matter.
+The important idea is that the callback may run later.
+
+For example:
+
+```kotlin
+@Composable
+fun DeviceButton(deviceName: String) {
+    Button(
+        onClick = {
+            println(deviceName)
+        }
+    ) {
+        Text(deviceName)
+    }
+}
+```
+
+When `DeviceButton` runs, it creates the `onClick` lambda. The lambda uses `deviceName`, even though `deviceName` was declared outside the lambda.
+
+The button appears on screen first. Later, when the user clicks the button, the lambda runs and still has access to `deviceName`.
+
+That is what capturing means:
+
+```text
+A lambda can remember values from the place where it was created.
+The callback can use those values later, when the event happens.
+```
+
+In Compose, if `deviceName` changes, Compose may run `DeviceButton` again. This is recomposition. During recomposition, Compose may create a new `onClick` lambda that captures the new `deviceName`.
+
+For simple event handlers, you usually do not need to manage this manually. The main thing to remember is:
+
+```text
+The lambda is created now but this callback may run later.
+The values it captured during creation can be remembered and used when it runs.
+```
 
 ---
 
-## 18. Callback naming conventions
+## 17. Callback naming conventions
 
 Callback parameter names commonly describe events:
 
@@ -1154,7 +1230,7 @@ The child should report the event. The parent decides what the event means for t
 
 ---
 
-## 19. Common mistakes
+## 18. Common mistakes
 
 ### Mistake 1: calling the function while passing it
 
@@ -1184,21 +1260,75 @@ If the type is:
 onDeviceSelect: (String) -> Unit
 ```
 
-this is incorrect:
+then the callback needs one `String` argument whenever it runs.
+
+This is incorrect:
 
 ```kotlin
 onDeviceSelect()
 ```
 
-Provide a `String`:
+Kotlin will complain because the callback type says:
+
+```text
+To run this function, you must provide one String.
+```
+
+Provide a `String` when invoking the callback:
 
 ```kotlin
 onDeviceSelect(deviceName)
 ```
 
+For example:
+
+```kotlin
+@Composable
+fun DeviceRow(
+    deviceName: String,
+    onDeviceSelect: (String) -> Unit
+) {
+    Button(
+        onClick = {
+            onDeviceSelect(deviceName)
+        }
+    ) {
+        Text(deviceName)
+    }
+}
+```
+
+Here:
+
+- `onDeviceSelect` is the callback function.
+- `deviceName` is the argument passed into that callback.
+- `DeviceRow` knows which device it is displaying, so it can provide `deviceName` when the button is clicked.
+
+The parent provides this callback function and decides what to do with the selected device name:
+
+```kotlin
+DeviceRow(
+    deviceName = "BT-Sensor-01",
+    onDeviceSelect = { selectedDeviceName ->
+        selectedDevice = selectedDeviceName
+    }
+)
+```
+
+The event flow is:
+
+```text
+User clicks this row
+-> DeviceRow calls onDeviceSelect(deviceName)
+-> parent lambda receives that value as selectedDeviceName
+-> parent updates selectedDevice
+```
+
+So the function type tells you what information must be provided when the callback is invoked.
+
 ### Mistake 3: confusing where a callback is defined with where it runs
 
-The parent may define the callback:
+It is easy to misunderstand that this callback runs where it is written:
 
 ```kotlin
 onNavigate = { selectedScreen ->
@@ -1206,7 +1336,63 @@ onNavigate = { selectedScreen ->
 }
 ```
 
-but the child invokes it after a click. Definition location and execution location are different ideas.
+But in fact this code only **defines** what should happen later.
+
+For example, the parent might write:
+
+```kotlin
+TabletShell(
+    currentScreen = currentScreen,
+    onNavigate = { selectedScreen ->
+        currentScreen = selectedScreen
+    }
+)
+```
+
+At this moment, the parent creates a function value and passes it down to `TabletShell`. The screen has not changed yet merely because the lambda was written there.
+
+Then `TabletShell` may pass the same callback farther down:
+
+```kotlin
+SideNavBar(
+    currentScreen = currentScreen,
+    onNavigate = onNavigate
+)
+```
+
+This still does not run the callback. It only gives `SideNavBar` a function it can call later.
+
+Finally, the child invokes the callback in response to a user event:
+
+```kotlin
+NavigationItem(
+    label = screen.label,
+    onClick = {
+        onNavigate(screen)
+    }
+)
+```
+
+Now the callback actually runs. The child provides the argument `screen` back to the parent, and the parent's lambda receives it as `selectedScreen`:
+
+```text
+Child click happens
+-> child calls onNavigate(screen)
+-> parent lambda runs
+-> selectedScreen receives the screen value
+-> currentScreen = selectedScreen updates parent state
+-> Compose recomposes with the new screen
+```
+
+So there are three different ideas:
+
+| Step | What happens | Does the callback run? |
+|---|---|---|
+| Define | Parent writes `{ selectedScreen -> currentScreen = selectedScreen }` | No |
+| Pass/register | Parent and intermediate composables pass `onNavigate` down | No |
+| Invoke | Child calls `onNavigate(screen)` after a click event | Yes |
+
+Definition location and execution location are different. The parent usually defines what the event means, but the child decides when to report that the event happened.
 
 ### Mistake 4: assuming every `{ ... }` is an event callback
 
@@ -1246,7 +1432,7 @@ onSelectSessionForData = { selectedSession ->
 
 ---
 
-## 20. Complete mini-example
+## 19. Complete mini-example
 
 This example combines state, a reusable child composable, a callback carrying data, and recomposition.
 
@@ -1325,7 +1511,7 @@ The child produces events, but the parent owns the state.
 
 ---
 
-## 21. Practice exercises
+## 20. Practice exercises
 
 ### Exercise 1: read the type
 
@@ -1389,7 +1575,7 @@ clearDataViewModelWhenDeviceChanges
 
 ---
 
-## 22. Exercise answers
+## 21. Exercise answers
 
 ### Answer 1
 
@@ -1437,7 +1623,7 @@ It describes the event instead of one parent's implementation.
 
 ---
 
-## 23. Final mental model
+## 22. Final mental model
 
 When you encounter callback code, ask five questions:
 
@@ -1467,7 +1653,7 @@ Type:
     (String) -> Unit
 
 Defined by:
-    the parent calling DeviceScreen
+    the parent calling DeviceScreen. DeviceScreen is currently called by another function.
 
 Invoked by:
     DeviceScreen when a device is selected
@@ -1479,7 +1665,77 @@ Effect:
     the parent receives the name and clears data-screen state
 ```
 
-The most important rules are:
+One confusing point is why `onDeviceSelect` is not the one providing the callback. 
+
+Think of it like this:
+
+```kotlin
+DeviceScreen(
+    onDeviceSelect = SOME_FUNCTION_FROM_PARENT
+)
+```
+
+The left side:
+
+```kotlin
+onDeviceSelect =
+```
+
+is the parameter name that `DeviceScreen` declared.
+
+The right side:
+
+```kotlin
+{ selectedName ->
+    println(selectedName)
+    dataViewModel.clearDataScreen()
+}
+```
+
+is the actual callback function provided by the parent.
+
+Inside `DeviceScreen`, it may look like this:
+
+```kotlin
+@Composable
+fun DeviceScreen(
+    onDeviceSelect: (String) -> Unit
+) {
+    Button(
+        onClick = {
+            onDeviceSelect("BT-Sensor-01")
+        }
+    ) {
+        Text("Select device")
+    }
+}
+```
+
+So the full story is:
+
+```text
+DeviceScreen defines the callback parameter:
+onDeviceSelect: (String) -> Unit
+
+Parent provides the callback body:
+{ selectedName -> ... }
+
+DeviceScreen invokes the callback later:
+onDeviceSelect("BT-Sensor-01")
+
+The parent's lambda receives that value:
+selectedName = "BT-Sensor-01"
+```
+
+So the best wording is probably:
+
+```text
+DeviceScreen declares the callback parameter that it needs.
+The parent provides the callback implementation/body.
+DeviceScreen calls that callback when a device is selected.
+```
+
+**The most important rules are:**
 
 ```text
 A lambda is one way to create a function value.
