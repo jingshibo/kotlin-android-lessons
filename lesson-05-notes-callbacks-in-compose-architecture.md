@@ -1,72 +1,126 @@
 # Lesson 5 notes - callbacks in Compose architecture
 
-This note continues Lesson 5 after the callback and lambda fundamentals. The focus here is how callbacks support Compose state ownership, event flow, ViewModels, recomposition, and asynchronous results.
+This note builds on Lesson 5's callback and lambda fundamentals. Its first three sections explain how a parent and child work together: who owns state, what is passed between them, when a callback runs, and how a state change updates the UI.
+
+We start with one parent and one child, explain why state may belong in the parent, and then follow a navigation event through several components. Later sections apply these ideas to ViewModels, optional callbacks, and asynchronous results.
 
 ---
+
 ## 1. State flows down and events flow up
 
-The reusable `DeviceRow` example from Lesson 5 follows a central Compose pattern:
+### 1.1 The parent owns state; the child receives values and a callback
 
-```text
-Parent state
-    |
-    | selectedDevice and isSelected flow down
-    v
-DeviceRow
-    |
-    | onSelect(deviceName) event flows up
-    v
-Parent callback updates state
-    |
-    v
-Compose redraws the affected UI
-```
+A **parent** composable calls a **child** composable. Here, `DeviceList` is the parent because it calls `DeviceRow`.
 
-This is often summarized as:
-
-```text
-State flows down.
-Events flow up.
-```
-
-More precisely:
-
-```text
-The parent passes current values down to children.
-Children invoke callbacks to report user events upward.
-The state owner handles the event and changes state.
-The new state flows down during recomposition.
-```
-
-The callback itself usually does not "flow upward" as data. The parent passes the callback down, and the child invokes it to send an event upward.
-
----
-
-## 2. State hoisting
-
-**State hoisting** means moving state to the nearest parent that needs to control or share it.
-
-Here is a component that owns its own text:
+State is information that can change and affect what the UI displays. In this example, it is the selected device name:
 
 ```kotlin
 @Composable
-fun InternalSampleInput() {
-    var sampleId by remember {
+fun DeviceList() {
+    var selectedDevice by remember {
         mutableStateOf("")
     }
 
-    OutlinedTextField(
-        value = sampleId,
-        onValueChange = { newValue ->
-            sampleId = newValue
+    DeviceRow(
+        deviceName = "BT-Sensor-01",
+        isSelected = selectedDevice == "BT-Sensor-01",
+        onSelect = { deviceName ->
+            selectedDevice = deviceName
         }
     )
 }
 ```
 
-This works, but the parent cannot read or control `sampleId`.
+`mutableStateOf("")` creates an observable state holder, initially containing an empty string. `remember` keeps that holder across recompositions while this part of the UI remains in the composition. The `by` syntax lets us read and update its value using `selectedDevice`.
 
-The hoisted version is:
+We call this **parent-owned state** because `DeviceList` declares it and supplies the code that updates it. Compose retains the holder; the `DeviceList` function does not need to keep running to keep it alive.
+
+The child accepts three parameters:
+
+```kotlin
+@Composable
+fun DeviceRow(
+    deviceName: String,
+    isSelected: Boolean,
+    onSelect: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier.selectable(
+            selected = isSelected,
+            onClick = { onSelect(deviceName) }
+        )
+    ) {
+        Text(if (isSelected) "$deviceName (selected)" else deviceName)
+    }
+}
+```
+
+| Parameter received by the child | What the parent supplies | Purpose |
+|---|---|---|
+| `deviceName` | `"BT-Sensor-01"` | The device this row represents |
+| `isSelected` | The result of `selectedDevice == "BT-Sensor-01"` | Whether to display the row as selected |
+| `onSelect` | `{ deviceName -> selectedDevice = deviceName }` | Behavior to invoke when this device is selected |
+
+`DeviceRow` declares the callback **parameter**. `DeviceList` supplies the actual **function body**. Passing that function into `onSelect` makes it available to the child; it does not execute the body.
+
+### 1.2 A click invokes the callback and changes state
+
+The phrase **state flows down** means the parent supplies values for the child to display. The callback function also travels down as an argument:
+
+```text
+DeviceList
+    |
+    | deviceName, isSelected
+    | onSelect callback function
+    v
+DeviceRow
+```
+
+The phrase **events flow up** describes the child reporting a user action by invoking that supplied callback. Read this diagram from the bottom upward:
+
+```text
+Parent-created callback updates selectedDevice
+    ^
+    | deviceName argument is received by the callback
+    |
+DeviceRow calls onSelect(deviceName)
+    ^
+    | click handler runs
+    |
+User clicks DeviceRow
+```
+
+The **event** is the selection action; the **event data** is the device name passed as the argument. The callback body decides how to respond. Here, it assigns that name to `selectedDevice`.
+
+This is an ordinary function call. Calling the callback runs its body as part of handling the click; it does not first rerun the parent composable. The function can update parent-owned state because it retains access to that state, as Section 3.4 explains.
+
+When the selection changes, Compose schedules the affected UI to recompose. **Recomposition** means running the relevant composable code again using the updated state. The parent now supplies `isSelected = true`, so the row displays its selected appearance. Compose can skip components that do not need updating.
+
+The child has received a Boolean value and a function, rather than direct access to the parent's state holder. It reports the selection through that function. A callback could instead reject the selection or only log it; invoking a callback does not itself guarantee a state change.
+
+---
+
+## 2. State hoisting: choosing who controls the value
+
+Section 1 started with state already in the parent. **State hoisting** is how we arrive at that arrangement: move state out of a child when another component needs to read or control it. For state shared by several children, choose a common parent that can serve them.
+
+Consider a text input that owns its value:
+
+```kotlin
+@Composable
+fun InternalSampleInput() {
+    var sampleId by remember { mutableStateOf("") }
+
+    OutlinedTextField(
+        value = sampleId,
+        onValueChange = { newValue -> sampleId = newValue }
+    )
+}
+```
+
+This works for a self-contained input. But a parent that needs the sample ID for a Save button cannot read this local state through the component's parameters.
+
+To let the parent control the value, give the child a value parameter and a callback parameter:
 
 ```kotlin
 @Composable
@@ -79,16 +133,10 @@ fun SampleInput(
         onValueChange = onSampleIdChange
     )
 }
-```
 
-The parent owns the state:
-
-```kotlin
 @Composable
 fun ResearchScreen() {
-    var sampleId by remember {
-        mutableStateOf("")
-    }
+    var sampleId by remember { mutableStateOf("") }
 
     SampleInput(
         sampleId = sampleId,
@@ -99,104 +147,47 @@ fun ResearchScreen() {
 }
 ```
 
-The common pair is:
+There is now one state holder, owned by `ResearchScreen`. `SampleInput` receives its current string value. The parameter also being named `sampleId` does not create another state holder.
 
-```kotlin
-value: T
-onValueChange: (T) -> Unit
-```
+`onValueChange = onSampleIdChange` forwards the supplied function to `OutlinedTextField`. When the user edits the text, the field invokes it with the proposed new string. The parent-provided body stores that string, and recomposition supplies the updated value to the field.
 
-This makes the child reusable, previewable, and easy to test.
+This value-and-callback pair lets the parent control the input while the child concentrates on displaying it. It also makes the child easier to reuse, preview, and test.
 
 ---
 
 ## 3. A complete navigation callback path
 
-Now follow a callback through several levels.
-
-### Level 1: `NavigationItem` reports a click
-
-```kotlin
-@Composable
-fun NavigationItem(
-    label: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier.clickable(onClick = onClick)
-    ) {
-        Text(label)
-    }
-}
-```
-
-`NavigationItem` does not decide which app state should change. It simply exposes a click event.
-
-### Level 2: `SideNavBar` knows which item was clicked
-
-```kotlin
-@Composable
-fun SideNavBar(
-    activeScreen: TabletScreen,
-    onNavigate: (TabletScreen) -> Unit
-) {
-    val items = listOf(
-        TabletScreen.Device,
-        TabletScreen.Data,
-        TabletScreen.Repository,
-        TabletScreen.Settings
-    )
-
-    Column {
-        items.forEach { item ->
-            NavigationItem(
-                label = item.navLabel,
-                onClick = {
-                    onNavigate(item)
-                }
-            )
-        }
-    }
-}
-```
-
-Each `onClick` lambda captures its current `item`.
-
-If the Data row is clicked:
+Now apply the same pattern across several levels:
 
 ```text
-item == TabletScreen.Data
+ResearchTabletApp    owns navigation state and creates onNavigate
+    |
+    v
+TabletShell          forwards the current screen and onNavigate
+    |
+    v
+SideNavBar           connects each item to an onClick handler
+    |
+    v
+NavigationItem       displays a clickable navigation entry
 ```
 
-so the callback call becomes conceptually:
+Parent and child are relative terms: `TabletShell` is a child of `ResearchTabletApp` and a parent of `SideNavBar`.
+
+The example uses this screen type:
 
 ```kotlin
-onNavigate(TabletScreen.Data)
-```
-
-### Level 3: `TabletShell` forwards the callback
-
-```kotlin
-@Composable
-fun TabletShell(
-    activeScreen: TabletScreen,
-    onNavigate: (TabletScreen) -> Unit,
-    content: @Composable () -> Unit
-) {
-    Row {
-        SideNavBar(
-            activeScreen = activeScreen,
-            onNavigate = onNavigate
-        )
-
-        content()
-    }
+enum class TabletScreen(val navLabel: String) {
+    Device("Device"),
+    Data("Data"),
+    Repository("Repository"),
+    Settings("Settings")
 }
 ```
 
-This does not call `onNavigate`. It passes the same function value to `SideNavBar`.
+The screen composables such as `DeviceScreen()` and `DataScreen()` below stand for the app's existing screens. Compose imports are omitted.
 
-### Level 4: the app owns navigation state
+### 3.1 The parent owns navigation state and supplies the callback
 
 ```kotlin
 @Composable
@@ -223,31 +214,142 @@ fun ResearchTabletApp() {
 }
 ```
 
-### Full event sequence
+`currentScreenName` is the remembered state value. `currentScreen` is the enum value derived from it during composition. The parent passes that enum value as `activeScreen`, and supplies the lambda that will update the state as `onNavigate`.
 
-```text
-1. User taps the Data navigation item.
-2. Compose invokes NavigationItem's onClick callback.
-3. The callback invokes onNavigate(item).
-4. item is TabletScreen.Data.
-5. The event passes through TabletShell to ResearchTabletApp's callback.
-6. selectedScreen receives TabletScreen.Data.
-7. currentScreenName becomes "Data".
-8. Compose observes the state change.
-9. ResearchTabletApp recomposes.
-10. when (currentScreen) now displays DataScreen.
+`rememberSaveable` retains state across recompositions and also supports saving and restoring this string through supported activity or process recreation. It saves the state value, not the callback function.
+
+At this point, the navigation callback has been supplied, but its assignment has not run. The final trailing lambda supplies the UI content that `TabletShell` will display.
+
+### 3.2 The intermediate component forwards the callback
+
+```kotlin
+@Composable
+fun TabletShell(
+    activeScreen: TabletScreen,
+    onNavigate: (TabletScreen) -> Unit,
+    content: @Composable () -> Unit
+) {
+    Row {
+        SideNavBar(
+            activeScreen = activeScreen,
+            onNavigate = onNavigate
+        )
+
+        content()
+    }
+}
 ```
 
-Notice the separation of responsibilities:
+In `onNavigate = onNavigate`, the left side names `SideNavBar`'s parameter; the right side is the function value received by `TabletShell`. This forwards the same function without invoking it.
 
-```text
-NavigationItem knows that it was clicked.
-SideNavBar knows which item was clicked.
-ResearchTabletApp owns navigation state and decides what to display.
+`content()` is different: it invokes the composable content lambda now to describe the screen UI. A lambda's execution time depends on where it is called. Here, the content lambda runs during composition; the navigation lambda is invoked by a later click handler.
+
+### 3.3 The child connects a click to the selected item
+
+```kotlin
+@Composable
+fun SideNavBar(
+    activeScreen: TabletScreen,
+    onNavigate: (TabletScreen) -> Unit
+) {
+    val items = listOf(
+        TabletScreen.Device,
+        TabletScreen.Data,
+        TabletScreen.Repository,
+        TabletScreen.Settings
+    )
+
+    Column {
+        items.forEach { item ->
+            NavigationItem(
+                label = item.navLabel,
+                isSelected = item == activeScreen,
+                onClick = {
+                    onNavigate(item)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun NavigationItem(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.selectable(
+            selected = isSelected,
+            onClick = onClick
+        )
+    ) {
+        Text(if (isSelected) "$label (selected)" else label)
+    }
+}
 ```
+
+There are two event functions here. `NavigationItem` receives an `onClick: () -> Unit`, which needs no argument. `SideNavBar` supplies its body, `{ onNavigate(item) }`, which already has access to that row's `item` and the supplied `onNavigate` function.
+
+When the Data entry is clicked, that body calls `onNavigate(TabletScreen.Data)`. The parent-created function receives `TabletScreen.Data` as `selectedScreen` and assigns `selectedScreen.name` to `currentScreenName`.
+
+`NavigationItem` handles the click, `SideNavBar` supplies the event data, and the parent-created callback defines the state update.
+
+### 3.4 How the callback keeps access to parent state
+
+This is the connection to [Lesson 5, Section 16: Lambdas can capture surrounding values](lesson-05-callback-functions-lambdas-and-event-flow.md#16-lambdas-can-capture-surrounding-values):
+
+> A lambda can carry access to variables from the place where it was created.
+
+This retained access is called **capture**; a function together with its captured context is a **closure**.
+
+In our example, the parent's lambda can access the remembered state holder behind `currentScreenName`. Passing the lambda to a child preserves that access. The child does not need a separate state-holder parameter for the callback to update it.
+
+To make the holder visible, the parent could express the same state and callback without `by`:
+
+```kotlin
+val screenNameState = rememberSaveable {
+    mutableStateOf(TabletScreen.Device.name)
+}
+
+val navigate: (TabletScreen) -> Unit = { selectedScreen ->
+    screenNameState.value = selectedScreen.name
+}
+```
+
+Here, `navigate` retains access to `screenNameState`. Calling it later writes to that same holder. The earlier assignment `currentScreenName = selectedScreen.name` performs the corresponding update using delegated-property syntax.
+
+**The callback does not contain a frozen copy of the original screen name.** It retains access to the holder whose value can change. By comparison, the `activeScreen` parameter receives the enum value calculated for that composition. Updated display values are supplied during recomposition.
+
+When the child invokes the callback, its body executes as a normal function call using that captured access. There is no separate execution location called "the parent position," and no need to restart `ResearchTabletApp` before the assignment can happen. "Parent-defined" describes where the behavior was supplied and whose state it updates.
+
+A composable function finishes after describing its UI. While this UI remains active, Compose retains the remembered state and the UI retains its click handler, which can reach the navigation callback. That is why a later click still works. This does not mean the callback or state is kept forever after the UI is removed.
+
+### 3.5 The complete timeline: composition, click, and UI update
+
+Assume the app starts on Device and the user then selects Data:
+
+1. `ResearchTabletApp` runs to describe the initial UI.
+2. `rememberSaveable` supplies the navigation state holder, initially containing `"Device"`.
+3. The parent reads `currentScreenName` and derives `currentScreen = TabletScreen.Device`.
+4. The parent creates the `onNavigate` lambda. It captures access to the state holder; its body does not run yet.
+5. The parent passes the current screen value and the callback to `TabletShell`, which forwards them to `SideNavBar`.
+6. `SideNavBar` supplies each `NavigationItem` with a click lambda that captures that row's `item` and the `onNavigate` function.
+7. The UI is composed. The composable calls finish, while the displayed UI retains its click handlers and Compose retains the remembered state.
+8. The user clicks Data. The UI invokes that entry's `onClick` handler.
+9. The click handler calls `onNavigate(item)`, with `item` equal to `TabletScreen.Data`.
+10. The parent-created lambda runs. Its `selectedScreen` parameter receives `TabletScreen.Data`.
+11. Through its captured access, the lambda updates the remembered state: `currentScreenName = selectedScreen.name`, changing `"Device"` to `"Data"`.
+12. Compose observes the change and schedules recomposition of the UI that read the state. The click handler finishes.
+13. During recomposition, the parent reads the retained `"Data"` value and derives `currentScreen = TabletScreen.Data`. The state is not reset to its initial value.
+14. The updated screen value flows down. The Data entry is selected, and the content lambda's `when` chooses `DataScreen()`. Compose may skip child calls that do not need updating.
+15. Event callbacks may be reused or new instances may be supplied for future clicks. Recomposition does not itself invoke the `onNavigate` body.
+
+The distinction in the last step matters: running composable code again can create or supply a function value without executing that function's body. In this example, the navigation body runs when the click handler calls it.
+
+References: [Compose state and state hoisting](https://developer.android.com/develop/ui/compose/state), [Kotlin closures](https://kotlinlang.org/docs/lambdas.html#closures), and [Compose's execution and recomposition model](https://developer.android.com/develop/ui/compose/mental-model).
 
 ---
-
 ## 4. Nullable callbacks
 
 You may encounter:
@@ -265,7 +367,7 @@ onDeviceSelect       parameter name
 = null               default value when the caller omits it
 ```
 
-The extra parentheses group the whole function type before `?` makes it nullable:
+The extra parentheses group the whole function type before `?` makes the function value nullable:
 
 ```kotlin
 ((String) -> Unit)?
@@ -303,10 +405,10 @@ Use this when handling the event is required.
 Default no-operation callback:
 
 ```kotlin
-onDeviceSelect: (String) -> Unit = {}
+onDeviceSelect: (String) -> Unit = { _ -> }
 ```
 
-Use this when doing nothing is a valid default. Be careful: it can also hide wiring that was accidentally forgotten.
+Use this when doing nothing is a valid default. The `_` means "this callback receives a `String`, but this implementation ignores it." Be careful: a no-operation default can also hide wiring that was accidentally forgotten.
 
 Nullable callback:
 
@@ -320,7 +422,7 @@ For important user actions, a required callback is often clearest. A preview can
 
 ```kotlin
 DeviceScreen(
-    onDeviceSelect = {}
+    onDeviceSelect = { _ -> }
 )
 ```
 
@@ -352,11 +454,13 @@ A callback keeps that decision in the parent:
 ```kotlin
 DeviceScreen(
     viewModel = deviceViewModel,
-    onDeviceSelect = {
+    onDeviceSelect = { _ ->
         dataViewModel.clearDataScreen()
     }
 )
 ```
+
+The `_` means the parent receives the selected device name but does not need to use it for this particular effect.
 
 Inside `DeviceScreen`:
 
