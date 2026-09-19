@@ -1,461 +1,599 @@
-# Chat Discussion: Jetpack Compose State and File Exporting
+# Lesson 5 - Understanding Callbacks, from Kotlin to Compose
 
-**User:** can you see my code
+This is an alternative version of [the original Lesson 5](lesson-05-callback-functions-lambdas-and-event-flow.md). It follows one example: selecting a research device.
 
-**Assistant:** Yes, I can see your code.
+In Lesson 4, you wrote code like this inside a composable:
 
-I've explored your project, and it looks like you're building a **Research Measurement App** using Jetpack Compose and MVVM architecture.
-
-Here's a summary of what I've found:
-- **`MainActivity.kt`**: Contains your `ResearchViewModel`, which manages the app's state (`ResearchUiState`), and your main UI components like `ResearchScreen` and `ResearchScreenContent`. You're using `viewModelScope` for asynchronous tasks like connecting to a device and auto-saving data.
-- **`MeasurementRepository.kt`**: Handles the data logic. It includes the `Measurement` data class, a simulated measurement generator, and helper functions to convert measurements to and from CSV format.
-- **Data Persistence**: You've implemented an auto-save feature that stores measurements in a file named `autosave_measurements.csv` in the app's internal storage.
-- **Export**: There's a feature to export your measurements to a CSV file using the `ActivityResultContracts.CreateDocument` contract.
-
-Is there something specific you'd like me to help you with or review in your code?
-
----
-
-**User:** i do not understand why pendingCsvText should be a mutable data. is this necessary?
-
-**Assistant:** The `pendingCsvText` is used as a temporary "holding area" for your data while the system file picker is open. Here is why it was implemented that way and whether it is truly necessary.
-
-### 1. Why it is currently there
-The process of saving a file with `ActivityResultLauncher` happens in three steps:
-1. **The Trigger:** You click the "Export" button.
-2. **The System UI:** The app "pauses" its own UI and opens the Android system file picker.
-3. **The Callback (`onResult`):** After the user picks a location, the system returns to your app and executes the `onResult` code.
-
-Because the `onResult` block runs **after** the user interacts with the system, it needs a way to access the CSV text that was prepared when the button was first clicked.
-
-### 2. Why it is "Mutable Data" (`mutableStateOf`)
-- **Mutable:** Because it starts empty and you update it only when the button is clicked.
-- **State (`mutableStateOf`):** This is used so that the value is "remembered" by Compose across recompositions. If you used a regular `var`, it would be reset to `""` every time the screen refreshed.
-
-### 3. Is it necessary?
-**Strictly speaking, no.** In your specific code, you can simplify this.
-
-You already have a function `getCsvText` passed into `ResearchScreenContent`. You can call that function directly inside the `onResult` callback. This removes the need for `pendingCsvText` entirely.
-
-#### How to simplify it:
-In your `ResearchScreenContent`, you could change the launcher and button like this:
-
-```kotlin
-// 1. Remove the pendingCsvText state variable entirely
-
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        if (uri != null) {
-            // 2. Generate the CSV text right here when needed
-            val csvText = getCsvText()
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(csvText.toByteArray())
-            }
-            onExportMessage("CSV exported successfully.")
-        } else {
-            onExportMessage("CSV export cancelled.")
-        }
-    }
-)
-
-// ... inside the Button onClick ...
-Button(
-    onClick = {
-        val filename = if (uiState.sampleId.isNotBlank()) {
-            "${safeFilename(uiState.sampleId)}_measurements.csv"
-        } else {
-            "measurements.csv"
-        }
-        // 3. Just launch; no need to set a temporary variable
-        createCsvLauncher.launch(filename)
-    },
-    // ...
-)
-```
-
-### The Trade-off
-- **The "State" Approach (Current):** "Freezes" the data at the exact moment the user clicks the button. If measurements are being added in the background while the file picker is open, they won't be included.
-- **The "Function Call" Approach (Simplified):** Captures the measurements at the moment the user confirms the file location.
-
-For your app, the **simplified approach** is generally preferred because it removes unnecessary state and avoids triggering extra UI recompositions when you update `pendingCsvText`.
-
----
-
-**User:** when i trigger the file picker window, the main UI is still running, right?
-
-**Assistant:** Yes, exactly. This is a very important detail in Android development.
-
-Even though the system file picker covers your screen, your app's **process** is still alive and running in the background. Specifically:
-
-1. **The UI is "Paused":** Your `MainActivity` enters the `onPause` state. It's no longer drawing frames to the screen, but it hasn't been destroyed.
-2. **The ViewModel is Active:** Your `ResearchViewModel` and its `viewModelScope` are still fully operational.
-3. **The Acquisition Loop Continues:** If your `acquisitionState` is `RECORDING`, your `while` loop inside `startAcquisition` is still running. It will continue to add a new measurement every second.
-
-### Why this matters for your Export:
-
-If you use the `pendingCsvText` (State) approach:
-1. You click "Export" at 10:00:00. `pendingCsvText` captures 10 measurements.
-2. You take 15 seconds to pick a folder.
-3. At 10:00:15, you save the file.
-4. The saved file contains **10 measurements** (the ones present when you clicked).
-
-If you use the `getCsvText()` (Function Call) approach inside `onResult`:
-1. You click "Export" at 10:00:00.
-2. You take 15 seconds to pick a folder. Meanwhile, the loop adds 15 more measurements.
-3. At 10:00:15, you save the file.
-4. The saved file contains **25 measurements** (all data collected up until the exact moment of saving).
-
-### Which one is better?
-In research apps, the **Function Call** approach is usually better because it ensures the user gets the most up-to-date data possible at the moment they confirm the save. It also makes your UI code cleaner!
-
----
-
-**User:** but before file picker appearing, I have already run the measurementListToCsv function once and the converted result is stored in pendingCsvText, which no longer changes no matter if pendingCsvText is mutable or not, right?
-
-**Assistant:** You are 100% correct about the "snapshot" behavior: once that string is created and stored in `pendingCsvText`, **it is just a static piece of text.** It will not change even if your app continues to collect new data in the background.
-
-So, why is it marked as `mutableStateOf` and why do we use it? There are two technical reasons:
-
-### 1. The "Assignment" Problem (Mutable)
-In Kotlin, you cannot change a `val`. If `pendingCsvText` were a `val`, you couldn't do this inside the button:
-```kotlin
-pendingCsvText = measurementListToCsv(...) // Error: Val cannot be reassigned
-```
-We use a **mutable** state because we need to update it from its initial empty value (`""`) to the actual CSV data when the button is clicked.
-
-### 2. The "Memory" Problem (`remember`)
-This is the most important part for Android. When the file picker opens, your app might "recompose" (refresh the UI) or even be partially stopped.
-- If you used a regular variable (`var text = ""`), it would be reset to `""` when the screen refreshes.
-- By using `remember { mutableStateOf(...) }`, you are telling Compose: **"Save this value in a safe place so that when the file picker finishes and returns to this screen, the data is still there."**
-
-### To answer your question directly:
-You are right that the **content** of the text doesn't change once it's created. But the **variable** that holds it must be "mutable" so you can put the text in it, and it must be "State" so the app doesn't forget it while the file picker is open.
-
-### Why I still recommend the "No Variable" way:
-Even though your current way works, calling `getCsvText()` directly inside the `onResult` is cleaner because:
-1. **Memory:** You don't keep a giant CSV string sitting in your phone's RAM while the user is browsing folders.
-2. **Accuracy:** You save the data as it exists *right now* (when the user hits "Save"), not as it existed 30 seconds ago when they first clicked the button.
-
-It turns a "Snapshot of the past" into a "Live Save."
-
----
-
-**User:** why do not i just write like this:
-context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    outputStream.write(measurementListToCsv(uiState.measurements).toByteArray())
-                }
-
-**Assistant:** You absolutely should write it like that! In fact, that is the **recommended approach**.
-
-Here is why writing it directly inside the `onResult` block is better than using a `pendingCsvText` variable:
-
-### 1. It eliminates "Stale Data"
-If you use a variable, you capture the measurements at the moment the user clicks "Export." If the device is still measuring while the user is choosing a folder, those new measurements are missed.
-By calling `measurementListToCsv(uiState.measurements)` inside `onResult`, you generate the CSV at the **exact millisecond** the user hits "Save," ensuring every single data point is included.
-
-### 2. It simplifies your state management
-Every `mutableStateOf` you add makes the code slightly more complex to track. By removing `pendingCsvText`, you:
-- Remove one variable you have to manage.
-- Prevent an unnecessary UI "recomposition" that happens when you update that variable.
-- Make the `onClick` logic much shorter.
-
-### 3. It saves Memory (RAM)
-CSV files can get quite large.
-- **Variable approach:** You store the entire CSV string in the phone's memory while the file picker is open.
-- **Direct approach:** You only create the string at the moment it's needed, and once it's written to the file, it's immediately ready to be cleared from memory.
-
----
-
-### What the improved code looks like:
-
-**1. Remove the variable:**
-```kotlin
-// Delete this line
-// var pendingCsvText by remember { mutableStateOf("") }
-```
-
-**2. Update the Launcher:**
-```kotlin
-val createCsvLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.CreateDocument("text/csv"),
-    onResult = { uri: Uri? ->
-        if (uri != null) {
-            // Generate the data right here!
-            val csvContent = measurementListToCsv(uiState.measurements)
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(csvContent.toByteArray())
-            }
-            onExportMessage("CSV exported successfully.")
-        } else {
-            onExportMessage("CSV export cancelled.")
-        }
-    }
-)
-```
-
-**3. Update the Button:**
 ```kotlin
 Button(
-    onClick = {
-        val filename = if (uiState.sampleId.isNotBlank()) {
-            "${safeFilename(uiState.sampleId)}_measurements.csv"
-        } else {
-            "measurements.csv"
-        }
-        // Just launch! No need to store anything first.
-        createCsvLauncher.launch(filename)
-    },
-    enabled = uiState.measurements.isNotEmpty(),
-    modifier = Modifier.weight(1f)
+    onClick = { measurementCount++ }
 ) {
-    Text("Export CSV")
+    Text("Measure")
 }
 ```
 
-**Summary:** Your intuition is correct. Moving the logic into the callback makes the code more robust, more efficient, and easier to read.
+There are two blocks in this call:
 
----
+- `{ measurementCount++ }` describes what to do when the button is clicked.
+- `{ Text("Measure") }` describes what appears inside the button.
 
-**User:** but there you still stored the value first: val csvText = measurementListToCsv(uiState.measurements)
+The first block is used as a **callback**: a function supplied to other code so that code can invoke it when appropriate. Supplying the function does not, by itself, run its body.
 
-would not this also be a problem?
+We will first make that idea concrete in ordinary Kotlin, then bring it back to Compose. By the end, you should be able to read a callback's type, distinguish passing from calling, identify where its arguments come from, and trace a click through a child composable into parent-owned state.
 
-**Assistant:** That is a very sharp observation! You are right to notice that in my example, I still used a `val`.
+The Kotlin examples below are separate examples to run one at a time. Later snippets build on earlier definitions where stated. Section 8 supplies a complete Compose example with imports. ViewModels, StateFlow, coroutines, and navigation architecture are covered in the [companion architecture note](lesson-05-notes-callbacks-in-compose-architecture.md).
 
-However, there is a **huge technical difference** between using a `mutableStateOf` variable and a local `val` inside a callback.
+## 1. Start with a function you can call
 
-### 1. The "Life Span" (Memory)
-- **The Problematic Way (`mutableStateOf`):** This variable lives as long as your screen is open. If you click Export and then spend 2 minutes picking a folder, that giant CSV string is sitting in your phone's RAM for that entire 2 minutes.
-- **The Local `val` Way:** This variable only exists for the **milliseconds** it takes to run the code inside the curly braces `{ ... }`. As soon as the `onResult` function finishes, the phone's "Garbage Collector" sees that `csvText` is no longer needed and immediately frees up that memory.
-
-### 2. The "Timing" (Data Accuracy)
-The local `val` inside `onResult` doesn't exist until the user clicks "Save" in the file picker. This means it accurately captures any new data that arrived while the file picker was open.
-
-### Can you write it even shorter (Inline)?
-Yes! You can absolutely do what you suggested and remove the `val` entirely:
+A named function groups some work:
 
 ```kotlin
-onResult = { uri: Uri? ->
-    if (uri != null) {
-        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-            // NO VARIABLE AT ALL:
-            outputStream.write(measurementListToCsv(uiState.measurements).toByteArray())
+fun announceSelection() {
+    println("A device was selected")
+}
+
+fun main() {
+    announceSelection()
+}
+```
+
+When execution reaches `announceSelection()`, Kotlin runs that function's body. The parentheses are the function call.
+
+This function takes no arguments and returns `Unit`. `Unit` means there is no useful result for the caller to use; the purpose here is the printing action.
+
+## 2. A function can also be a value
+
+You already know how to put a string in a variable:
+
+```kotlin
+val deviceName = "BT-Sensor-01"
+```
+
+Kotlin also lets you put a function value in a variable:
+
+```kotlin
+fun main() {
+    val selectionAction: () -> Unit = {
+        println("A device was selected")
+    }
+
+    println("Before the call")
+    selectionAction()
+    println("After the call")
+}
+```
+
+Output:
+
+```text
+Before the call
+A device was selected
+After the call
+```
+
+Declaring `selectionAction` creates the function value. Its body runs only when `selectionAction()` is called.
+
+Read the declaration in three pieces:
+
+| Piece | Meaning |
+|---|---|
+| `selectionAction` | The variable holding the function value |
+| `() -> Unit` | The function type: no arguments, returns `Unit` |
+| `{ println("A device was selected") }` | The lambda expression that creates the function value |
+
+A **lambda expression** is a way of writing a function without declaring a function name. Here, `selectionAction` names the variable holding it.
+
+The distinction we will use throughout the lesson is:
+
+```kotlin
+selectionAction    // The function value: you can store it or pass it.
+selectionAction()  // A call: run that function's body now.
+```
+
+## 3. Pass that function into another function
+
+A function parameter can receive a function value, just as it can receive a string:
+
+```kotlin
+fun simulateDeviceSelection(onSelect: () -> Unit) {
+    println("1. Simulating a selection")
+    onSelect()
+    println("3. Selection handled")
+}
+
+fun main() {
+    val selectionAction: () -> Unit = {
+        println("2. Responding to the selection")
+    }
+
+    simulateDeviceSelection(onSelect = selectionAction)
+}
+```
+
+Output:
+
+```text
+1. Simulating a selection
+2. Responding to the selection
+3. Selection handled
+```
+
+Follow the handoff:
+
+1. `main` creates the function value and stores it in `selectionAction`.
+2. `main` passes that value into `simulateDeviceSelection`.
+3. Inside `simulateDeviceSelection`, the parameter `onSelect` refers to the supplied function value.
+4. `onSelect()` invokes it, so the message beginning with `2.` is printed.
+
+The supplied function is being used as a **callback**. `main` supplies the behaviour; `simulateDeviceSelection` chooses when to invoke it.
+
+This also makes `simulateDeviceSelection` a **higher-order function**: a function that takes another function as an argument, or returns one.
+
+Notice that this callback runs before `simulateDeviceSelection` returns. A callback does not have to run asynchronously or after a delay. Its receiver determines when it runs. A UI button waits for a click; our simulation calls it directly.
+
+### Write the lambda directly at the call site
+
+Using the same `simulateDeviceSelection` definition, we can replace `main` with:
+
+```kotlin
+fun main() {
+    simulateDeviceSelection(
+        onSelect = {
+            println("2. Responding to the selection")
         }
-        onExportMessage("CSV exported successfully.")
+    )
+}
+```
+
+The intermediate variable is optional. The lambda is now supplied directly as an argument.
+
+In `onSelect = { ... }`, the left side names the parameter declared by `simulateDeviceSelection`. The right side supplies the function value for that parameter. This is Kotlin's named-argument syntax.
+
+**Lambda describes how the function is written. Callback describes the role it plays.**
+
+## 4. Give the callback information about the event
+
+So far, our callback reports only that a selection happened. Now we want it to receive the selected device's name.
+
+Change its type from `() -> Unit` to `(String) -> Unit`:
+
+```kotlin
+fun simulateDeviceSelection(onSelect: (String) -> Unit) {
+    val deviceName = "BT-Sensor-01"
+    onSelect(deviceName)
+}
+
+fun main() {
+    simulateDeviceSelection(
+        onSelect = { selectedName ->
+            println("Selected: $selectedName")
+        }
+    )
+}
+```
+
+Output:
+
+```text
+Selected: BT-Sensor-01
+```
+
+`(String) -> Unit` means that the function requires one `String` argument and returns no useful result. The code invoking it must supply that string.
+
+There are two different parameters here:
+
+| Name | What it receives |
+|---|---|
+| `onSelect` | The function value supplied by `main` |
+| `selectedName` | The string supplied when that function is invoked |
+
+The value travels through this call:
+
+```text
+simulateDeviceSelection calls onSelect(deviceName)
+                                       |
+                              "BT-Sensor-01"
+                                       |
+The supplied lambda receives it as selectedName
+```
+
+`deviceName` and `selectedName` do not have to match. One is the variable used by the caller; the other is the lambda's local parameter name. The argument is passed by position.
+
+### The two arrows have different jobs
+
+Compare these fragments:
+
+```kotlin
+(String) -> Unit
+{ selectedName -> println(selectedName) }
+```
+
+In the **function type**, `->` separates the input types from the return type. In the **lambda expression**, `->` separates the parameter names from the body.
+
+Kotlin knows that `selectedName` is a `String` because the expected callback type is `(String) -> Unit`.
+
+## 5. Use the same mechanism in a Compose button
+
+Our simulation chose a device and immediately called the callback. A real button should call it when the user clicks.
+
+Here is a child composable that displays one device:
+
+```kotlin
+@Composable
+fun DeviceButton(
+    deviceName: String,
+    onSelect: (String) -> Unit
+) {
+    Button(
+        onClick = {
+            onSelect(deviceName)
+        }
+    ) {
+        Text(deviceName)
     }
 }
 ```
 
-### Why developers sometimes use the `val` anyway:
-Often, we use a `val` first just for **readability**. If a line of code gets too long (like the one above), it can be harder for a human to read.
+This has two levels of event handling:
 
-**But from the phone's perspective:**
-Writing `outputStream.write(measurementListToCsv(...))` and creating a local `val` are effectively **the same thing**. In both cases, the CSV string is created "on-the-fly" and deleted immediately after it is used.
+| Function parameter | Type | Meaning |
+|---|---|---|
+| `Button`'s `onClick` | `() -> Unit` | Run some work when clicked; no argument is supplied |
+| `DeviceButton`'s `onSelect` | `(String) -> Unit` | Report which device was selected |
 
-**The only "problem" is the `mutableStateOf` at the top of your screen, because that one is "permanent" memory.** If you've moved the logic into the `onResult` block (either inline or with a local `val`), you have solved the memory and data-sync problems!
+The `onClick` lambda connects them:
 
----
-
-**User:** i just realized since val csvText = measurementListToCsv(uiState.measurements) is inside rememberLauncherForActivityResult, it would exist no matter if the screen refresh or not, right?
-
-**Assistant:** Actually, it’s exactly the opposite! This is a subtle but very important part of how programming works.
-
-There is a big difference between the **instructions** (the code inside the curly braces) and the **data** (the `csvText` itself).
-
-### The "Recipe" Analogy
-Think of `rememberLauncherForActivityResult` like a **Recipe Book** that you put on your kitchen counter (`remember`).
-
-1. **The Instructions:** The code inside `{ uri -> ... }` is the **recipe**. Because you used `remember`, the recipe stays on the counter even if you leave the room and come back (a screen refresh).
-2. **The Execution:** The line `val csvText = ...` is like **chopping vegetables**. You only do it when you actually start cooking (when the user picks a file).
-3. **The Cleanup:** Once you finish the dish (the function finishes), you clean the kitchen. The chopped vegetables (`csvText`) are gone. You don't leave them sitting on the counter forever.
-
-### Why this is efficient:
-- **Across Refreshes:** If the screen refreshes 100 times, the **recipe** (the code) stays there, but **no CSV text is created**. You aren't "chopping vegetables" every time the screen refreshes.
-- **Only on Demand:** The variable `csvText` is only "born" the moment the user confirms the file location.
-- **Immediate Death:** As soon as the `onResult` block hits the final `}`, the `csvText` variable "dies." The memory it was using is released back to the phone.
-
-### Contrast with your original `mutableStateOf` way:
-If you put `pendingCsvText` at the top level of your screen:
-- It’s like taking those chopped vegetables and **storing them in a Tupperware container** in the middle of your counter.
-- They take up space **all the time**, whether you are cooking or not.
-- Every time you walk into the kitchen (screen refresh), you see that Tupperware container sitting there, taking up room.
-
-### Summary
-By putting `val csvText` inside the `onResult` block:
-1. It **does not exist** while the user is measuring.
-2. It **does not exist** while the screen is refreshing.
-3. It **only exists for a split second** when the file is being saved.
-
-That's why this approach is much better for your phone's memory! Does that distinction between the *code instructions* and the *actual data* make sense?
-
----
-
-**User:** sorry, i did not speak clearly. I mean the csvText is not dependant on the Main UI screen, right? no matter Main UI refreshes or not, csvText live until onResult finishes
-
-**Assistant:** Yes, you are exactly right. You've hit on the exact reason why this pattern is so robust.
-
-In Jetpack Compose, we call a screen refresh a **"Recomposition."** Here is how `csvText` relates to that:
-
-### 1. It is independent of refreshes
-Normal screen refreshes (like when a timer updates or you type a letter in the `Sample ID` box) **do not** run the code inside the `onResult` block.
-- The refresh runs the "UI Drawing" code.
-- The `onResult` block only runs when the **"Result Event"** happens (the user returns from the file picker).
-
-### 2. It is safe during execution
-Even if the screen *happened* to try and refresh at the exact same microsecond that the file was being saved:
-- The variable `csvText` is locked inside that specific execution block.
-- It will stay alive through every line of code inside those curly braces `{ ... }` until it reaches the final `}`.
-- The UI refresh cannot "reach in" and delete or change that local variable.
-
-### 3. Why this is the "Gold Standard"
-By writing it this way, you have separated your **Data Event** from your **UI State**:
-
-| Feature | `mutableStateOf` (Old Way) | Local `val` in `onResult` (New Way) |
-| :--- | :--- | :--- |
-| **Depends on UI Refreshes?** | **Yes.** Every refresh checks this variable. | **No.** It is invisible to the UI refresh. |
-| **Life Span** | Minutes (as long as screen is open). | Milliseconds (only while saving). |
-| **Risk of being reset?** | Risk of losing data if not `remember`ed correctly. | **Zero risk.** It's a standard Kotlin local variable. |
-
-**You expressed it perfectly:** The variable is born when the result comes back, it does its job regardless of what the UI is doing, and it dies as soon as the file is written. It is a clean, isolated "mission."
-
----
-
-**User:** now i have a question, would the main UI recompose when the code in onClick is running or it only recompose when there is no main UI code running?
-
-**Assistant:** This is a brilliant question that gets to the heart of how Android and Jetpack Compose actually work.
-
-The short answer is: **The Main UI cannot recompose while your `onClick` code is running.**
-
-Here is the "Why" and the "How" behind that:
-
-### 1. The "Single Thread" Rule
-Android handles all UI tasks (drawing, clicking, and recomposing) on a single thread called the **Main Thread** (or UI Thread). Because it is one single thread, it can only do one thing at a time.
-
-- If the thread is busy running the code inside your `onClick` curly braces, it **cannot** be running the code to refresh the screen.
-- They have to take turns.
-
-### 2. How the "Turn-Taking" Works
-Imagine a queue (a line) of tasks for the Main Thread:
-1. **Task A:** Run the code in the `onClick` block.
-2. **Task B:** Recompose the UI.
-
-When you update a state (like `uiState = ...`) inside the `onClick`:
-- Compose "marks" that the UI needs to be refreshed.
-- But it **waits** for your `onClick` block to reach the final `}`.
-- Only after the `onClick` is completely finished does the Main Thread look at its "To-Do list" and say, *"Okay, now I am free to handle that Recomposition."*
-
-### 3. The Benefit: "Batching"
-This is actually a great performance feature. If you update 5 different pieces of state inside one `onClick` block:
 ```kotlin
 onClick = {
-    state1 = "A"
-    state2 = "B"
-    state3 = "C"
-    // ... more code ...
+    onSelect(deviceName)
 }
 ```
-The UI **will not** refresh 5 times. It waits until the very end and refreshes **once**, showing all 5 changes at the same time. This is very efficient!
 
-### 4. The Danger: "UI Freezing"
-Because the UI cannot recompose while `onClick` is running, if you put a very "heavy" task in there (like a 5-second mathematical calculation or a network call), the app will look **frozen**. The user might click a button, and the button won't even show the "pressed" animation until your code finishes.
+When Compose runs `DeviceButton`, it supplies this lambda to `Button`. The body waits for the click. When invoked, it calls `onSelect` with the device name.
 
-**This is why we use Coroutines (`viewModelScope.launch`):**
-- If you put code inside a `launch { ... }`, the `onClick` block finishes **immediately** (in microseconds).
-- The Main Thread is then free to refresh the UI.
-- The heavy work happens "on the side" (usually on a background thread), and only when it finishes does it send a message back to the Main Thread to update the UI again.
+The lambda can use `deviceName` even though that variable is declared outside its body. This is called **capturing** a surrounding variable.
 
-### Summary for your App:
-In your code:
+Capturing does not always mean freezing a value at the moment the lambda is created. For example, a captured local `var` can be read after its value changes. In this component, `deviceName` is a read-only function parameter; when Compose updates the component with another name, its click handler must reflect that updated input.
+
+### Why the wrapper is needed
+
+You cannot use `onClick = onSelect` here: their types differ. `Button` requires a function with no arguments, while `onSelect` requires a string.
+
+The wrapper `{ onSelect(deviceName) }` is a no-argument function that supplies the string when it runs.
+
+You also cannot use `onClick = onSelect(deviceName)`. That expression is a function call whose result is `Unit`, while `onClick` requires `() -> Unit`. **This version fails to compile.**
+
+### What is the block after `Button(...)`?
+
+It is another lambda, passed to the button's `content` parameter. Kotlin allows a lambda for the final function parameter to be written outside the parentheses. This is **trailing lambda syntax**.
+
+The button above can also be written as:
+
 ```kotlin
-onClick = {
-    val filename = ...
-    createCsvLauncher.launch(filename) // This finishes very fast
+Button(
+    onClick = { onSelect(deviceName) },
+    content = { Text(deviceName) }
+)
+```
+
+`content` is composable UI content; `onClick` is ordinary event-handling code. Compose uses the content to describe the button's UI, including during recomposition. The click handler runs in response to a click.
+
+## 6. Let the parent decide what changes
+
+In this lesson, **parent** means the composable that calls a child composable. It does not refer to class inheritance.
+
+`DeviceButton` knows which device it displays, but it does not need to decide how the rest of the app responds to a selection. The parent supplies that behaviour:
+
+```kotlin
+@Composable
+fun DeviceSelectionScreen() {
+    var selectedDevice by remember { mutableStateOf("") }
+
+    Column {
+        Text("Selected: $selectedDevice")
+
+        DeviceButton(
+            deviceName = "BT-Sensor-01",
+            onSelect = { selectedName ->
+                selectedDevice = selectedName
+            }
+        )
+    }
 }
 ```
-1. The `onClick` runs and finishes in a fraction of a millisecond.
-2. The Main Thread is immediately free.
-3. Because you launched the file picker, the next thing the Main Thread does is "Pause" your UI and show the System File Picker.
 
-**So, the UI is never "stuck" because your `onClick` code is very lightweight!**
+The parent creates the state and supplies a lambda that updates it. The child invokes that lambda when clicked.
 
----
+Trace one click:
 
-**User:** But the launcher of file picker is different. although it is called in onClick. the main UI program continues to run when the file picker window opens. They are running on different threads, right?
+```text
+User clicks the button
+  -> Button invokes its onClick lambda
+  -> that lambda calls onSelect("BT-Sensor-01")
+  -> the parent's supplied lambda receives selectedName
+  -> selectedDevice is assigned "BT-Sensor-01"
+  -> the state change schedules recomposition for UI that reads it
+  -> the displayed selection updates
+```
 
-**Assistant:** You are touching on a very sophisticated part of Android: the difference between **Threads**, **Processes**, and **Activities**.
+Writing a lambda inside the parent does not make it execute when the parent is composed. It defines the behaviour that the child can invoke.
 
-Here is the breakdown of what is actually happening when that file picker pops up.
+### Which variable should change?
 
-### 1. It’s not just a Thread; it’s a separate Activity
-When you call `createCsvLauncher.launch()`, your app is telling the Android OS: *"Hey, I need to open the System File Picker."*
+In this lambda:
 
-The File Picker is usually a completely separate **Activity** (and often a separate **Process**) managed by the Android System.
-- **Your App:** Is still "alive" in the background.
-- **The File Picker:** Is now the "Foreground" application.
+```kotlin
+onSelect = { selectedName ->
+    selectedDevice = selectedName
+}
+```
 
-### 2. Is your App still "Running"? (The Lifecycle)
-This is the tricky part. In Android, your app enters a state called **`onPause`** (and then usually **`onStop`**) when the file picker covers it.
-- **Drawing:** Your app **stops drawing** to the screen. Recomposition (refreshing the UI) is effectively paused because there is no screen for it to draw on!
-- **Code:** Your background code (like your `while` loop for measurement) **continues to run**.
+`selectedName` is the incoming argument. Like an ordinary function parameter, it cannot be reassigned. `selectedDevice` is the parent's state variable, and that is what we update.
 
-### 3. Are they on different Threads?
-- **The File Picker:** Runs on its own threads in its own system process.
-- **Your App's Main Thread:** Is actually "idling." It's not drawing anything, but it's waiting for the system to tell it when the user is done with the file picker.
-- **Your App's Background Threads (Coroutines):** This is where your measurement loop lives. It is running on a different thread than the UI, which is why it can keep adding data even while the app is "hidden."
+The callback can access `selectedDevice` because it captures the surrounding state. The child does not need direct access to that state variable.
 
-### 4. What happens to Recomposition?
-If your background loop adds a measurement while the file picker is open:
-1. The `uiState` updates in memory.
-2. Compose "notes" that a refresh is needed.
-3. **But it doesn't actually recompose yet.** It waits until your Activity comes back to the foreground.
-4. The moment you close the file picker and see your app again, Compose says: *"Aha! The data changed while I was away!"* and it performs one big recomposition to catch up.
+## 7. Send state down and report events up
 
-### Summary: The "Two Engines"
-Think of your app like a car with two engines:
-1. **The UI Engine (Main Thread):** This engine turns off when you park the car (open the file picker).
-2. **The Background Engine (Coroutines):** This engine stays running (collecting data) while the car is parked.
+We can let `DeviceButton` display whether it is selected by adding an `isSelected: Boolean` parameter. The parent calculates that value from its state and passes it down.
 
-When you get back in the car (close the file picker), the **UI Engine** turns back on, looks at the dashboard (the data collected by the other engine), and updates the display immediately.
+The relationship becomes:
 
-**So, you were right:** They are independent. The file picker doesn't "freeze" your background logic, but it does "pause" the visual part of your program.
+```text
+Parent owns selectedDevice
+  |
+  | deviceName and isSelected go down as inputs
+  v
+Child displays the device
+  |
+  | child invokes the supplied callback with the selected name
+  v
+Parent's callback updates selectedDevice
+```
 
----
+This is what **state flows down, events flow up** means. The callback function itself is passed down to the child; invoking it lets the child report an event to the parent's handler.
 
-**User:** but if main ui stops to run and not recompose on it is in onClick and file picker, why val csvText may be lost in our previous method? your reason why we should not use val is not persuasive in this case
+Keeping the selection state in the parent lets several children share it. Moving state from a child to its caller is called **state hoisting**.
 
-**Assistant:** You are making a very fair point. If your Activity is merely **Paused**, it doesn't just "forget" its variables. You are right that the reason "it might be lost" isn't the most persuasive one if we only look at a perfectly stable situation.
+The child remains reusable: another parent could supply a callback that logs the selection or starts an operation. The child still reports the same event.
 
-However, in Android development, we have to worry about the **"Unstable"** situations. There are three specific reasons why your intuition about using `val` (outside of a `remember` or a callback) becomes a problem:
+## 8. Complete Compose example
 
-### 1. The "Rotation" Problem (Configuration Change)
-Imagine this:
-1. You click "Export."
-2. The File Picker opens.
-3. While the File Picker is open, you **rotate your phone** from Portrait to Landscape.
+Add this code to a Kotlin file in your existing Compose project, after its `package` declaration. It uses Material 3. Display it by calling `DeviceSelectionScreen()` inside the theme block in your activity's existing `setContent` block, as in Lesson 4.
 
-In Android, rotating the phone **destroys and recreates** your Activity.
-- If you stored your CSV in a simple `val` or `var` (not `remember`ed), it is **completely wiped out**.
-- When you pick the file and return, the app crashes or saves an empty file because that variable was "born" in an Activity that no longer exists.
-- By calculating the CSV inside the `onResult` callback, it doesn't matter if the Activity was recreated—the callback will just look at the *current* `uiState` and generate a fresh file.
+This version replaces the earlier definitions of `DeviceButton` and `DeviceSelectionScreen`; do not paste both versions into the same file. It demonstrates selection only, without connecting to physical hardware.
 
-### 2. The "Process Death" Problem
-If the user opens the File Picker and then gets a phone call, or opens Instagram for a few minutes, Android might **kill your app's process** to save RAM.
-- When the user returns to your app, Android tries to "restore" it.
-- Again, any simple `val` is gone.
-- `mutableStateOf` (if used with `rememberSaveable`) can survive this, but it's a lot of extra work to save a giant CSV string.
-- Calculating it in `onResult` is "lazy" in a good way—it only happens when it's actually time to write the bytes.
+```kotlin
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
-### 3. The "Stale Data" (The most persuasive reason)
-This is the one that applies even if the phone doesn't rotate.
-- Your app is a **Live Measurement App**.
-- Your background loop is still adding data while the user is looking at the File Picker.
-- **The "Old Way" (onClick):** You generate the CSV at 10:00 AM. The user takes a minute to find a folder. The file is saved at 10:01 AM, but it is **missing** 60 seconds of data.
-- **The "New Way" (onResult):** The CSV is generated at 10:01 AM. It includes every single measurement up to that exact second.
+@Composable
+fun DeviceSelectionScreen() {
+    var selectedDevice by remember { mutableStateOf("") }
 
-### Conclusion
-You are right: If we lived in a perfect world where phones never rotated, apps were never killed, and data never updated in the background, your original way would be fine!
+    Column {
+        Text(
+            text = if (selectedDevice.isEmpty()) {
+                "No device selected"
+            } else {
+                "Selected: $selectedDevice"
+            }
+        )
 
-But because Android is "messy," we use the **onResult** approach because it is **"Self-Healing."** It doesn't care what happened while the user was away—it just looks at the data right now and saves it.
+        DeviceButton(
+            deviceName = "BT-Sensor-01",
+            isSelected = selectedDevice == "BT-Sensor-01",
+            onSelect = { selectedName ->
+                selectedDevice = selectedName
+            }
+        )
 
-Does the "Rotation/Recreation" risk make the `onResult` approach seem more necessary now?
+        DeviceButton(
+            deviceName = "BT-Sensor-02",
+            isSelected = selectedDevice == "BT-Sensor-02",
+            onSelect = { selectedName ->
+                selectedDevice = selectedName
+            }
+        )
+
+        Button(
+            onClick = { selectedDevice = "" },
+            enabled = selectedDevice.isNotEmpty()
+        ) {
+            Text("Clear selection")
+        }
+    }
+}
+
+@Composable
+fun DeviceButton(
+    deviceName: String,
+    isSelected: Boolean,
+    onSelect: (String) -> Unit
+) {
+    Button(
+        onClick = { onSelect(deviceName) }
+    ) {
+        Text(
+            text = if (isSelected) {
+                "$deviceName (selected)"
+            } else {
+                deviceName
+            }
+        )
+    }
+}
+```
+
+Try these actions:
+
+1. Initially, the screen displays “No device selected” and the clear button is disabled.
+2. Tap `BT-Sensor-02`. The heading and that button's label show the selection.
+3. Tap `BT-Sensor-01`. The selection moves to that device.
+4. Tap “Clear selection”. Both device labels return to normal and the clear button becomes disabled.
+
+`remember` retains state across recompositions. This example does not preserve the selection across activity recreation; that is a separate state-saving concern.
+
+## 9. Recognize alternative syntax
+
+Once you understand the explicit form, these shorter forms become easier to read.
+
+### `it` names an implicit single parameter
+
+At a call site expecting `(String) -> Unit`, these callbacks do the same work:
+
+```kotlin
+onSelect = { selectedName -> selectedDevice = selectedName }
+onSelect = { selectedDevice = it }
+```
+
+These are alternative argument fragments, not two arguments to supply together. Kotlin can infer the one parameter from the expected function type, so it can name that parameter `it`.
+
+If the handler does not need the string, make that clear with `_`:
+
+```kotlin
+onSelect = { _ -> println("A selection happened") }
+```
+
+You may also see `{ println("A selection happened") }` in this position. It still accepts the string required by the expected type; its body simply ignores it.
+
+### `::` refers to a named function
+
+A callback can use an existing named function instead of a lambda. With the `(String) -> Unit` version of `simulateDeviceSelection` from Section 4:
+
+```kotlin
+fun printSelectedDevice(deviceName: String) {
+    println("Selected: $deviceName")
+}
+
+fun main() {
+    simulateDeviceSelection(onSelect = ::printSelectedDevice)
+}
+```
+
+`::printSelectedDevice` supplies a function reference. `printSelectedDevice("BT-Sensor-01")` calls the function.
+
+If you already have a function value stored in `selectionAction`, pass `selectionAction` directly. It does not need `::`.
+
+### Matching types allow direct forwarding
+
+When a component receives `onClear: () -> Unit`, it can give that function directly to a button:
+
+```kotlin
+@Composable
+fun ClearSelectionButton(onClear: () -> Unit) {
+    Button(onClick = onClear) {
+        Text("Clear selection")
+    }
+}
+```
+
+`onClick = { onClear() }` would also work here. The wrapper is useful if you need extra work or need to supply an argument. Direct forwarding is enough when the types match and there is nothing to add.
+
+## 10. Practice: predict, explain, and modify
+
+### Exercise 1: predict the order
+
+Before running this Kotlin program, write down its output:
+
+```kotlin
+fun reportSelection(onSelect: (String) -> Unit) {
+    println("B")
+    onSelect("BT-Sensor-02")
+    println("D")
+}
+
+fun main() {
+    val handler: (String) -> Unit = { name ->
+        println("C: $name")
+    }
+
+    println("A")
+    reportSelection(onSelect = handler)
+}
+```
+
+Then identify who supplies the function and who supplies the string.
+
+### Exercise 2: explain the type mismatch
+
+Inside `DeviceButton`, why does this argument fail to compile?
+
+```kotlin
+onClick = onSelect(deviceName)
+```
+
+Write the correct argument and explain when its body runs.
+
+### Exercise 3: extend the UI
+
+Add a third device, `BT-Sensor-03`, to the complete Compose example. It should show “(selected)” when selected, and the other devices should lose that label.
+
+Do you need a separate state variable for each button?
+
+### Exercise 4: distinguish event data from state
+
+In the complete example, explain the roles of:
+
+```text
+deviceName
+onSelect
+selectedName
+selectedDevice
+```
+
+### Answers
+
+**1.** The output is:
+
+```text
+A
+B
+C: BT-Sensor-02
+D
+```
+
+`main` supplies the function stored in `handler`. `reportSelection` supplies the string when it calls `onSelect`. Creating `handler` does not print `C`.
+
+**2.** `onSelect(deviceName)` is a call returning `Unit`; `onClick` requires a function of type `() -> Unit`. The correct argument is:
+
+```kotlin
+onClick = { onSelect(deviceName) }
+```
+
+The wrapper body runs when the button invokes it in response to a click.
+
+**3.** Add this call inside the existing `Column`:
+
+```kotlin
+DeviceButton(
+    deviceName = "BT-Sensor-03",
+    isSelected = selectedDevice == "BT-Sensor-03",
+    onSelect = { selectedName ->
+        selectedDevice = selectedName
+    }
+)
+```
+
+No additional state variable is needed. One `selectedDevice` value represents the single selection and determines every button's `isSelected` input.
+
+**4.** `deviceName` is the child's input identifying its device. `onSelect` holds the callback supplied by the parent. `selectedName` receives the string when that callback runs. `selectedDevice` is the parent's observable state, updated by the callback.
+
+## 11. Quick reference
+
+| When reading code, ask… | In our example… |
+|---|---|
+| What function type is required? | `onSelect: (String) -> Unit` |
+| Who supplies the behaviour? | `DeviceSelectionScreen` supplies the lambda |
+| Who invokes it? | `DeviceButton`'s click handler calls `onSelect(deviceName)` |
+| Who supplies the argument? | The child supplies its `deviceName` |
+| What changes? | The lambda updates the parent's `selectedDevice` state |
+
+For further detail, see the official [Kotlin function and lambda documentation](https://kotlinlang.org/docs/lambdas.html), [Compose button guide](https://developer.android.com/develop/ui/compose/components/button), and [Compose state and state-hoisting guide](https://developer.android.com/develop/ui/compose/state).
+
+Continue with the [companion architecture note](lesson-05-notes-callbacks-in-compose-architecture.md) when you are ready to follow callbacks through multiple composables and connect them to ViewModels and asynchronous work.

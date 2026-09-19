@@ -926,7 +926,123 @@ Callbacks are often called later, but "callback" does not mathematically guarant
 
 ---
 
-## 13. `onClick` is a callback
+## 13. Lambdas keep access to variables where they are created
+
+A callback may run after the function that created it has finished. How does it still access variables from that function?
+
+A lambda can use variables available where it is created. It keeps access to the variables it uses from outside its body, even if it is passed to another function and called later. This is called **capture**.
+
+### Access comes from where the lambda is created
+
+**Example 1: capturing a variable**
+
+Here, the lambda is created inside `DeviceButton`, and it uses the function's `deviceName` parameter:
+
+```kotlin
+@Composable
+fun DeviceButton(deviceName: String) {
+    Button(
+        onClick = {
+            println(deviceName)
+        }
+    ) {
+        Text(deviceName)
+    }
+}
+```
+
+`Button` receives this lambda as its `onClick` callback. Later, when the user clicks, the callback still has access to `deviceName`, even though the original `DeviceButton` call has finished. `Button` does not need to pass the name into the callback; its function type is `() -> Unit`.
+
+**Example 2: receiving an argument instead**
+
+In the example above, the lambda accesses `deviceName` from where it was created. Compare this with a lambda whose caller supplies the name:
+
+```kotlin
+val showDevice: (String) -> Unit = { name ->
+    println(name)
+}
+
+showDevice("BT-Sensor-01")
+```
+
+Here, `name` is the lambda's own parameter. The function type `(String) -> Unit` means the caller must supply a string. Each call can supply a different name; the lambda does not capture a name from outside its body.
+
+The difference is **where the information comes from**: capture gives access to a variable from where the lambda was created; a parameter receives an argument from the caller. A callback can use both mechanisms together, **receiving event data as an argument while retaining access to parent-owned state through capture.** The parent-child example below shows this combination.
+
+### A captured mutable variable can change
+
+Capture does not always mean keeping a frozen copy of a value. This ordinary Kotlin example shows a lambda reading and updating a captured `var`:
+
+```kotlin
+fun main() {
+    var count = 0
+    val increaseCount = { count++ }
+
+    count = 10
+    increaseCount()
+
+    println(count) // 11
+}
+```
+
+`increaseCount` keeps access to the same `count` variable. When called, it increments the current value, `10`, rather than a separate copy of the initial `0`.
+
+This does not contradict Section 11's rule that lambda parameters are read-only. Here, `count` is a `var` declared outside the lambda, not an input parameter. A captured `val` still cannot be reassigned.
+
+### Why a child can invoke a callback that updates parent state
+
+A parent-created callback can use the same mechanism to update state declared in the parent:
+
+```kotlin
+@Composable
+fun DeviceParent() {
+    var selectedDevice by remember { mutableStateOf("") }
+
+    DeviceSelectButton(
+        deviceName = "BT-Sensor-01",
+        onSelect = { selectedName ->
+            selectedDevice = selectedName
+        }
+    )
+}
+
+@Composable
+fun DeviceSelectButton(
+    deviceName: String,
+    onSelect: (String) -> Unit
+) {
+    Button(onClick = { onSelect(deviceName) }) {
+        Text(deviceName)
+    }
+}
+```
+
+The parent supplies the callback function. The child calls `onSelect(deviceName)`, supplying the `deviceName` value received as `selectedName`. Through capture, the callback also retains access to the state holder of `selectedDevice`, so its body can update that state without rerunning the parent first.
+
+Information reaches the callback in two ways: **`selectedName` comes from its caller; `selectedDevice` comes from where the lambda was created.** The architecture note develops how that state update leads to UI changes.
+
+Capturing a function parameter such as `deviceName` keeps the value from that particular function call. It does not automatically switch to a new call's parameter value. When Compose recomposes `DeviceButton` with a different name, it supplies the button with a callback that uses the updated name.
+
+### Applying capture to a navigation menu
+
+In a navigation menu, each click lambda can use both the current loop item and the callback available where it is created:
+
+```kotlin
+items.forEach { item ->
+    NavigationItem(
+        label = item.navLabel,
+        onClick = {
+            onNavigate(item)
+        }
+    )
+}
+```
+
+Each click lambda captures the `item` for its own iteration and the `onNavigate` function. When clicked later, it calls that function with that item's value.
+
+---
+
+## 14. `onClick` is a callback
 
 The simplified shape of `Button` is similar to:
 
@@ -966,7 +1082,7 @@ The `Text("Measure")` block is not the click behavior. It is the button's UI con
 
 ---
 
-## 14. Trailing lambda syntax
+## 15. Trailing lambda syntax
 
 Kotlin allows the final lambda argument to be placed outside the parentheses.
 
@@ -1043,7 +1159,7 @@ content()
 
 ---
 
-## 15. Creating a reusable composable with callbacks
+## 16. Creating a reusable composable with callbacks
 
 A reusable UI component should usually receive the data it displays and callbacks for the events it can produce.
 
@@ -1116,78 +1232,6 @@ The child does not need to know where state is stored. It only needs:
 ```text
 data to display
 callback to report an event
-```
-
----
-
-## 16. Lambdas can capture surrounding values
-
-A lambda can use values declared outside it:
-
-```kotlin
-val deviceName = "BT-Sensor-01"
-
-Button(
-    onClick = {
-        println(deviceName)
-    }
-) {
-    Text("Show device")
-}
-```
-
-The lambda **captures** `deviceName`.
-
-A navigation menu can use the same idea:
-
-```kotlin
-items.forEach { item ->
-    NavigationItem(
-        label = item.navLabel,
-        onClick = {
-            onNavigate(item)
-        }
-    )
-}
-```
-
-Each callback captures the `item` for its own iteration.
-
-The important idea is that the callback may run later.
-
-For example:
-
-```kotlin
-@Composable
-fun DeviceButton(deviceName: String) {
-    Button(
-        onClick = {
-            println(deviceName)
-        }
-    ) {
-        Text(deviceName)
-    }
-}
-```
-
-When `DeviceButton` runs, it creates the `onClick` lambda. The lambda uses `deviceName`, even though `deviceName` was declared outside the lambda.
-
-The button appears on screen first. Later, when the user clicks the button, the lambda runs and still has access to `deviceName`.
-
-That is what capturing means:
-
-```text
-A lambda can remember values from the place where it was created.
-The callback can use those values later, when the event happens.
-```
-
-In Compose, if `deviceName` changes, Compose may run `DeviceButton` again. This is recomposition. During recomposition, Compose may create a new `onClick` lambda that captures the new `deviceName`.
-
-For simple event handlers, you usually do not need to manage this manually. The main thing to remember is:
-
-```text
-The lambda is created now but this callback may run later.
-The values it captured during creation can be remembered and used when it runs.
 ```
 
 ---
