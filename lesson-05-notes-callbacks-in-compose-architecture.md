@@ -12,7 +12,8 @@ We start with one parent and one child, explain why state may belong in the pare
 
 **核心理解**：Parent 把 value 和 callback 传给 child。发生 event 时，child 调用 callback，并把获取的 event data 作为参数传入 callback。
 Callback 中的代码更新 MutableState，Compose 检测到状态变化后，安排读取该状态的 UI 重新执行，也就是 recomposition。
-重要：callback 保留了对 parent 中相关 state 的访问，因此即使由 child 调用，它仍然可以更新这些 state。
+
+特别的：callback 保留了对 parent 中相关 state 的访问，因此即使由 child 调用，它仍然可以更新这些 state。
 
 A **parent** composable calls a **child** composable. 
 Here, `DeviceList` is the parent and it calls the child `DeviceRow`.
@@ -97,7 +98,7 @@ User clicks DeviceRow
 
 The **event** is the selection action; the **event data** is the `deviceName` passed as the callback argument. The callback receives that value as `selectedName` and assigns it to `selectedDevice`. These names do not need to match.
 
-**The parent supplies the callback function; the child supplies its argument when calling it.** Writing `{ selectedName -> ... }` declares a parameter that will receive a value later. The child supplies that value by calling `onSelect(deviceName)`.
+**The parent supplies the callback function; the child supplies its argument when calling it.** Writing `{ selectedName -> ... }` declares a parameter that will receive a value later. The child supplies that value by `deviceName` when calling `onSelect(deviceName)`.
 
 In this example, `deviceName` originally came from the parent as a separate input to the child. In other cases, the child can report a value from user interaction, such as entered text or a selected item. The callback mechanism is the same.
 
@@ -107,7 +108,7 @@ This is an ordinary function call. Calling the callback runs its body as part of
 
 As [Lesson 5, Section 13: Lambdas keep access to variables where they are created](lesson-05-callback-functions-lambdas-and-event-flow.md#13-lambdas-keep-access-to-variables-where-they-are-created) explains, a lambda can carry access to variables from the place where it was created. This retained access is called **capture**; a function together with its captured context is a **closure**.
 
-In `DeviceList`, the lambda `{ selectedName -> selectedDevice = selectedName }` captures access to the remembered state holder behind `selectedDevice`. Passing the lambda to `DeviceRow` preserves that access. The child only needs to invoke `onSelect(deviceName)` for the supplied body to update the holder. `selectedName` is the argument received at invocation; access to the state holder is captured when the lambda is created.
+In `DeviceList`, the lambda `{ selectedName -> selectedDevice = selectedName }` captures access to the remembered state holder behind `selectedDevice`. Passing the lambda to `DeviceRow` preserves that access. The child only needs to invoke `onSelect(deviceName)` for the supplied body to update the holder. `selectedName` is the argument received at invocation; access to the `selectedDevice` state holder is captured when the lambda is created.
 
 To make the holder visible, here is the same parent written without `by`, using the `DeviceRow` from Section 1.1:
 
@@ -138,7 +139,7 @@ A composable function finishes after describing its UI. While this UI remains ac
 
 ### 1.4 The state change updates the UI through recomposition
 
-When the selection changes, Compose schedules the affected UI to recompose. **Recomposition** means running the relevant composable code again using the updated state. The parent now supplies `isSelected = true`, so the row displays its selected appearance. Compose can skip components that do not need updating.
+When selection changes the state, Compose schedules the affected UI to recompose. **Recomposition** means running the relevant composable code again using the updated state. The parent now supplies `isSelected = true`, so the row displays its selected appearance. Compose can skip components that do not need updating.
 
 The child has received a Boolean value and a function, rather than direct access to the parent's state holder. It reports the selection through that function. A callback could instead reject the selection or only log it; invoking a callback does not itself guarantee a state change.
 
@@ -146,7 +147,9 @@ The child has received a Boolean value and a function, rather than direct access
 
 ## 2. State hoisting: choosing who controls the value
 
-Section 1 started with state already in the parent. **State hoisting** is how we arrive at that arrangement: move state out of a child when another component needs to read or control it. For state shared by several children, choose a common parent that can serve them.
+Section 1 started with state already in the parent. This is very useful if multiple childs share the same state. **State hoisting** is how we arrive at that arrangement: 
+
+For those with state inside a child, we can move state out of the child if other components also need to read or control this state. For state shared by several children, choose a common parent that can serve them.
 
 Consider a text input that owns its value:
 
@@ -216,7 +219,7 @@ SideNavBar           connects each item to an onClick handler
 NavigationItem       displays a clickable navigation entry
 ```
 
-Parent and child are relative terms: `TabletShell` is a child of `ResearchTabletApp` and a parent of `SideNavBar`.
+**Parent and child are relative terms**: `TabletShell` is a child of `ResearchTabletApp` and a parent of `SideNavBar`.
 
 The example uses this screen type:
 
@@ -339,7 +342,7 @@ When the Data entry is clicked, that body calls `onNavigate(TabletScreen.Data)`.
 
 `NavigationItem` handles the click, `SideNavBar` supplies the event data, and the parent-created callback defines the state update.
 
-The callback retains access to the state holder behind `currentScreenName` through capture, just as `DeviceList`'s callback did in Section 1.3. Forwarding it through intermediate components preserves that access.
+The callback retains access to the state holder of `currentScreenName` through capture, just as `DeviceList`'s callback did in Section 1.3. Forwarding it through intermediate components preserves that access.
 
 ### 3.4 The complete timeline: composition, click, and UI update
 

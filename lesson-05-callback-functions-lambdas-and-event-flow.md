@@ -1019,7 +1019,7 @@ fun DeviceSelectButton(
 
 The parent supplies the callback function. The child calls `onSelect(deviceName)`, supplying the `deviceName` value received as `selectedName`. Through capture, the callback also retains access to the state holder of `selectedDevice`, so its body can update that state without rerunning the parent first.
 
-Information reaches the callback in two ways: **`selectedName` comes from its caller; `selectedDevice` comes from where the lambda was created.** The architecture note develops how that state update leads to UI changes.
+**Information reaches the callback in two ways**: `selectedName` receives the value passed by the child when it invokes the callback; the callback retains access to the parent’s `selectedDevice` state where it was created.The architecture note develops how that state update leads to UI changes.
 
 Capturing a function parameter such as `deviceName` keeps the value from that particular function call. It does not automatically switch to a new call's parameter value. When Compose recomposes `DeviceButton` with a different name, it supplies the button with a callback that uses the updated name.
 
