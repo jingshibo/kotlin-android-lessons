@@ -802,38 +802,23 @@ repository/data
 
 For now, we only prepare this folder as an architectural home.
 
-We are not implementing full dependency injection in this lesson.
+We have placed shared runtime state and its operations inside `ResearchRuntimeStateManager`. But defining this class does not automatically make its state shared. If each ViewModel creates its own manager, each gets a separate state holder.
 
-But before we continue into the `data`, `device`, `processing`, and `ml` folders, there is one important architecture question to understand:
-
-```text
-When several parts of the app need the same object,
-who creates that object,
-and how do the other parts get access to it?
-```
+How do we make sure the ViewModels use the same manager instance?
 
 ---
 
-## 11. Shared app object instances
+## 11. How ViewModels share the same runtime objects
 
-Some objects should not be created again and again.
+To share this runtime state, the ViewModels need access to the same `ResearchRuntimeStateManager` object. This raises two questions: who creates that object, and how do the ViewModels receive it?
 
-This applies to both:
-
-```text
-runtime managers
-repositories
-```
-
-For example, if two ViewModels need the same selected patient/session state, they should not each create a separate `ResearchRuntimeStateManager`.
-
-If they did this:
+Consider what happens if each ViewModel creates its own manager:
 
 ```kotlin
 val runtimeStateManager = ResearchRuntimeStateManager()
 ```
 
-in two different places, then the app would have two different runtime managers.
+Each call to `ResearchRuntimeStateManager()` creates a new instance with its own state holder.
 
 That means:
 
@@ -861,6 +846,8 @@ Singleton-style shared instance
 Dependency injection
     -> some outside setup creates the object and passes it in
 ```
+
+This section introduces both approaches; we are not implementing a full dependency-injection setup in this lesson.
 
 ### Singleton-style shared instance
 
@@ -1142,6 +1129,39 @@ For now, we only create the files.
 We do not need to fully implement Room in Lesson 25.
 
 That will be Lesson 27.
+
+### Sharing a data type does not break the layer seperation rule
+
+A common question is: **If screen layers should only get data through a ViewModel, can they directly use data classes defined in `data/entity`?**
+
+Answer: Passing a `PatientEntity` to a composable does not by itself violate layer separation. We need to distinguish **where the data comes from** from **which Kotlin type represents it**. 
+
+**The crucial distinction: data source versus data type:**
+
+#### 1. Data-source separation
+
+In the architecture used by this app, a screen should not query Room, a DAO, or a repository directly. The repository obtains persistent data, and the ViewModel exposes that data as observable UI state.
+
+`PatientsScreen` therefore does not call `SessionRepository`. It receives values through the ViewModel-to-UI path and reports user actions through callbacks. The ViewModel handles those actions and calls the repository when necessary.
+
+#### 2. Data-type sharing
+
+The screen may still use `PatientEntity` as the type of a received value. `PatientEntity` is a data class whose properties describe a patient database row. Reading those properties does not execute SQL or contact the database.
+
+Using the same type does make the UI depend on the entity's shape. That dependency may be acceptable for this app. If it later becomes inconvenient, the repository or ViewModel can map `PatientEntity` to a separate application or UI model.
+
+The data flow is:
+
+```text
+Room database
+    -> SessionRepository fetches List<PatientEntity>
+    -> PatientsViewModel exposes the list in uiState
+    -> PatientsRoute reads uiState
+    -> PatientsScreen receives the list
+    -> PatientDataRow renders one PatientEntity
+```
+
+The `PatientEntity` type can appear at several points in this flow, but only the data layer accesses the database.
 
 ---
 
