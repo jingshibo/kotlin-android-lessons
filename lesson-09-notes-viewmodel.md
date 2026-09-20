@@ -13,9 +13,17 @@ This note is organized in this order:
 7. Use the checklist to judge future variables and functions.
 
 一个基本的认识如下： 原本 lesson 07 中的UI plot函数里同时包含了各类变量的定义，UI的绘制，和状态的更新。
-- 其中有一部分变量是需要记忆和多次更新的状态量。这些量可以通过类进行组织，然后在ViewModel中进行实例化，产生一个持续存在的mutable变量。这些变量可以被外部读取，其变化也会被UI自动探测以更新显示，但不可直接在UI中进行赋值更新。
-- 另一部分变量是临时设置的UI参量，可能是mutable或普通变量，它们仍然留在UI中。比如，`pendingCsvText` 的存在就是仅为了支持文件选择流程，虽然这也是一个mutable变量，但不必作为系统 state 存在，我们不放入 ViewModel 中。再比如 `meanvalue`是基于state的值得到的一个普通变量，直接在UI中定义就行了，也不必放入ViewModel。
-- 所有的状态更新过程（改变state的操作）都放入ViewModel，而UI只负责对当前state进行显示，而不进行任何状态修改操作。只有ViewModel内部的函数可以对状态量进行更新。当UI上发生了一个event（比如onClick），这个event会自动调用ViewModel中的函数，这个函数会实现状态量的更新。此时UI会探测到状态量的变化，然后重刷UI界面，自动显示最新的状态值。
+- 其中有一部分变量是需要记忆和多次更新的状态量。
+   - 这些量可以通过类进行组织，然后在ViewModel中进行实例化，产生一个持续存在的mutable变量。
+   - 这些变量可以被外部读取，其变化也会被UI自动探测以更新显示，但不可直接在UI中进行赋值更新。
+- 另一部分变量是临时设置的UI参量，可能是mutable或普通变量，它们仍然留在UI中。
+   - 比如，`pendingCsvText` 的存在就是仅为了支持文件选择流程，虽然这也是一个mutable变量，但不必作为系统 state 存在，我们不放入 ViewModel 中。
+   - 再比如 `meanvalue`是基于state的值得到的一个普通变量，直接在UI中定义就行了，也不必放入ViewModel。
+- 具体怎么区分这两种state应该放在viewModel还是UI中：
+   1. Put in ViewModel State: Any data that represents business/database records or needs to be processed by ViewModel methods.
+   2. Keep as Local Composable State (remember { mutableStateOf(...) }): Temporary visual dialog pop-ups or local animations that are short-lived and don't involve business logic.
+- 所有的状态更新过程（改变state的操作）都放入ViewModel，而UI只负责对当前state进行显示，而不进行任何状态修改操作。只有ViewModel的函数可以对状态量进行更新。
+   - 当UI上发生了一个event（比如onClick），这个event会自动调用ViewModel中的函数，这个函数会实现状态量的更新。此时UI会探测到状态量的变化，然后重刷UI界面，自动显示最新的状态值。
 
 The goal is not to memorize a rule like:
 
