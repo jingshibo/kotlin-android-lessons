@@ -20,8 +20,8 @@ This note is organized in this order:
    - 比如，`pendingCsvText` 的存在就是仅为了支持文件选择流程，虽然这也是一个mutable变量，但不必作为系统 state 存在，我们不放入 ViewModel 中。
    - 再比如 `meanvalue`是基于state的值得到的一个普通变量，直接在UI中定义就行了，也不必放入ViewModel。
 - 具体怎么区分这两种state应该放在viewModel还是UI中：
-   1. Put in ViewModel State: Any data that represents business/database records or needs to be processed by ViewModel methods.
-   2. Keep as Local Composable State (remember { mutableStateOf(...) }): Temporary visual dialog pop-ups or local animations that are short-lived and don't involve business logic.
+   1. **Put in ViewModel State**: Any data that represents business/database records or needs to be processed by ViewModel methods.
+   2. **Keep as Local Composable State** (remember { mutableStateOf(...) }): Temporary visual dialog pop-ups or local animations that are short-lived and don't involve ViewModel business logic.
 - 所有的状态更新过程（改变state的操作）都放入ViewModel，而UI只负责对当前state进行显示，而不进行任何状态修改操作。只有ViewModel的函数可以对状态量进行更新。
    - 当UI上发生了一个event（比如onClick），这个event会自动调用ViewModel中的函数，这个函数会实现状态量的更新。此时UI会探测到状态量的变化，然后重刷UI界面，自动显示最新的状态值。
 
