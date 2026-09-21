@@ -166,11 +166,18 @@ com.example.researchapp
  |   |-- PatientListScreen.kt
  |   |-- PatientDetailScreen.kt
  |   |-- MeasurementScreen.kt
- |   `-- ResultScreen.kt
+ |   |-- ResultScreen.kt
+ |   |
+ |   `-- model
+ |       |-- PatientListItem.kt
+ |       `-- SessionListItem.kt
  |
  |-- viewmodel
  |   |-- ResearchViewModel.kt
- |   `-- ResearchUiState.kt
+ |   |-- ResearchUiState.kt
+ |   |
+ |   `-- mapper
+ |       `-- EntityUiMappers.kt
  |
  |-- runtime
  |   |-- ResearchRuntimeState.kt
@@ -237,6 +244,44 @@ runtime
 data
     -> persistent research data and data operations
 ```
+
+The UI-specific model files introduced later belong in:
+
+```text
+app/src/main/java/com/example/researchapp/ui/model/PatientListItem.kt
+app/src/main/java/com/example/researchapp/ui/model/SessionListItem.kt
+```
+
+These classes describe the values needed by particular screens. They are not Room entities and do not belong in `data/entity`.
+
+The functions that convert database entities into these UI models can go in:
+
+```text
+app/src/main/java/com/example/researchapp/viewmodel/mapper/EntityUiMappers.kt
+```
+
+For example, that file can later contain:
+
+```kotlin
+package com.example.researchapp.viewmodel.mapper
+
+import com.example.researchapp.data.entity.PatientEntity
+import com.example.researchapp.ui.model.PatientListItem
+
+fun PatientEntity.toPatientListItem(): PatientListItem {
+    return PatientListItem(
+        id = id,
+        patientCode = patientCode,
+        createdAt = createdAt
+    )
+}
+```
+
+This mapper sits near the ViewModel because the ViewModel uses it to build UI state. Do not place this entity-to-UI mapper in the `data` package: doing so would make the data layer depend on a UI model.
+
+We are not adding a `domain` folder yet. A domain layer is useful when the app develops reusable business rules or needs storage-independent models across several features. It is not required merely to convert a Room entity into one screen's UI model.
+
+Section 4 shows the target structure so that each future file has a clear destination. You do not need to create every file before the lesson that introduces it.
 
 ---
 
@@ -1130,38 +1175,201 @@ We do not need to fully implement Room in Lesson 25.
 
 That will be Lesson 27.
 
-### Sharing a data type does not break the layer seperation rule
+### Database access and model coupling are different concerns
 
-A common question is: **If screen layers should only get data through a ViewModel, can they directly use data classes defined in `data/entity`?**
+A common question is: **If screens should receive data through a ViewModel, can a screen still use a class from `data/entity`, such as `PatientEntity`?**
 
-Answer: Passing a `PatientEntity` to a composable does not by itself violate layer separation. We need to distinguish **where the data comes from** from **which Kotlin type represents it**. 
+To answer this clearly, separate two ideas:
 
-**The crucial distinction: data source versus data type:**
+```text
+1. Which layer accesses the database?
+2. Which model type does the UI depend on?
+```
 
-#### 1. Data-source separation
+#### 1. Keep database access out of the UI
 
-In the architecture used by this app, a screen should not query Room, a DAO, or a repository directly. The repository obtains persistent data, and the ViewModel exposes that data as observable UI state.
-
-`PatientsScreen` therefore does not call `SessionRepository`. It receives values through the ViewModel-to-UI path and reports user actions through callbacks. The ViewModel handles those actions and calls the repository when necessary.
-
-#### 2. Data-type sharing
-
-The screen may still use `PatientEntity` as the type of a received value. `PatientEntity` is a data class whose properties describe a patient database row. Reading those properties does not execute SQL or contact the database.
-
-Using the same type does make the UI depend on the entity's shape. That dependency may be acceptable for this app. If it later becomes inconvenient, the repository or ViewModel can map `PatientEntity` to a separate application or UI model.
-
-The data flow is:
+In this app, a composable should not query Room, call a DAO, or call a repository directly. Persistent data follows this path:
 
 ```text
 Room database
-    -> SessionRepository fetches List<PatientEntity>
-    -> PatientsViewModel exposes the list in uiState
-    -> PatientsRoute reads uiState
-    -> PatientsScreen receives the list
-    -> PatientDataRow renders one PatientEntity
+    -> DAO
+    -> Repository
+    -> ViewModel
+    -> UI state
+    -> Composable screen
 ```
 
-The `PatientEntity` type can appear at several points in this flow, but only the data layer accesses the database.
+User actions travel back through callbacks:
+
+```text
+Composable screen
+    -> callback
+    -> ViewModel function
+    -> Repository
+    -> DAO / Room database
+```
+
+This is **data-access separation**. The UI displays values and reports events, while the data layer performs database operations.
+
+#### 2. An entity can be passed to the UI, but that creates coupling
+
+Passing a `PatientEntity` to a composable does not cause the composable to access Room. Reading `patient.patientCode` is only reading a Kotlin property; it does not execute a database query.
+
+However, it makes the UI depend on the structure of a database entity. For example:
+
+```kotlin
+@Composable
+fun PatientRow(patient: PatientEntity) {
+    Text(patient.patientCode)
+}
+```
+
+If `PatientEntity` changes because storage requirements change, this UI may also need to change. Therefore:
+
+```text
+Using PatientEntity in the UI does not break data-access separation,
+but it does couple the UI to the database representation.
+```
+
+For a small application, that coupling may be an acceptable simplification. Separate models become more useful when the database and UI need different fields, types, names, or formats.
+
+#### 3. Use a UI model when the UI has a different purpose
+
+Later in this project, the patient list will use a focused UI model:
+
+```kotlin
+data class PatientListItem(
+    val id: Long,
+    val patientCode: String,
+    val createdAt: Long
+)
+```
+
+The ViewModel can map the database entity to that UI model:
+
+```kotlin
+fun PatientEntity.toPatientListItem(): PatientListItem {
+    return PatientListItem(
+        id = id,
+        patientCode = patientCode,
+        createdAt = createdAt
+    )
+}
+```
+
+The flow then becomes:
+
+```text
+Room database
+    -> DAO returns PatientEntity
+    -> Repository provides PatientEntity
+    -> ViewModel maps it to PatientListItem
+    -> UI state contains PatientListItem
+    -> PatientListScreen displays PatientListItem
+```
+
+Now the screen depends on what the patient list needs to display rather than on the complete Room table representation. If the database structure changes but the UI contract remains the same, the mapper can absorb some or all of that change.
+
+The mapper is a boundary between representations; it is not a guarantee that every database change affects only one function. A schema change may also require a Room migration, DAO changes, repository changes, and tests.
+
+#### 4. Domain models and UI models are not the same thing
+
+In a larger app, we might also introduce a storage-independent domain model such as `Patient`. A domain model represents concepts and rules used across the application. A UI model such as `PatientListItem` represents exactly what a particular screen needs.
+
+For example, a value such as `createdAt` may remain a `Long` or another time type in a domain model, while the UI converts it to formatted text for display. A model containing display strings such as `"2026-09-01 10:15:30"` or `"91%"` is usually a UI model rather than a domain model.
+
+We do not need a separate domain layer merely to follow the rule. For this beginner project, the important choice is:
+
+```text
+UI never accesses Room directly.
+The repository and ViewModel control the data flow.
+Use a separate UI model when it usefully protects the UI from storage details.
+```
+
+#### 5. Where should date formatting happen?
+
+For this project, keep the creation time as a `Long` in both the Room entity and the UI model:
+
+```kotlin
+data class PatientListItem(
+    val id: Long,
+    val patientCode: String,
+    val createdAt: Long
+)
+```
+
+The entity-to-UI mapper copies the value without formatting it:
+
+```kotlin
+fun PatientEntity.toPatientListItem(): PatientListItem {
+    return PatientListItem(
+        id = id,
+        patientCode = patientCode,
+        createdAt = createdAt
+    )
+}
+```
+
+When a screen needs to display the date, format it in the UI layer. Put the reusable formatter in:
+
+```text
+ui/format/DateFormatters.kt
+```
+
+For example:
+
+```kotlin
+package com.example.researchapp.ui.format
+
+import java.text.DateFormat
+import java.util.Date
+
+fun formatTimestamp(timestamp: Long): String {
+    return DateFormat.getDateTimeInstance(
+        DateFormat.MEDIUM,
+        DateFormat.SHORT
+    ).format(Date(timestamp))
+}
+```
+
+The composable uses that function only when it needs display text:
+
+```kotlin
+@Composable
+fun PatientListRow(
+    patient: PatientListItem,
+    onClick: () -> Unit
+) {
+    Card(onClick = onClick) {
+        Text("Patient code: ${patient.patientCode}")
+        Text("Created: ${formatTimestamp(patient.createdAt)}")
+    }
+}
+```
+
+The complete conversion is:
+
+```text
+PatientEntity.createdAt
+    Long timestamp stored by Room
+        |
+        | mapper copies the Long
+        v
+PatientListItem.createdAt
+    Long timestamp available to the UI
+        |
+        | UI formatter creates locale-aware display text
+        v
+Text displays the formatted date
+```
+
+This approach keeps the raw timestamp available for sorting and comparisons, while the UI controls how it is presented. It also avoids storing both a raw timestamp and a formatted copy in the UI model.
+
+Do not put the full formatting expression directly inside `Text`. Calling a named function keeps the composable readable and lets several screens use the same formatting rule.
+
+Date formatting could instead happen in an entity-to-UI mapper when a UI model deliberately contains a property such as `createdAtText: String`. That is a valid alternative, but it is not the choice used here. In this project, `PatientListItem` retains `createdAt: Long`, and the UI layer formats it for display.
+
+Lessons 32 and 33 apply this choice by introducing `PatientListItem` and mapping `PatientEntity` values before exposing them to the patient-list screen.
 
 ---
 
