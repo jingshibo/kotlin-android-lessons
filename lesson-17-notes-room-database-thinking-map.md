@@ -879,7 +879,159 @@ Notice how the function parameters match the SQL placeholders:
 :endedAt uses the function parameter endedAt
 ```
 
-## 7. Create the database class
+## 7. Read related tables with `@Embedded` and `@Relation`
+
+Section 6 showed that a DAO can use a manual SQL `JOIN` when one database question crosses several tables. Room offers another option when the desired result is an object graph such as:
+
+```text
+one session together with its patient
+one patient together with all sessions
+```
+
+For these results, we can create a plain data class containing `@Embedded` and `@Relation` properties. This class describes a query result; it is not another database table and does not use `@Entity`.
+
+### One session with its patient
+
+```kotlin
+import androidx.room3.Embedded
+import androidx.room3.Relation
+
+data class SessionWithPatient(
+    @Embedded
+    val session: SessionEntity,
+
+    @Relation(
+        parentColumn = "patientId",
+        entityColumn = "id"
+    )
+    val patient: PatientEntity
+)
+```
+
+Read the two annotations separately:
+
+```text
+@Embedded val session: SessionEntity
+    -> map each row returned by the main sessions query into session
+
+@Relation(...)
+    -> take session.patientId
+    -> find the PatientEntity whose id matches it
+    -> place that related object in patient
+```
+
+The column names come from the entities in this lesson:
+
+| `@Relation` property | Refers to |
+|---|---|
+| `parentColumn = "patientId"` | `SessionEntity.patientId` in the embedded parent row |
+| `entityColumn = "id"` | `PatientEntity.id` in the related table |
+
+The word `parentColumn` here means the column in the object returned by the main DAO query. It does not mean the parent table from the `ForeignKey` annotation. Those two annotations describe different concerns.
+
+The DAO still needs a query function:
+
+```kotlin
+import androidx.room3.Query
+import androidx.room3.Transaction
+
+@Transaction
+@Query("SELECT * FROM sessions ORDER BY startedAt DESC")
+suspend fun getSessionsWithPatients(): List<SessionWithPatient>
+```
+
+Room first obtains the session rows and then obtains the related patients needed to build the `SessionWithPatient` objects. Because Room may run multiple queries, `@Transaction` makes the reads occur atomically and keeps the assembled result consistent.
+
+### Can this replace a manual `JOIN` query?
+
+It can replace **some** manual `JOIN` queries, especially when the app wants complete related objects.
+
+For example, a custom summary can be produced with a manual join:
+
+```kotlin
+data class SessionPatientSummary(
+    val sessionId: Long,
+    val sessionName: String,
+    val patientCode: String
+)
+
+@Query("""
+    SELECT
+        sessions.id AS sessionId,
+        sessions.sessionName AS sessionName,
+        patients.patientCode AS patientCode
+    FROM sessions
+    INNER JOIN patients ON sessions.patientId = patients.id
+    ORDER BY sessions.startedAt DESC
+""")
+suspend fun getSessionPatientSummaries(): List<SessionPatientSummary>
+```
+
+When the required result is the full `SessionEntity` plus the full `PatientEntity`, `SessionWithPatient` avoids listing and aliasing all their columns manually. Room validates the referenced columns and maps both objects.
+
+However, `@Relation` does not remove the DAO query, and it does not necessarily turn the operation into one SQL `JOIN`. It tells Room how to fetch and assemble related objects.
+
+Use a manual SQL query when the database should:
+
+- filter or sort using columns across several tables
+- calculate totals, counts, averages, or grouped results
+- return only a small custom projection
+- perform a query whose performance needs one carefully controlled SQL statement
+
+Use `@Embedded` and `@Relation` when the app naturally needs complete related entities and the relationship maps cleanly to an object structure.
+
+### One patient with many sessions
+
+The same mechanism handles a one-to-many result:
+
+```kotlin
+data class PatientWithSessions(
+    @Embedded
+    val patient: PatientEntity,
+
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "patientId"
+    )
+    val sessions: List<SessionEntity>
+)
+```
+
+Here, Room reads `PatientEntity.id` and finds every `SessionEntity` whose `patientId` matches it. The related property is a list because one patient can own many sessions.
+
+```kotlin
+@Transaction
+@Query("SELECT * FROM patients ORDER BY createdAt DESC")
+suspend fun getPatientsWithSessions(): List<PatientWithSessions>
+```
+
+The direction of the columns is now reversed because the embedded parent is `PatientEntity`:
+
+```text
+PatientEntity.id
+    -> matches SessionEntity.patientId
+```
+
+### Do we need these relationship classes?
+
+Not always. Create one when the app has a real read operation that needs those related objects together. A simple query such as `getSessionsForPatient(patientId)` can continue returning `List<SessionEntity>` if patient details are not needed at that point.
+
+Also keep these roles separate:
+
+```text
+ForeignKey
+    -> protects database integrity
+
+@Embedded and @Relation
+    -> describe how Room should assemble a related query result
+
+DAO @Query
+    -> starts the read and determines the parent rows to return
+```
+
+So `@Relation` is a convenient alternative to some manual multi-table mapping, not a replacement for all multi-table SQL. See the [official Room relationship guide](https://developer.android.com/training/data-storage/room/relationships) for other relationship shapes and query approaches.
+
+## 8. Create the database class
 
 The database class answers:
 
@@ -1096,7 +1248,7 @@ Database class
     creates or returns the Room database instance
 ```
 
-## 8. Use the database through the repository
+## 9. Use the database through the repository
 
 After the database class exists, the app needs to use it.
 
@@ -1215,7 +1367,7 @@ Room/SQLite
     reads or writes the database
 ```
 
-## 9. Convert Readable Codes into Internal IDs
+## 10. Convert Readable Codes into Internal IDs
 
 The most important transferred values are:
 
@@ -1474,7 +1626,7 @@ Internal ID is for relationships:
     patientId = 1
 ```
 
-## 10. Follow the ID flow in multi-table
+## 11. Follow the ID flow in multi-table
 
 Now apply the readable-code-to-internal-ID idea to the actual ViewModel and repository flow.
 
@@ -1694,7 +1846,7 @@ the child table uses a ForeignKey constraint
 ```
 
 
-## 11. The full Room thinking loop
+## 12. The full Room thinking loop
 
 When adding a new table, use this checklist:
 
@@ -1726,7 +1878,7 @@ ViewModel decides when to use the repository.
 UI lets the user trigger the flow.
 ```
 
-## 12. Most important mental model
+## 13. Most important mental model
 
 Room database work is not only about writing annotations.
 
