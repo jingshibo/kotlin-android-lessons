@@ -1286,7 +1286,128 @@ The repository and ViewModel control the data flow.
 Use a separate UI model when it usefully protects the UI from storage details.
 ```
 
-#### 5. Where should date formatting happen?
+#### 5. Keep meaningful data types until the UI displays them
+
+A UI model does not need to contain only display-ready strings. It should contain the values the UI needs in forms that preserve their meaning.
+
+A useful general rule is:
+
+```text
+Keep IDs, numbers, timestamps, nullability, booleans, and states typed.
+Convert them to labels, units, percentages, colors, and formatted text
+when the UI displays them.
+```
+
+For this project:
+
+| Value | Keep in the UI model | Example display conversion |
+|---|---|---|
+| Database ID | `Long` | `"Patient ID: 12"` |
+| Timestamp | `Long` or `Long?` | `"21 Sep 2026, 14:30"` |
+| Measurement | `Double` | `"2.438 V"` |
+| Confidence | `Double` | `"91%"` |
+| Repetition number | `Int` | `"Repetition 3"` |
+| Optional value | A nullable type such as `Long?` | `"In progress"` when the value is `null` |
+| Status or state | Prefer an enum | A label, color, or icon |
+
+##### Keep IDs as IDs
+
+Even if an ID appears inside text, keep it as a `Long` in the UI model:
+
+```kotlin
+data class PatientListItem(
+    val id: Long,
+    val patientCode: String,
+    val createdAt: Long
+)
+```
+
+The UI may display it:
+
+```kotlin
+Text("Patient ID: ${patient.id}")
+```
+
+It may also pass the same typed ID through a callback:
+
+```kotlin
+onClick = {
+    onPatientClick(patient.id)
+}
+```
+
+Converting the ID to a display string in the mapper would make it less useful for navigation, callbacks, and repository operations.
+
+##### Keep measurements and confidence numeric
+
+Keep measurement values as `Double`:
+
+```kotlin
+data class MeasurementUiModel(
+    val rawValue: Double,
+    val processedValue: Double
+)
+```
+
+The UI can add precision and units when displaying them:
+
+```kotlin
+fun formatMeasurement(value: Double): String {
+    return "%.3f V".format(value)
+}
+```
+
+Likewise, keep model confidence numeric:
+
+```kotlin
+data class ResultUiModel(
+    val label: String,
+    val confidence: Double
+)
+```
+
+The UI can format `0.91` as `"91%"`. Keeping the `Double` also lets the UI use the value for a progress indicator, threshold comparison, chart, or sort operation.
+
+##### Preserve null when it has meaning
+
+`SessionListItem` should keep `endedAt` nullable:
+
+```kotlin
+data class SessionListItem(
+    val id: Long,
+    val sessionName: String,
+    val startedAt: Long,
+    val endedAt: Long?
+)
+```
+
+Here, `null` means that the session has not ended. The UI decides how to explain that state:
+
+```kotlin
+val endText = session.endedAt?.let(::formatTimestamp)
+    ?: "In progress"
+```
+
+Converting `null` to `"In progress"` inside the mapper would discard the original meaning and make calculations or other presentation choices more difficult.
+
+##### Prefer typed states to unrestricted strings
+
+`MeasurementEntity` currently stores status as a `String`. As the app becomes stricter, a typed status can prevent spelling mistakes and invalid values:
+
+```kotlin
+enum class MeasurementStatus {
+    OK,
+    INVALID,
+    NOISY,
+    ERROR
+}
+```
+
+The UI can map each status to an appropriate label, color, or icon. Do not replace the state itself with a color name such as `"Green"`; color is only one possible presentation of the state.
+
+These are guidelines rather than a requirement that every UI model must contain raw values. A display-only model may deliberately contain formatted text. For this project, retaining meaningful types gives the UI more flexibility and keeps formatting decisions close to where values are displayed.
+
+#### 6. Date formatting as a specific example
 
 For this project, keep the creation time as a `Long` in both the Room entity and the UI model:
 
