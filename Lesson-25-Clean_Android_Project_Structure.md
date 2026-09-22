@@ -168,16 +168,28 @@ com.example.researchapp
  |   |-- MeasurementScreen.kt
  |   |-- ResultScreen.kt
  |   |
- |   `-- model
- |       |-- PatientListItem.kt
- |       `-- SessionListItem.kt
+ |   |-- model
+ |   |   |-- PatientListItem.kt
+ |   |   `-- SessionListItem.kt
+ |   |
+ |   |-- mapper
+ |   |   |-- PatientUiMappers.kt
+ |   |   `-- SessionUiMappers.kt
+ |   |
+ |   `-- format
+ |       |-- DateFormatters.kt
+ |       `-- ValueFormatters.kt
  |
  |-- viewmodel
  |   |-- ResearchViewModel.kt
- |   |-- ResearchUiState.kt
- |   |
- |   `-- mapper
- |       `-- EntityUiMappers.kt
+ |   `-- ResearchUiState.kt
+ |
+ |-- domain
+ |   `-- model
+ |       |-- PatientRecord.kt
+ |       |-- SessionRecord.kt
+ |       |-- MeasurementRecord.kt
+ |       `-- ResultRecord.kt
  |
  |-- runtime
  |   |-- ResearchRuntimeState.kt
@@ -192,6 +204,12 @@ com.example.researchapp
  |   |   |-- SessionEntity.kt
  |   |   |-- MeasurementEntity.kt
  |   |   `-- ResultEntity.kt
+ |   |
+ |   |-- mapper
+ |   |   |-- PatientMappers.kt
+ |   |   |-- SessionMappers.kt
+ |   |   |-- MeasurementMappers.kt
+ |   |   `-- ResultMappers.kt
  |   |
  |   `-- dao
  |       |-- PatientDao.kt
@@ -218,19 +236,24 @@ com.example.researchapp
 
 This is not the only possible structure.
 
-But it is a good beginner-friendly structure for our current app.
+It is the target structure for this research app. The separate models and mappers keep Room-specific classes out of the ViewModel and composable layers.
 
-The new package here is:
+### Distinguishing `runtime` and `domain`
+
+Two packages that need a clear distinction are:
 
 ```text
 runtime
+domain
 ```
 
-This package is for temporary workflow state and the operations that safely change that state.
+The `runtime` package is for temporary workflow state and the operations that safely change that state.
 
 It is separate from `viewmodel` because runtime state is not just one screen's UI state.
 
 It is separate from `data` because runtime state is not permanent database data.
+
+The `domain` package contains storage-independent application records. It is separate from `data` because domain models do not describe Room tables, and it is separate from `ui` because they do not describe one screen's presentation.
 
 A useful mental model is:
 
@@ -241,45 +264,64 @@ viewmodel
 runtime
     -> runtime states and operations across screens
 
+domain
+    -> storage-independent application records
+
 data
     -> persistent research data and data operations
 ```
 
-The UI-specific model files introduced later belong in:
+### Distinguishing model and mapping folders
+
+A **model** is a class that holds data in the form needed by one layer. A **mapper** is a function that converts one model into another. For example, `PatientRecord` holds patient data, while `PatientEntity.toDomainModel()` converts a database entity into that domain model.
+
+The word `model` therefore appears in more than one folder because each layer may need a different representation of the same patient:
+
+- `data/entity` contains the database representation. `PatientEntity` follows the Room table structure and annotations.
+- `domain/model` contains the application representation. `PatientRecord` describes meaningful patient data without depending on Room or a particular screen.
+- `ui/model` contains a screen-specific representation. `PatientListItem` may contain only the fields required by the patient list.
+
+Mapper folders contain the conversion functions between those representations:
+
+- `data/mapper` converts between database entities and domain models. It belongs to `data` because these functions know about Room-specific entity classes.
+- `ui/mapper` converts domain models into UI models. It belongs to `ui` because these functions prepare data for a particular screen.
+- `ui/format` is slightly different: it converts a typed value into display text at the point where the UI needs text, such as turning a `Long` timestamp into a formatted date.
+
+The complete flow can look like this:
 
 ```text
-app/src/main/java/com/example/researchapp/ui/model/PatientListItem.kt
-app/src/main/java/com/example/researchapp/ui/model/SessionListItem.kt
+PatientEntity
+    -> data mapper
+PatientRecord
+    -> UI mapper
+PatientListItem
+    -> UI formatter when text is needed
+Text shown by the composable
 ```
 
-These classes describe the values needed by particular screens. They are not Room entities and do not belong in `data/entity`.
-
-The functions that convert database entities into these UI models can go in:
+Here is the same distinction as a compact folder reference:
 
 ```text
-app/src/main/java/com/example/researchapp/viewmodel/mapper/EntityUiMappers.kt
+data/entity
+    -> Room table representations
+
+data/mapper
+    -> Room entities <-> domain models
+
+domain/model
+    -> storage-independent application records
+
+ui/model
+    -> values required by particular screens
+
+ui/mapper
+    -> domain models -> UI models
+
+ui/format
+    -> typed UI values -> display text
 ```
 
-For example, that file can later contain:
-
-```kotlin
-package com.example.researchapp.viewmodel.mapper
-
-import com.example.researchapp.data.entity.PatientEntity
-import com.example.researchapp.ui.model.PatientListItem
-
-fun PatientEntity.toPatientListItem(): PatientListItem {
-    return PatientListItem(
-        id = id,
-        patientCode = patientCode,
-        createdAt = createdAt
-    )
-}
-```
-
-This mapper sits near the ViewModel because the ViewModel uses it to build UI state. Do not place this entity-to-UI mapper in the `data` package: doing so would make the data layer depend on a UI model.
-
-We are not adding a `domain` folder yet. A domain layer is useful when the app develops reusable business rules or needs storage-independent models across several features. It is not required merely to convert a Room entity into one screen's UI model.
+The important boundary is that a ViewModel may use `PatientRecord` and `PatientListItem`, but it should not need to import the Room-specific `PatientEntity`. A UI model is useful when a screen needs a smaller or presentation-specific shape, but it is not mandatory for every domain model. Section 13 explains mapper placement in more detail.
 
 Section 4 shows the target structure so that each future file has a clear destination. You do not need to create every file before the lesson that introduces it.
 
@@ -291,10 +333,11 @@ Each folder has a clear meaning.
 
 | Folder | Purpose |
 |---|---|
-| `ui` | Compose screens and navigation |
+| `ui` | Compose screens, UI models, UI mappers, and display formatting |
 | `viewmodel` | UI state and app flow |
+| `domain` | Storage-independent application models |
 | `runtime` | Shared temporary app/session state used across screens or ViewModels |
-| `data` | Room database, DAOs, entities, repository |
+| `data` | Room database, DAOs, entities, entity/domain mappers, and repository |
 | `device` | Fake or real device communication |
 | `processing` | Signal processing and feature extraction |
 | `ml` | ML model interface and fake/real model runner |
@@ -352,7 +395,7 @@ It should only start the Compose app.
 
 ## 7. `ui` folder
 
-The `ui` folder contains the visible screens.
+The `ui` folder contains visible screens and the supporting models, mappers, and formatters used to present their data.
 
 ```text
 ui
@@ -362,6 +405,23 @@ ui
  ├── MeasurementScreen.kt
  └── ResultScreen.kt
 ```
+
+The supporting folders are:
+
+```text
+ui
+ |-- model
+ |   |-- PatientListItem.kt
+ |   `-- SessionListItem.kt
+ |-- mapper
+ |   |-- PatientUiMappers.kt
+ |   `-- SessionUiMappers.kt
+ `-- format
+     |-- DateFormatters.kt
+     `-- ValueFormatters.kt
+```
+
+The screen files render UI. Files in `ui/model` hold screen-focused values, files in `ui/mapper` convert domain models into those values, and files in `ui/format` turn typed values into display text.
 
 ### `ResearchApp.kt`
 
@@ -1167,7 +1227,15 @@ data
  └── dao
 ```
 
-This is where Room-related code will go.
+This is where Room-related code and the entity/domain mapping boundary will go. The complete data package also includes:
+
+```text
+data/mapper
+    -> PatientMappers.kt
+    -> SessionMappers.kt
+    -> MeasurementMappers.kt
+    -> ResultMappers.kt
+```
 
 For now, we only create the files.
 
@@ -1193,8 +1261,9 @@ In this app, a composable should not query Room, call a DAO, or call a repositor
 ```text
 Room database
     -> DAO
-    -> Repository
-    -> ViewModel
+    -> data mapper
+    -> domain model returned by Repository
+    -> ViewModel builds UI state
     -> UI state
     -> Composable screen
 ```
@@ -1206,6 +1275,7 @@ Composable screen
     -> callback
     -> ViewModel function
     -> Repository
+    -> data mapper
     -> DAO / Room database
 ```
 
@@ -1233,9 +1303,38 @@ but it does couple the UI to the database representation.
 
 For a small application, that coupling may be an acceptable simplification. Separate models become more useful when the database and UI need different fields, types, names, or formats.
 
-#### 3. Use a UI model when the UI has a different purpose
+#### 3. Use a domain model to keep Room out of the ViewModel
 
-Later in this project, the patient list will use a focused UI model:
+For this research app, we choose the stricter boundary: the repository does not expose `PatientEntity` outside the data layer. It maps the entity to a storage-independent model:
+
+```kotlin
+data class PatientRecord(
+    val patientId: Long,
+    val patientCode: String,
+    val notes: String,
+    val createdAt: Long
+)
+```
+
+`PatientRecord` belongs in `domain/model`. It contains application data without Room annotations or database-specific behavior.
+
+The repository performs the conversion before returning data:
+
+```text
+Room database
+    -> DAO returns PatientEntity
+    -> data mapper converts it to PatientRecord
+    -> Repository returns PatientRecord
+    -> ViewModel receives PatientRecord
+```
+
+The ViewModel therefore does not import `PatientEntity`, a DAO, or the Room database. If the storage representation changes while the repository contract remains stable, the ViewModel can continue using the same `PatientRecord`.
+
+#### 4. Use a UI model when a screen has a narrower purpose
+
+A domain model represents application data. A UI model represents exactly what a particular screen needs.
+
+For example, the patient-list screen can use:
 
 ```kotlin
 data class PatientListItem(
@@ -1245,47 +1344,34 @@ data class PatientListItem(
 )
 ```
 
-The ViewModel can map the database entity to that UI model:
+A UI mapper converts the domain model:
 
 ```kotlin
-fun PatientEntity.toPatientListItem(): PatientListItem {
+fun PatientRecord.toPatientListItem(): PatientListItem {
     return PatientListItem(
-        id = id,
-        patientCode = patientCode,
-        createdAt = createdAt
+        id = this.patientId,
+        patientCode = this.patientCode,
+        createdAt = this.createdAt
     )
 }
 ```
 
-The flow then becomes:
+The resulting flow is:
 
 ```text
-Room database
-    -> DAO returns PatientEntity
-    -> Repository provides PatientEntity
-    -> ViewModel maps it to PatientListItem
-    -> UI state contains PatientListItem
-    -> PatientListScreen displays PatientListItem
+PatientEntity
+    -> data mapper
+PatientRecord
+    -> Repository
+ViewModel
+    -> UI mapper
+PatientListItem
+    -> PatientListScreen
 ```
 
-Now the screen depends on what the patient list needs to display rather than on the complete Room table representation. If the database structure changes but the UI contract remains the same, the mapper can absorb some or all of that change.
+The entity, domain model, and UI model have different responsibilities even when some of their properties currently look similar. A separate model is useful when it creates a meaningful boundary; it is not a requirement to duplicate every class mechanically.
 
-The mapper is a boundary between representations; it is not a guarantee that every database change affects only one function. A schema change may also require a Room migration, DAO changes, repository changes, and tests.
-
-#### 4. Domain models and UI models are not the same thing
-
-In a larger app, we might also introduce a storage-independent domain model such as `Patient`. A domain model represents concepts and rules used across the application. A UI model such as `PatientListItem` represents exactly what a particular screen needs.
-
-For example, a value such as `createdAt` may remain a `Long` or another time type in a domain model, while the UI converts it to formatted text for display. A model containing display strings such as `"2026-09-01 10:15:30"` or `"91%"` is usually a UI model rather than a domain model.
-
-We do not need a separate domain layer merely to follow the rule. For this beginner project, the important choice is:
-
-```text
-UI never accesses Room directly.
-The repository and ViewModel control the data flow.
-Use a separate UI model when it usefully protects the UI from storage details.
-```
-
+A mapper can absorb representation changes when its input or output contract remains stable. It does not guarantee that every database change affects only one function. A schema change may also require a Room migration, DAO changes, repository changes, and tests.
 #### 5. Keep meaningful data types until the UI displays them
 
 A UI model does not need to contain only display-ready strings. It should contain the values the UI needs in forms that preserve their meaning.
@@ -1419,14 +1505,14 @@ data class PatientListItem(
 )
 ```
 
-The entity-to-UI mapper copies the value without formatting it:
+The domain-to-UI mapper copies the value without formatting it:
 
 ```kotlin
-fun PatientEntity.toPatientListItem(): PatientListItem {
+fun PatientRecord.toPatientListItem(): PatientListItem {
     return PatientListItem(
-        id = id,
-        patientCode = patientCode,
-        createdAt = createdAt
+        id = this.patientId,
+        patientCode = this.patientCode,
+        createdAt = this.createdAt
     )
 }
 ```
@@ -1474,7 +1560,12 @@ The complete conversion is:
 PatientEntity.createdAt
     Long timestamp stored by Room
         |
-        | mapper copies the Long
+        | data mapper copies the Long
+        v
+PatientRecord.createdAt
+    Long timestamp exposed by the repository
+        |
+        | UI mapper copies the Long
         v
 PatientListItem.createdAt
     Long timestamp available to the UI
@@ -1488,13 +1579,218 @@ This approach keeps the raw timestamp available for sorting and comparisons, whi
 
 Do not put the full formatting expression directly inside `Text`. Calling a named function keeps the composable readable and lets several screens use the same formatting rule.
 
-Date formatting could instead happen in an entity-to-UI mapper when a UI model deliberately contains a property such as `createdAtText: String`. That is a valid alternative, but it is not the choice used here. In this project, `PatientListItem` retains `createdAt: Long`, and the UI layer formats it for display.
+Date formatting could instead happen in a domain-to-UI mapper when a UI model deliberately contains a property such as `createdAtText: String`. That is a valid alternative, but it is not the choice used here. In this project, `PatientListItem` retains `createdAt: Long`, and the UI layer formats it for display.
 
-Lessons 32 and 33 apply this choice by introducing `PatientListItem` and mapping `PatientEntity` values before exposing them to the patient-list screen.
+Section 13 explains where the data and UI mappers belong and how the repository keeps Room entities away from the ViewModel.
 
 ---
 
-## 13. `data/entity` folder
+## 13. Where mapper functions belong
+
+Mapper placement becomes easier when we first identify which representations the function connects.
+
+For patient data, this app uses three representations:
+
+| Representation | Example type | Owner | Purpose |
+|---|---|---|---|
+| Database entity | `PatientEntity` | `data/entity` | Represents a Room table row |
+| Domain model | `PatientRecord` | `domain/model` | Represents patient data without Room or UI details |
+| UI model | `PatientListItem` | `ui/model` | Contains the values required by one screen |
+
+The mapper belongs near the layer-specific representation it is protecting the rest of the app from.
+
+### Entity/domain mappers belong in `data/mapper`
+
+Create:
+
+```text
+data/mapper/PatientMappers.kt
+```
+
+That file contains both mapping directions:
+
+```kotlin
+package com.example.researchapp.data.mapper
+
+import com.example.researchapp.data.entity.PatientEntity
+import com.example.researchapp.domain.model.PatientRecord
+
+fun PatientEntity.toDomainModel(): PatientRecord {
+    return PatientRecord(
+        patientId = this.id,
+        patientCode = this.patientCode,
+        notes = this.notes,
+        createdAt = this.createdAt
+    )
+}
+
+fun PatientRecord.toEntity(): PatientEntity {
+    return PatientEntity(
+        id = this.patientId,
+        patientCode = this.patientCode,
+        notes = this.notes,
+        createdAt = this.createdAt
+    )
+}
+```
+
+These functions belong in the data layer because both know about `PatientEntity`, which is a Room storage representation.
+
+This remains true for:
+
+```kotlin
+fun PatientRecord.toEntity(): PatientEntity
+```
+
+The receiver is `PatientRecord`, but the function still creates and depends on `PatientEntity`. The receiver type controls how an extension function is called; it does not decide which architectural layer owns the function.
+
+[Lesson 3, Section 6](lesson-03-classes-null-safety-and-enums.md#6-extension-functions) explains extension-function syntax and the meaning of `this`. In the first mapper, `this` is the `PatientEntity` being converted. In the second mapper, `this` is the `PatientRecord` being converted.
+
+### The repository performs the data-boundary conversion
+
+The repository calls the DAO and immediately converts entities before returning data to the rest of the app. A simplified example is:
+
+```kotlin
+class MeasurementRepository(
+    private val patientDao: PatientDao
+) {
+    suspend fun getPatients(): List<PatientRecord> {
+        return patientDao.getAllPatients()
+            .map { entity ->
+                entity.toDomainModel()
+            }
+    }
+
+    suspend fun savePatient(patient: PatientRecord) {
+        patientDao.insertPatient(
+            patient.toEntity()
+        )
+    }
+}
+```
+
+The exact DAO method names may differ when Room is implemented, but the boundary remains the same:
+
+```text
+DAO speaks in entities.
+Repository exposes domain models.
+```
+
+After this conversion, a ViewModel can use:
+
+```kotlin
+val patients: List<PatientRecord> = repository.getPatients()
+```
+
+The ViewModel does not need to import:
+
+```text
+PatientEntity
+PatientDao
+ResearchDatabase
+```
+
+### Domain/UI mappers belong in `ui/mapper`
+
+If a screen needs a smaller or differently shaped model, create:
+
+```text
+ui/mapper/PatientUiMappers.kt
+```
+
+For example:
+
+```kotlin
+package com.example.researchapp.ui.mapper
+
+import com.example.researchapp.domain.model.PatientRecord
+import com.example.researchapp.ui.model.PatientListItem
+
+fun PatientRecord.toPatientListItem(): PatientListItem {
+    return PatientListItem(
+        id = this.patientId,
+        patientCode = this.patientCode,
+        createdAt = this.createdAt
+    )
+}
+```
+
+This mapper belongs to the UI layer because its output, `PatientListItem`, exists for a screen. It knows about the domain model and UI model, but it does not know about Room.
+
+The ViewModel can use it while building UI state:
+
+```kotlin
+val patientItems = repository.getPatients()
+    .map { patient ->
+        patient.toPatientListItem()
+    }
+```
+
+### Display formatting belongs in `ui/format`
+
+A mapper changes one model representation into another. A formatter changes a typed value into text intended for display.
+
+For example:
+
+```text
+PatientRecord -> PatientListItem
+    UI mapper
+
+Long timestamp -> "22 Sep 2026, 14:30"
+    UI formatter
+```
+
+Put reusable date, measurement, and percentage formatting functions under `ui/format`. As explained in Section 12, this project keeps timestamps and measurements typed in its UI models and formats them when they are displayed.
+
+### Simplified and stricter designs are both possible
+
+A small app may use a shorter path:
+
+```text
+PatientEntity
+    -> Repository
+    -> ViewModel
+    -> PatientListItem
+```
+
+That design does not make the ViewModel query Room, but it does make the ViewModel depend on a Room entity type.
+
+This research app chooses the stricter path:
+
+```text
+PatientEntity
+    -> data mapper
+PatientRecord
+    -> Repository
+    -> ViewModel
+    -> UI mapper
+PatientListItem
+    -> Composable
+```
+
+The extra model and mapper are useful here because persistent research records may evolve independently from individual screens. This is a deliberate boundary, not a rule that every small class must always have three copies.
+
+### Mapper placement reference
+
+| Conversion | File location | Reason |
+|---|---|---|
+| `PatientEntity -> PatientRecord` | `data/mapper/PatientMappers.kt` | Knows about a Room entity |
+| `PatientRecord -> PatientEntity` | `data/mapper/PatientMappers.kt` | Creates a Room entity |
+| `PatientRecord -> PatientListItem` | `ui/mapper/PatientUiMappers.kt` | Creates a screen-specific model |
+| `Long -> formatted date String` | `ui/format/DateFormatters.kt` | Creates display text |
+| `Double -> value with units` | `ui/format/ValueFormatters.kt` | Creates display text |
+
+The practical rule is:
+
+```text
+If a mapper mentions a Room entity, keep it in the data layer.
+If a mapper creates a screen-specific model, keep it in the UI layer.
+Keep Room entities out of the ViewModel when using the domain boundary.
+```
+
+---
+
+## 14. `data/entity` folder
 
 This folder contains Room entities:
 
@@ -1538,7 +1834,7 @@ Entity files describe what data we store.
 
 ---
 
-## 14. `data/dao` folder
+## 15. `data/dao` folder
 
 This folder contains DAO interfaces:
 
@@ -1586,7 +1882,7 @@ We will implement these later.
 
 ---
 
-## 15. `MeasurementRepository.kt`
+## 16. `MeasurementRepository.kt`
 
 The repository is the bridge between the ViewModel and the data/device/processing/ML layers.
 
@@ -1608,8 +1904,17 @@ ResearchRuntimeStateManager
 MeasurementRepository
     -> coordinates data operations
     -> Room writes and queries
+    -> maps Room entities to and from domain models
     -> device reads
     -> processing/ML/export work
+```
+
+For persistent records, the repository is also the boundary that prevents Room entities from leaking into the ViewModel:
+
+```text
+DAO returns entity
+    -> repository uses data mapper
+    -> repository returns domain model
 ```
 
 Its final responsibility will be:
@@ -1641,7 +1946,7 @@ In Direction A, we are setting up the project step by step.
 
 ---
 
-## 16. `device` folder
+## 17. `device` folder
 
 The `device` folder contains:
 
@@ -1725,7 +2030,7 @@ But not yet.
 
 ---
 
-## 17. `processing` folder
+## 18. `processing` folder
 
 The `processing` folder contains signal-processing logic.
 
@@ -1794,7 +2099,7 @@ That is very important.
 
 ---
 
-## 18. `ml` folder
+## 19. `ml` folder
 
 The `ml` folder contains model-related code.
 
@@ -1866,7 +2171,7 @@ This gives us a fake ML result before using a real LiteRT/TFLite model.
 
 ---
 
-## 19. `export` folder
+## 20. `export` folder
 
 The `export` folder contains export formatting code.
 
@@ -1898,7 +2203,7 @@ The UI should only let the user choose where to save the file.
 
 ---
 
-## 20. What should we implement first?
+## 21. What should we implement first?
 
 Do not implement everything at once.
 
@@ -1907,23 +2212,25 @@ A good Direction A order is:
 ```text
 1. Create project folders
 2. Create placeholder screen files
-3. Create UiState and ViewModel
+3. Create domain model files
 4. Create entity files
-5. Create DAO files
-6. Create Room database
-7. Create repository
-8. Connect fake device source
-9. Add processing
-10. Add fake ML
-11. Add export
-12. Test the complete fake workflow
+5. Create entity/domain mapper files
+6. Create DAO files
+7. Create Room database
+8. Create repository boundaries that expose domain models
+9. Create UI models, UI mappers, UiState, and ViewModel
+10. Connect fake device source
+11. Add processing
+12. Add fake ML
+13. Add export
+14. Test the complete fake workflow
 ```
 
 Lesson 25 focuses mostly on step 1 and the file structure.
 
 ---
 
-## 21. Why we start with placeholders
+## 22. Why we start with placeholders
 
 You may wonder:
 
@@ -1950,7 +2257,7 @@ A clean skeleton gives you a map.
 
 ---
 
-## 22. Common mistake: too much code in UI
+## 23. Common mistake: too much code in UI
 
 A common beginner structure is:
 
@@ -1990,7 +2297,7 @@ That is the architecture we are building.
 
 ---
 
-## 23. Common mistake: starting with real Bluetooth too early
+## 24. Common mistake: starting with real Bluetooth too early
 
 Another common mistake is trying to implement real Bluetooth before the app skeleton exists.
 
@@ -2020,7 +2327,7 @@ This is a safer learning path.
 
 ---
 
-## 24. Common mistake: starting with real ML too early
+## 25. Common mistake: starting with real ML too early
 
 Similarly, do not start with the real model immediately.
 
@@ -2050,7 +2357,7 @@ That means the UI, ViewModel, Repository, and Result screen can be tested before
 
 ---
 
-## 25. Current skeleton after Lesson 25
+## 26. Current skeleton after Lesson 25
 
 After Lesson 25, your project should have this shape:
 
@@ -2064,6 +2371,22 @@ com.example.researchapp
  ├── processing
  ├── ml
  └── export
+```
+
+The complete target also includes a domain-model folder and explicit mapping folders:
+
+```text
+domain/model
+    -> PatientRecord and other storage-independent records
+
+data/mapper
+    -> entity/domain conversion
+
+ui/mapper
+    -> domain/UI conversion
+
+ui/format
+    -> display formatting
 ```
 
 The app may not do much yet.
@@ -2086,7 +2409,7 @@ The goal is to create a clean foundation.
 
 ---
 
-## 26. What you learned in Lesson 25
+## 27. What you learned in Lesson 25
 
 You learned how to map the architecture into real Android project folders:
 
@@ -2102,7 +2425,7 @@ viewmodel
 shared temporary runtime state
  -> runtime
 
-Room and repository
+Room, entity/domain mappers, and repository
  ↓
 data
 
@@ -2121,6 +2444,22 @@ ml
 CSV/JSON export
  ↓
 export
+```
+
+The model boundaries are:
+
+```text
+data/mapper
+    -> Room entities to and from domain models
+
+domain/model
+    -> storage-independent application records
+
+ui/mapper
+    -> domain models to screen-specific UI models
+
+ui/format
+    -> typed values to display text
 ```
 
 You also learned two setup ideas that affect how these folders connect:
@@ -2143,9 +2482,12 @@ When you add new code, ask:
 
 ```text
 Is this UI code?
+Is this a UI model, UI mapper, or display formatter?
 Is this state-management code?
+Is this a storage-independent domain model?
 Is this shared runtime state used across screens/ViewModels?
 Is this database code?
+Does this mapper mention a Room entity and therefore belong in data?
 Is this device code?
 Is this processing code?
 Is this ML code?
@@ -2195,3 +2537,5 @@ ResultEntity
 and explain exactly what each field means.
 
 This will turn the research data model from Lesson 17 into real Kotlin files inside the new project structure.
+
+Those entity files are the storage-side starting point. Before they are exposed to a ViewModel, the project should also add the corresponding domain models and `data/mapper` functions described in Section 13.
