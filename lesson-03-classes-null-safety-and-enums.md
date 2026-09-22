@@ -25,6 +25,7 @@ We will cover:
 - `val` and `var` inside classes
 - `val` and `var` for object variables versus object properties
 - functions inside classes
+- extension functions and the receiver object
 - `object`
 - `companion object`
 - class inheritance
@@ -320,7 +321,228 @@ Value: 2.45
 
 This means an object can store data and also have functions related to that data.
 
-## 6. The `object` keyword
+## 6. Extension functions
+
+Section 5 showed a function declared inside a class:
+
+```kotlin
+class Measurement(
+    val sampleId: String,
+    val value: Double
+) {
+    fun printInfo() {
+        println("Sample: $sampleId")
+        println("Value: $value")
+    }
+}
+```
+
+Because `printInfo()` is declared inside `Measurement`, it is a **member function** of that class.
+
+Kotlin also lets us declare a function outside a class and call it with dot notation on objects of that class. This is called an **extension function**:
+
+```kotlin
+fun Measurement.describe(): String {
+    return "Sample: ${this.sampleId}, value: ${this.value}"
+}
+```
+
+The function is used like this:
+
+```kotlin
+val measurement = Measurement("S001", 2.45)
+val description = measurement.describe()
+
+println(description)
+```
+
+Output:
+
+```text
+Sample: S001, value: 2.45
+```
+
+### Reading the extension-function declaration
+
+Break this declaration into parts:
+
+```kotlin
+fun Measurement.describe(): String
+```
+
+```text
+fun          starts a function declaration
+Measurement  receiver type
+.            connects the receiver type to the function name
+describe     extension function name
+()           function parameters
+String       return type
+```
+
+The **receiver type** tells Kotlin which type of object can use the extension. Because the receiver type is `Measurement`, a `Measurement` object can call `describe()`:
+
+```kotlin
+measurement.describe()
+```
+
+### What `this` means inside an extension function
+
+Inside the extension function, `this` refers to the particular receiver object on which the function was called:
+
+```kotlin
+fun Measurement.describe(): String {
+    return "Sample: ${this.sampleId}, value: ${this.value}"
+}
+```
+
+When this code runs:
+
+```kotlin
+val measurement = Measurement("S001", 2.45)
+measurement.describe()
+```
+
+the value of `this` inside `describe()` is the object stored in `measurement`.
+
+Therefore:
+
+```kotlin
+this.sampleId
+this.value
+```
+
+mean:
+
+```text
+Read sampleId and value from the Measurement object
+that called this extension function.
+```
+
+### `this` may be omitted
+
+Kotlin allows properties of the receiver object to be used without writing `this` when the meaning is clear. These two extension functions are equivalent:
+
+```kotlin
+fun Measurement.describe(): String {
+    return "Sample: ${this.sampleId}, value: ${this.value}"
+}
+```
+
+```kotlin
+fun Measurement.describe(): String {
+    return "Sample: $sampleId, value: $value"
+}
+```
+
+The shorter form is common Kotlin style. The explicit `this` form can be easier to understand while learning or when another variable has the same name.
+
+### Extension functions are useful for mapping objects
+
+Suppose the app has another class for values prepared for display:
+
+```kotlin
+class MeasurementDisplay(
+    val sampleId: String,
+    val displayedValue: String
+)
+```
+
+An extension function can convert a `Measurement` into a `MeasurementDisplay`:
+
+```kotlin
+fun Measurement.toDisplay(): MeasurementDisplay {
+    return MeasurementDisplay(
+        sampleId = this.sampleId,
+        displayedValue = this.value.toString()
+    )
+}
+```
+
+In this line:
+
+```kotlin
+sampleId = this.sampleId
+```
+
+the two sides have different jobs:
+
+```text
+sampleId = this.sampleId
+    |            |
+    |            property read from the current Measurement object
+    MeasurementDisplay constructor parameter being filled
+```
+
+Using `this.sampleId` makes the source of the value explicit. Kotlin also permits the shorter form:
+
+```kotlin
+sampleId = sampleId
+```
+
+On the left, `sampleId` is the named constructor parameter. On the right, it is the receiver object's property. Both versions compile, but the explicit `this` version is often clearer when first learning mapping code.
+
+Call the mapper with dot notation:
+
+```kotlin
+val display = measurement.toDisplay()
+```
+
+### Extension function compared with an ordinary function
+
+The same conversion could be written as an ordinary function:
+
+```kotlin
+fun mapMeasurementToDisplay(
+    measurement: Measurement
+): MeasurementDisplay {
+    return MeasurementDisplay(
+        sampleId = measurement.sampleId,
+        displayedValue = measurement.value.toString()
+    )
+}
+```
+
+The calls look like this:
+
+```kotlin
+val first = measurement.toDisplay()
+val second = mapMeasurementToDisplay(measurement)
+```
+
+Both functions can perform the same conversion. The extension style reads naturally from left to right:
+
+```text
+Take this measurement and convert it to a display model.
+```
+
+### An extension does not modify the original class
+
+Although the call looks like a member-function call, an extension function does not actually insert a new member into `Measurement`. It remains a separate function declared outside the class.
+
+That means an extension function:
+
+- does not change the original class source code
+- does not require inheritance
+- cannot access private members of the class
+- is available only where its declaration is visible or imported
+
+This syntax appears frequently in mapper code. For example, a later lesson uses a function shaped like:
+
+```kotlin
+fun PatientEntity.toPatientListItem(): PatientListItem
+```
+
+Read it as:
+
+```text
+Define a function named toPatientListItem.
+It can be called on a PatientEntity.
+It returns a PatientListItem.
+```
+
+This is an extension-function declaration. It is not a callback or a separate class relationship.
+
+## 7. The `object` keyword
 
 Normally, a `class` is a blueprint.
 
@@ -393,7 +615,7 @@ You will also see `object` inside `companion object`.
 
 That is the next idea.
 
-## 7. Companion object
+## 8. Companion object
 
 Normally, you create an object first, then call functions on that object.
 
@@ -514,7 +736,7 @@ ClassName.functionName()
 
 when the function is inside a `companion object`.
 
-## 8. Class inheritance
+## 9. Class inheritance
 
 Sometimes one class needs to be a special kind of another class.
 
@@ -746,7 +968,7 @@ val researchViewModel: ResearchViewModel = ResearchViewModel()
 Here the variable type and the object type are exactly the same.
 
 
-## 9. data class
+## 10. data class
 
 For research data, you will very often want a class that mainly stores information.
 
@@ -774,7 +996,7 @@ val measurement = Measurement(
 
 Use a `data class` when the main purpose of the class is to hold data.
 
-## 10. Why use data class?
+## 11. Why use data class?
 
 Suppose:
 
@@ -807,7 +1029,7 @@ Measurement(sampleId=S001, value=2.45)
 
 With a normal class, printing the object would not automatically give such useful output.
 
-## 11. Comparing data classes
+## 12. Comparing data classes
 
 Consider:
 
@@ -832,7 +1054,7 @@ because Kotlin compares their stored values.
 
 This is very useful when comparing research records.
 
-## 12. copy()
+## 13. copy()
 
 Another useful data class feature is `copy()`.
 
@@ -862,7 +1084,7 @@ while the other properties remain the same.
 
 You will see `copy()` often in modern Android development.
 
-## 13. Default parameter values
+## 14. Default parameter values
 
 Kotlin allows default values in functions.
 
@@ -916,7 +1138,7 @@ Text(
 
 where many other parameters have defaults.
 
-## 14. Default values in a data class
+## 15. Default values in a data class
 
 You can also write default values in a data class.
 
@@ -945,7 +1167,7 @@ valid = true
 
 Default values are useful when some information has a normal starting value, but other information still needs to be provided.
 
-## 15. A realistic measurement model
+## 16. A realistic measurement model
 
 For a research app, a measurement often needs more than one value.
 
@@ -975,7 +1197,7 @@ val measurement = Measurement(
 
 You do not need to worry about timestamps deeply yet.
 
-## 16. Lists of objects
+## 17. Lists of objects
 
 Now combine Lesson 2 with Lesson 3.
 
@@ -1037,7 +1259,7 @@ calculates the average.
 
 This style becomes very common in the research app.
 
-## 17. Null safety
+## 18. Null safety
 
 Now we get to one of the most important Kotlin concepts.
 
@@ -1073,7 +1295,7 @@ The `?` means:
 This variable may contain either a String or null.
 ```
 
-## 18. Why null safety matters in Android
+## 19. Why null safety matters in Android
 
 Android code constantly deals with things that might not exist yet:
 
@@ -1105,7 +1327,7 @@ After a measurement:
 latestReading = 2.45
 ```
 
-## 19. Kotlin protects you from null errors
+## 20. Kotlin protects you from null errors
 
 Suppose:
 
@@ -1131,7 +1353,7 @@ You must explicitly handle that possibility.
 
 This is a major reason Kotlin is safer than Java.
 
-## 20. Safe-call operator ?.
+## 21. Safe-call operator ?.
 
 You can write:
 
@@ -1183,7 +1405,7 @@ null
 
 rather than crashing.
 
-## 21. A very common Android pattern
+## 22. A very common Android pattern
 
 Suppose:
 
@@ -1213,7 +1435,7 @@ This is safe, but usually you do not want to display `null` to the user.
 
 That is where the Elvis operator helps.
 
-## 22. Elvis operator ?:
+## 23. Elvis operator ?:
 
 Usually you do not want to display `null`.
 
@@ -1254,7 +1476,7 @@ Unknown device
 
 You will see this operator frequently.
 
-## 23. Combining ?. and ?:
+## 24. Combining ?. and ?:
 
 This is very common:
 
@@ -1279,7 +1501,7 @@ val displayValue = latestReading?.toString() ?: "No data"
 
 Very useful.
 
-## 24. Standard if null check
+## 25. Standard if null check
 
 You can also do:
 
@@ -1305,7 +1527,7 @@ to:
 String
 ```
 
-## 25. !! - non-null assertion
+## 26. !! - non-null assertion
 
 You will also encounter:
 
@@ -1363,7 +1585,7 @@ over:
 val deviceName = name!!
 ```
 
-## 26. A practical nullable measurement example
+## 27. A practical nullable measurement example
 
 Suppose:
 
@@ -1402,7 +1624,7 @@ Do not worry too much about `let` yet. We will encounter lambdas and scope funct
 
 The first `if` version is perfectly good while learning.
 
-## 27. enum class
+## 28. enum class
 
 Sometimes a value should only be one of a small fixed set of options.
 
@@ -1454,7 +1676,7 @@ state = DeviceState.CONNECTED
 
 Note: Each enum entry is an object instance. An enum class automatically creates a fixed instance for each listed entry. You can access these entries directly through the enum class, without needing to instantiate an object first.
 
-## 28. Enum constants are not strings
+## 29. Enum constants are not strings
 
 The items in an enum class are enum constants of type `DeviceState`, not `String` values.
 
@@ -1581,7 +1803,7 @@ That object already has navLabel and shortcut values.
 
 This is useful when each fixed option needs extra information for the UI.
 
-## 29. when + enum
+## 30. when + enum
 
 Enums work beautifully with `when`.
 
@@ -1608,7 +1830,7 @@ Because Kotlin knows you have handled every possible value of `DeviceState`.
 
 That is safer than using arbitrary strings.
 
-## 30. Research example
+## 31. Research example
 
 Now we can combine data classes, null safety, and enums.
 
@@ -1667,7 +1889,7 @@ val statusMessage = when (measurement.status) {
 
 This looks much more like real Android application code.
 
-## 31. A complete example
+## 32. A complete example
 
 ```kotlin
 enum class DeviceState {
@@ -1719,7 +1941,7 @@ Repetition: 1
 Value: 2.43
 ```
 
-## 32. What you need to remember from Lesson 3
+## 33. What you need to remember from Lesson 3
 
 If you remember only these patterns, you are doing well.
 
@@ -1748,6 +1970,20 @@ val measurement = Measurement(
     sampleId = "S001",
     value = 2.45
 )
+```
+
+Extension function:
+
+```kotlin
+fun Measurement.describe(): String {
+    return "Sample: ${this.sampleId}, value: ${this.value}"
+}
+```
+
+Call the extension function:
+
+```kotlin
+val description = measurement.describe()
 ```
 
 Object keyword:
@@ -1853,7 +2089,7 @@ val message = when (state) {
 }
 ```
 
-## 33. One mental model for ?, ?., ?:, !!
+## 34. One mental model for ?, ?., ?:, !!
 
 This is worth memorizing:
 
