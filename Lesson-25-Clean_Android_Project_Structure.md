@@ -1728,14 +1728,58 @@ fun PatientRecord.toPatientListItem(): PatientListItem {
 
 This mapper belongs to the UI layer because its output, `PatientListItem`, exists for a screen. It knows about the domain model and UI model, but it does not know about Room.
 
-The ViewModel can use it while building UI state:
+A list-item UI model is a screen-specific projection of the application data. It contains the fields and item-specific UI state required to render that item on screen.
+
+The UI model is normally **prepared by the ViewModel and rendered by the screen**. It is called a UI model because it is designed for the screen, not because only a composable is allowed to use it.
+
+The flow is:
+
+```text
+Repository returns PatientRecord
+    -> ViewModel calls the UI mapper
+ViewModel creates PatientListItem
+    -> ViewModel stores it in PatientsUiState
+Screen reads PatientsUiState
+    -> Composable renders PatientListItem
+```
+
+For example, the screen state can contain a list of UI models:
+
+```kotlin
+data class PatientsUiState(
+    val patients: List<PatientListItem> = emptyList()
+)
+```
+
+The ViewModel maps the repository results while preparing that state:
 
 ```kotlin
 val patientItems = repository.getPatients()
     .map { patient ->
         patient.toPatientListItem()
     }
+
+uiState = uiState.copy(
+    patients = patientItems
+)
 ```
+
+The screen then consumes the prepared UI models:
+
+```kotlin
+@Composable
+fun PatientsScreen(uiState: PatientsUiState) {
+    LazyColumn {
+        items(uiState.patients) { patientItem ->
+            PatientRow(patient = patientItem)
+        }
+    }
+}
+```
+
+The ViewModel is not displaying `PatientListItem`; it is preparing the state that the screen will display. Calling a plain mapper function does not make the ViewModel depend on Compose UI functions.
+
+In this project structure, `viewmodel` and `ui` are separate packages, but both are on the presentation side of the app. The name `ui/mapper` describes the mapper's destination: it creates a model for the UI. In a feature-based structure, the ViewModel, UI state, UI model, mapper, and screen could instead live together under a package such as `patients`.
 
 ### Display formatting belongs in `ui/format`
 
@@ -1763,18 +1807,49 @@ Put reusable date, measurement, and percentage formatting functions under `ui/fo
 
 ### Simplified and stricter designs are both possible
 
-A small app may use a shorter path:
+The application does not automatically need a different model class in every layer. Add a boundary when it prevents unwanted coupling or gives a layer a meaningfully different representation.
+
+The shortest design allows a Room entity to travel beyond the data layer:
 
 ```text
 PatientEntity
     -> Repository
     -> ViewModel
-    -> PatientListItem
+    -> Composable
 ```
 
-That design does not make the ViewModel query Room, but it does make the ViewModel depend on a Room entity type.
+The ViewModel is not querying Room directly, but it still depends on a Room-specific class. This can be acceptable for a very small prototype, but database changes can then affect the ViewModel and UI.
 
-This research app chooses the stricter path:
+A cleaner design introduces a domain boundary but lets the UI use the domain model directly:
+
+```text
+PatientEntity
+    -> data mapper
+PatientRecord
+    -> Repository
+    -> ViewModel
+    -> Composable
+```
+
+In this version, `PatientRecord` serves both the application logic and the UI. This is a good choice when the screen needs roughly the same fields and structure as the domain model. There is no need to create `PatientListItem` merely to duplicate every property.
+
+For example, the screen state may hold domain models directly:
+
+```kotlin
+data class PatientsUiState(
+    val patients: List<PatientRecord> = emptyList()
+)
+```
+
+A separate UI model becomes useful when the screen needs a meaningfully different representation:
+
+- only a small subset of a large domain model
+- combined or derived values
+- item-specific UI state such as `isSelected`
+- a different structure designed for that screen
+- stronger isolation from changes to the domain model
+
+The flow then includes a UI mapper:
 
 ```text
 PatientEntity
@@ -1787,7 +1862,19 @@ PatientListItem
     -> Composable
 ```
 
-The extra model and mapper are useful here because persistent research records may evolve independently from individual screens. This is a deliberate boundary, not a rule that every small class must always have three copies.
+This research app keeps Room entities behind the data boundary. It can use `PatientRecord` directly on simple screens and introduce a screen-specific model such as `PatientListItem` when the presentation needs justify one.
+
+The important distinction is:
+
+```text
+Required: Room entity -> domain model
+    part of this project's data boundary
+
+Optional: domain model -> UI model
+    add it when the screen needs a different representation
+```
+
+Combining the domain and UI representations therefore means allowing the UI to use `PatientRecord`. It does not mean allowing the UI to use the Room-specific `PatientEntity`.
 
 ### Mapper placement reference
 
@@ -1795,7 +1882,7 @@ The extra model and mapper are useful here because persistent research records m
 |---|---|---|
 | `PatientEntity -> PatientRecord` | `data/mapper/PatientMappers.kt` | Knows about a Room entity |
 | `PatientRecord -> PatientEntity` | `data/mapper/PatientMappers.kt` | Creates a Room entity |
-| `PatientRecord -> PatientListItem` | `ui/mapper/PatientUiMappers.kt` | Creates a screen-specific model |
+| `PatientRecord -> PatientListItem` | `ui/mapper/PatientUiMappers.kt` | Creates a screen-specific model when one is needed |
 | `Long -> formatted date String` | `ui/format/DateFormatters.kt` | Creates display text |
 | `Double -> value with units` | `ui/format/ValueFormatters.kt` | Creates display text |
 
@@ -1805,6 +1892,7 @@ The practical rule is:
 If a mapper mentions a Room entity, keep it in the data layer.
 If a mapper creates a screen-specific model, keep it in the UI layer.
 Keep Room entities out of the ViewModel when using the domain boundary.
+A separate UI model is optional when the domain model already fits the screen.
 ```
 
 ---
