@@ -273,7 +273,17 @@ data
 
 ### Distinguishing model and mapping folders
 
-A **model** is a class that holds data in the form needed by one layer. A **mapper** is a function that converts one model into another. For example, `PatientRecord` holds patient data, while `PatientEntity.toDomainModel()` converts a database entity into that domain model.
+A **model** is a class that holds data in the form needed by one layer. A **mapper** is a function that usually converts a whole object from one model class into an object of another model class. For example, `PatientRecord` holds patient data, while `PatientEntity.toDomainModel()` converts one complete `PatientEntity` into a `PatientRecord`.
+
+A **formatter** normally converts one individual value into text for display. It does not create another model class. For example, `formatTimestamp(createdAt)` converts one `Long` value into a date `String`.
+
+```text
+mapper
+    whole model object -> another model object
+
+formatter
+    one typed value -> display text
+```
 
 The word `model` therefore appears in more than one folder because each layer may need a different representation of the same patient:
 
@@ -285,7 +295,7 @@ Mapper folders contain the conversion functions between those representations:
 
 - `data/mapper` converts between database entities and domain models. It belongs to `data` because these functions know about Room-specific entity classes.
 - `ui/mapper` converts domain models into UI models. It belongs to `ui` because these functions prepare data for a particular screen.
-- `ui/format` is slightly different: it converts a typed value into display text at the point where the UI needs text, such as turning a `Long` timestamp into a formatted date.
+- `ui/format` is not another model layer. It normally contains reusable functions such as `formatTimestamp()` that turn individual typed values into display text.
 
 The complete flow can look like this:
 
@@ -295,9 +305,10 @@ PatientEntity
 PatientRecord
     -> UI mapper
 PatientListItem
-    -> UI formatter when text is needed
-Text shown by the composable
+    -> UI formatter, converts createdAt to text shown by the composable
 ```
+
+A UI mapper can call a formatter when the UI model deliberately stores display-ready text such as `createdAtText: String`. UI models can also keep meaningful values typed, while formatting happens when the composable displays a value.
 
 Here is the same distinction as a compact folder reference:
 
@@ -421,7 +432,7 @@ ui
      `-- ValueFormatters.kt
 ```
 
-The screen files render UI. Files in `ui/model` hold screen-focused values, files in `ui/mapper` convert domain models into those values, and files in `ui/format` turn typed values into display text.
+The screen files render UI. Files in `ui/model` contain screen-focused data classes. Files in `ui/mapper` contain functions that convert whole domain-model objects into UI-model objects. Files in `ui/format` contain functions that convert individual typed values, such as timestamps or measurements, into display text.
 
 ### `ResearchApp.kt`
 
@@ -1728,7 +1739,15 @@ val patientItems = repository.getPatients()
 
 ### Display formatting belongs in `ui/format`
 
-A mapper changes one model representation into another. A formatter changes a typed value into text intended for display.
+A mapper usually accepts a whole model object and returns an object of another model class. A formatter usually accepts one value and returns text intended for display.
+
+The `ui/format` folder therefore normally contains functions, not involving another set of data classes:
+
+```kotlin
+fun formatTimestamp(timestamp: Long): String
+
+fun formatPercentage(value: Double): String
+```
 
 For example:
 
@@ -1740,7 +1759,7 @@ Long timestamp -> "22 Sep 2026, 14:30"
     UI formatter
 ```
 
-Put reusable date, measurement, and percentage formatting functions under `ui/format`. As explained in Section 12, this project keeps timestamps and measurements typed in its UI models and formats them when they are displayed.
+Put reusable date, measurement, and percentage formatting functions under `ui/format`. A UI mapper may call one of these functions if it creates a display-ready property such as `createdAtText`. In practice, timestamps and measurements can also remain typed in UI models and are formatted when they are displayed, as explained in Section 12. 
 
 ### Simplified and stricter designs are both possible
 
