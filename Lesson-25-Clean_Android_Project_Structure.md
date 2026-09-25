@@ -612,6 +612,187 @@ Start simple.
 
 ---
 
+### UI models and ViewModel state are different scopes
+
+The terms can be confusing because a ViewModel state class is also part of the UI or presentation layer. In this tutorial, use this distinction:
+
+```text
+PatientListItem
+    -> describes one item displayed on a screen
+
+PatientsUiState
+    -> describes the entire patient screen at one moment
+```
+
+A UI item model and a ViewModel state class are therefore not competing alternatives. The whole-screen state can contain a collection of item UI models.
+
+For example, `PatientListItem` contains the values needed to render one patient row:
+
+```kotlin
+data class PatientListItem(
+    val id: Long,
+    val patientCode: String,
+    val createdAt: Long
+)
+```
+
+`PatientsUiState` contains the content and status of the entire screen:
+
+```kotlin
+data class PatientsUiState(
+    val patients: List<PatientListItem> = emptyList(),
+    val searchQuery: String = "",
+    val selectedPatientId: Long? = null,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
+```
+
+The relationship is:
+
+```text
+Repository returns PatientRecord
+    -> ViewModel maps each record to PatientListItem
+    -> ViewModel stores the list in PatientsUiState
+    -> PatientsScreen reads PatientsUiState
+    -> PatientRow renders each PatientListItem
+```
+
+The ViewModel might prepare the state like this:
+
+```kotlin
+val patientItems = repository.getPatients()
+    .map { patient ->
+        patient.toPatientListItem()
+    }
+
+uiState = uiState.copy(
+    patients = patientItems,
+    isLoading = false
+)
+```
+
+#### How to decide where a value belongs
+
+Put a value in an item UI model when it describes one displayed item:
+
+```text
+patient ID
+patient code
+created date
+derived label for that row
+```
+
+Put a value in the ViewModel state when it describes the screen or its current operation:
+
+```text
+the complete patient list
+search query
+selected patient ID
+loading status
+error message
+active filter or sort order
+whether a screen-level dialog is open
+```
+
+A useful question is:
+
+```text
+Does this value describe one patient row?
+    -> PatientListItem
+
+Does this value describe the whole patient screen?
+    -> PatientsUiState
+```
+
+#### Can fields be repeated?
+
+Some repeated property names between architectural models are expected:
+
+```text
+PatientRecord.patientCode
+    -> domain representation
+
+PatientListItem.patientCode
+    -> UI representation
+```
+
+The UI mapper copies the value because the two classes serve different layers and purposes.
+
+However, avoid storing the same piece of screen state twice. This creates two possible sources of truth:
+
+```kotlin
+// Avoid this when both properties represent the same patient code.
+data class PatientsUiState(
+    val selectedPatient: PatientListItem?,
+    val selectedPatientCode: String
+)
+```
+
+The properties could disagree. Store one source of truth instead:
+
+```kotlin
+data class PatientsUiState(
+    val selectedPatient: PatientListItem?
+)
+```
+
+Then read the code from the selected patient:
+
+```kotlin
+val patientCode = uiState.selectedPatient?.patientCode
+```
+
+Alternatively, store only the selected ID alongside the list:
+
+```kotlin
+data class PatientsUiState(
+    val patients: List<PatientListItem> = emptyList(),
+    val selectedPatientId: Long? = null
+)
+```
+
+A repeated value is reasonable when it represents a genuinely different state. An editable draft, for example, can differ from the saved patient:
+
+```kotlin
+data class PatientEditorUiState(
+    val originalPatient: PatientRecord?,
+    val patientCodeInput: String
+)
+```
+
+Here, `patientCodeInput` is the user's current draft. Changing it does not immediately change the saved `PatientRecord`.
+
+#### A separate item UI model is optional
+
+When a domain model already has exactly the shape a simple screen needs, the whole-screen state can contain domain models directly:
+
+```kotlin
+data class PatientsUiState(
+    val patients: List<PatientRecord> = emptyList(),
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
+```
+
+Introduce `PatientListItem` when the patient screen needs a smaller, derived, or otherwise screen-specific representation:
+
+```kotlin
+data class PatientsUiState(
+    val patients: List<PatientListItem> = emptyList(),
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
+```
+
+The central rule is:
+
+> An item UI model describes one displayed object. A ViewModel state class combines those objects with everything else needed to represent the entire screen. Keep one source of truth for each piece of screen state.
+
+As the project grows, separate screens can have separate state classes such as `PatientsUiState`, `SessionUiState`, and `MeasurementUiState`. The small `ResearchUiState` above is only the starting version for this lesson.
+
+---
+
 ### `ResearchViewModel.kt`
 
 This file controls app state and user actions.
