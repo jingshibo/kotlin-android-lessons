@@ -2024,6 +2024,146 @@ DAO returns entity
     -> repository returns domain model
 ```
 
+### Repository data type
+
+The repository implementation communicates with the DAO using entities, but its **public functions should normally communicate with the ViewModel using domain models**.
+
+```kotlin
+class MeasurementRepository(
+    private val patientDao: PatientDao
+) {
+    suspend fun getPatients(): List<PatientRecord> {
+        return patientDao.getAll()
+            .map { entity ->
+                entity.toDomainModel()
+            }
+    }
+
+    suspend fun savePatient(patient: PatientRecord) {
+        patientDao.insert(
+            patient.toEntity()
+        )
+    }
+}
+```
+
+Therefore, in the usual design:
+
+```text
+Repository input:
+    domain model
+
+Repository output:
+    domain model
+
+DAO input:
+    entity
+
+DAO output:
+    entity
+```
+
+In comparison, room DAO functions generally work with entity classes because entities represent database tables:
+
+```kotlin
+@Dao
+interface PatientDao {
+
+    @Insert
+    suspend fun insert(patient: PatientEntity)
+
+    @Query("SELECT * FROM patients")
+    suspend fun getAll(): List<PatientEntity>
+}
+```
+
+Room DAOs can also return selected columns, scalar values, or special database projections, but those are still data-layer representations.
+
+
+### Saving and loading flow
+
+The complete flow is:
+
+```text
+Saving:
+
+ViewModel
+    -> PatientRecord
+Repository
+    -> converts PatientRecord to PatientEntity
+DAO
+    -> saves PatientEntity
+Database
+```
+
+```text
+Loading:
+
+Database
+    -> PatientEntity
+DAO
+    -> returns PatientEntity
+Repository
+    -> converts PatientEntity to PatientRecord
+ViewModel
+    -> receives PatientRecord
+```
+
+The repository itself knows both representations because it performs the boundary conversion:
+
+```text
+ViewModel knows:
+    PatientRecord
+    MeasurementRepository
+
+Repository knows:
+    PatientRecord
+    PatientEntity
+    PatientDao
+    mapper functions
+
+DAO knows:
+    PatientEntity
+
+Composable knows:
+    PatientRecord or PatientListItem
+```
+
+### Repository inputs do not always need to be complete models
+
+Some operations naturally accept a domain model:
+
+```kotlin
+suspend fun savePatient(patient: PatientRecord)
+```
+
+Others only need a particular value:
+
+```kotlin
+suspend fun getPatient(patientId: Long): PatientRecord?
+
+suspend fun voidPatient(
+    patientId: Long,
+    reason: String
+)
+
+suspend fun deletePatient(patientId: Long)
+```
+
+You should not construct an entire `PatientRecord` when an operation only requires an ID.
+
+A repository query normally returns a domain model or a collection or stream of domain models. Other operations may instead return `Unit`, a newly created ID, or an operation result.
+
+A more precise rule is:
+
+> A repository's public API should use domain-level models and values. Room entities should remain internal to the data layer.
+
+UI models such as `PatientListItem` should not be passed into the repository.
+
+### The repository is a data boundary
+
+A repository is more than merely a bridge between a database and ViewModel. It represents the application's data boundary and could later coordinate Room, remote APIs, files, or caches without forcing the ViewModel to change.
+
 Its final responsibility will be:
 
 ```text
@@ -2050,6 +2190,86 @@ class MeasurementRepository {
 This looks empty, but that is fine.
 
 In Direction A, we are setting up the project step by step.
+
+### One repository or several?
+
+At this stage, the project contains only:
+
+```text
+data/MeasurementRepository.kt
+```
+
+Using one repository is acceptable as a temporary, beginner-friendly starting point. It reduces the number of classes while the project skeleton is being built.
+
+One repository may remain sufficient when:
+
+- the application is small
+- its records belong to one closely related data area
+- the repository's public API remains focused
+- splitting it would only create several tiny classes that always change together
+
+The responsibility list above is intentionally broad for this early learning stage. As the application grows, permanently putting all those operations in one class would give that class several unrelated reasons to change. Its name would also become misleading because it would manage much more than measurements.
+
+Do not automatically create one repository for every Room table. Instead, split repositories around a **coherent area of data and operations**. A likely future structure is:
+
+```text
+PatientRepository
+    -> create, update, find, and void patients
+
+SessionRepository
+    -> create and load research sessions
+
+MeasurementRepository
+    -> save and retrieve measurements
+
+ResultRepository
+    -> save and retrieve analysis or prediction results
+```
+
+Closely related records can still share a repository. For example, if results always belong to measurements and are always loaded with them, `MeasurementRepository` could manage both. The split should follow meaningful responsibility, not mechanically copy the database table list.
+
+Some operations in the earlier broad project structure list are not primarily repository responsibilities:
+
+```text
+DeviceDataSource
+    -> communicates with the device
+
+SignalProcessor
+    -> processes measurements
+
+ModelRunner
+    -> runs ML inference
+
+ExportFormatter
+    -> creates export text
+```
+
+**When one user action must coordinate several of these components, that workflow can belong in a use-case or coordinator class rather than making one repository own every operation:**
+
+```kotlin
+class RunMeasurementUseCase(
+    private val deviceDataSource: DeviceDataSource,
+    private val measurementRepository: MeasurementRepository,
+    private val signalProcessor: SignalProcessor,
+    private val modelRunner: ModelRunner,
+    private val resultRepository: ResultRepository
+)
+```
+
+The practical direction for this project is:
+
+```text
+Lesson 25 skeleton
+    -> one MeasurementRepository is acceptable temporarily
+
+As persistent-data responsibilities grow
+    -> split repositories by coherent data responsibility
+
+For workflows spanning several components
+    -> use a use-case or coordinator
+```
+
+If the application deliberately keeps one repository for all persistent research records, `ResearchRepository` would be a clearer name than `MeasurementRepository`.
 
 ---
 
