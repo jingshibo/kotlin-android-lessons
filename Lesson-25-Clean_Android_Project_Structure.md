@@ -705,21 +705,80 @@ Does this value describe the whole patient screen?
     -> PatientsUiState
 ```
 
-#### Can fields be repeated?
+#### What ViewModel UI state should include
 
-Some repeated property names between architectural models are expected:
+To be simple: ViewModel UI State (UiState) **wraps the UI Model(s)** (or domain models) **+ Screen Control States** (search text, filter dropdown selections, modal visibility toggles, form draft buffers).
+
+More precisely: A ViewModel UI state represents the **entire screen at one moment**. It usually combines three kinds of values:
 
 ```text
-PatientRecord.patientCode
-    -> domain representation
+screen content
+    -> UI models, or domain models when no separate UI model is needed
 
-PatientListItem.patientCode
-    -> UI representation
+screen control and input state
+    -> search text, selected filters, selected item, dialog visibility,
+       and form draft values
+
+screen operation state
+    -> loading status, errors, and operation results
 ```
 
-The UI mapper copies the value because the two classes serve different layers and purposes.
+For example:
 
-However, avoid storing the same piece of screen state twice. This creates two possible sources of truth:
+```kotlin
+data class PatientsUiState(
+    // Screen content
+    val patients: List<PatientListItem> = emptyList(),
+
+    // Screen control and input state
+    val searchQuery: String = "",
+    val selectedPatientId: Long? = null,
+    val isCreateDialogVisible: Boolean = false,
+    val patientCodeDraft: String = "",
+
+    // Screen operation state
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
+```
+
+It is clearer to say that `PatientsUiState` **contains** or **combines** these values rather than merely "wraps" a UI model. The state class is the complete screen snapshot, and the UI models are one part of that snapshot.
+
+Not every temporary visual detail must be moved into the ViewModel. State used only by one composable for a local visual behavior can remain in that composable with `remember` or `rememberSaveable`. 
+
+Put a value in the ViewModel state when the ViewModel needs to read or change it, when it affects screen logic, or when multiple parts of the screen need the same state.
+
+#### Can fields be repeated?
+
+Normally, the ViewModel state contains the UI model object or a collection of UI model objects. It does not copy every property from the UI model into separate state properties:
+
+```kotlin
+data class PatientListItem(
+    val id: Long,
+    val patientCode: String,
+    val createdAt: Long
+)
+
+data class PatientsUiState(
+    val patients: List<PatientListItem> = emptyList(),
+    val isLoading: Boolean = false
+)
+```
+
+The relationship is nesting:
+
+```text
+PatientsUiState
+    -> patients
+        -> PatientListItem
+            -> id
+            -> patientCode
+            -> createdAt
+```
+
+`PatientsUiState` owns the state of the whole screen, while each `PatientListItem` owns the values for one row. This is composition, not unnecessary duplication.
+
+Avoid copying a field out of a UI model and storing the same information separately in the screen state. That creates two possible sources of truth:
 
 ```kotlin
 // Avoid this when both properties represent the same patient code.
@@ -752,16 +811,26 @@ data class PatientsUiState(
 )
 ```
 
+Here, `PatientListItem.id` identifies each patient, while `selectedPatientId` answers a different screen-level question: **Which patient is currently selected?** The ViewModel or UI can find or highlight the matching item from the list.
+
+```kotlin
+val selectedPatient = uiState.patients.find { patient ->
+    patient.id == uiState.selectedPatientId
+}
+```
+
+This is not harmful duplication because the two properties have different responsibilities.
+
 A repeated value is reasonable when it represents a genuinely different state. An editable draft, for example, can differ from the saved patient:
 
 ```kotlin
 data class PatientEditorUiState(
-    val originalPatient: PatientRecord?,
-    val patientCodeInput: String
+    val originalPatient: PatientListItem?,
+    val patientCodeInput: String = ""
 )
 ```
 
-Here, `patientCodeInput` is the user's current draft. Changing it does not immediately change the saved `PatientRecord`.
+Here, `originalPatient.patientCode` is the value originally loaded for display, while `patientCodeInput` is the user's current draft. They may intentionally differ while the user is editing.
 
 #### A separate item UI model is optional
 
