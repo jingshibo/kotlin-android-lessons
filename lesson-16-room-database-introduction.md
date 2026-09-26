@@ -947,6 +947,8 @@ A more professional app may use dependency injection later.
 
 But for this tutorial, this is a practical beginner-friendly path.
 
+For a step-by-step version that creates one application-level database and repository, then supplies the repository to a normal `ViewModel`, see [Lesson 16 notes - Application-level dependencies with Room and ViewModel](lesson-16-notes-application-level-dependencies.md).
+
 The mental model is:
 
 ```text
