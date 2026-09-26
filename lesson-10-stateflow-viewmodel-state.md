@@ -213,7 +213,7 @@ viewModel.uiState.collect { latestState ->
 }
 ```
 
-è¿™é‡Œcollectçš„å«ä¹‰å¾ˆç›´æŽ¥ï¼Œå°±æ˜¯èŽ·å– viewModel.uiStateçš„å€¼ï¼Œè¿™é‡Œçš„latestStateæŒ‡çš„å°±æ˜¯uiStateçš„å½“å‰å€¼ã€‚ç„¶åŽåŸºäºŽèŽ·å–çš„è¿™ä¸ªå€¼è¿›è¡ŒåŽç»­æ“ä½œã€‚
+这里 `collect` 的含义很直接，就是获取 `viewModel.uiState` 发出的值。这里的 `latestState` 指的就是 `uiState` 当前发出的值，然后代码可以基于这个值进行后续操作。
 
 means:
 
@@ -649,7 +649,7 @@ Differences: `collectAsState()` vs. `collectAsStateWithLifecycle()`
 
 | Feature | `collectAsState()` | `collectAsStateWithLifecycle()` (Best Practice) |
 |---|---|---|
-| Lifecycle Awareness | âŒ None (Keeps collecting in background) | âœ… Lifecycle-Aware (Pauses when app is minimized) |
+| Lifecycle Awareness | No lifecycle awareness (keeps collecting in background) | Lifecycle-aware (pauses when the app is minimized) |
 | Battery & CPU Usage | Wastes CPU/battery updating UI state when app is hidden | Saves CPU & Battery by pausing background flow collection |
 | Behavior on Minimize | Keeps collecting flow emissions when screen is off | Pauses collection when lifecycle falls below `STARTED`, resumes on foreground |
 | Library Origin | `androidx.compose.runtime` (Base Compose) | `androidx.lifecycle.compose` (Android Lifecycle) |
