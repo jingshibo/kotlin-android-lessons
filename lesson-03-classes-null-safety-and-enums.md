@@ -1,22 +1,23 @@
-﻿# Lesson 3 - Classes, Data Classes, Null Safety, and Enums
+﻿# Lesson 3 - Classes, Null Safety, and Enums
 
 This lesson is especially important because these features appear constantly in Android code.
 
-The lesson has four main parts:
+The lesson has three main parts:
 
 ```text
 Part 1: Classes
     -> define your own object types
 
-Part 2: Data classes
-    -> store research data cleanly
-
-Part 3: Null safety
+Part 2: Null safety
     -> handle values that may not exist yet
 
-Part 4: Enums
+Part 3: Enums
     -> represent fixed states safely
 ```
+
+The data-class material is in the companion note:
+
+[Lesson 3 Notes - Data Classes](lesson-03-notes-data-classes.md)
 
 We will cover:
 
@@ -29,9 +30,7 @@ We will cover:
 - `object`
 - `companion object`
 - class inheritance
-- `data class`
 - named arguments
-- `copy()`
 - default parameter values
 - lists of objects
 - nullable types with `?`
@@ -968,123 +967,7 @@ val researchViewModel: ResearchViewModel = ResearchViewModel()
 Here the variable type and the object type are exactly the same.
 
 
-## 10. data class
-
-For research data, you will very often want a class that mainly stores information.
-
-Kotlin provides `data class` for this.
-
-Example:
-
-```kotlin
-data class Measurement(
-    val sampleId: String,
-    val value: Double,
-    val timestamp: Long
-)
-```
-
-Create one:
-
-```kotlin
-val measurement = Measurement(
-    sampleId = "S001",
-    value = 2.45,
-    timestamp = 1755760000
-)
-```
-
-Use a `data class` when the main purpose of the class is to hold data.
-
-## 11. Why use data class?
-
-Suppose:
-
-```kotlin
-data class Measurement(
-    val sampleId: String,
-    val value: Double
-)
-```
-
-Kotlin automatically gives you useful functionality such as:
-
-- readable `toString()`
-- equality comparison by stored values
-- `copy()`
-
-For example:
-
-```kotlin
-val m1 = Measurement("S001", 2.45)
-
-println(m1)
-```
-
-produces something like:
-
-```text
-Measurement(sampleId=S001, value=2.45)
-```
-
-With a normal class, printing the object would not automatically give such useful output.
-
-## 12. Comparing data classes
-
-Consider:
-
-```kotlin
-val m1 = Measurement("S001", 2.45)
-val m2 = Measurement("S001", 2.45)
-```
-
-With a data class:
-
-```kotlin
-println(m1 == m2)
-```
-
-returns:
-
-```text
-true
-```
-
-because Kotlin compares their stored values.
-
-This is very useful when comparing research records.
-
-## 13. copy()
-
-Another useful data class feature is `copy()`.
-
-```kotlin
-val original = Measurement(
-    sampleId = "S001",
-    value = 2.45
-)
-```
-
-You can make a modified copy:
-
-```kotlin
-val corrected = original.copy(
-    value = 2.50
-)
-```
-
-Now:
-
-```text
-original.value   = 2.45
-corrected.value  = 2.50
-```
-
-while the other properties remain the same.
-
-You will see `copy()` often in modern Android development.
-
-## 14. Default parameter values
+## 10. Default parameter values
 
 Kotlin allows default values in functions.
 
@@ -1138,43 +1021,14 @@ Text(
 
 where many other parameters have defaults.
 
-## 15. Default values in a data class
+## 11. Lists of objects
 
-You can also write default values in a data class.
+Now combine Lesson 2 with Lesson 3.
 
-```kotlin
-data class Measurement(
-    val sampleId: String,
-    val value: Double,
-    val valid: Boolean = true
-)
-```
-
-Then:
+Lists can contain objects created from a normal class. A data class is not required:
 
 ```kotlin
-val measurement = Measurement(
-    sampleId = "S001",
-    value = 2.45
-)
-```
-
-automatically has:
-
-```text
-valid = true
-```
-
-Default values are useful when some information has a normal starting value, but other information still needs to be provided.
-
-## 16. A realistic measurement model
-
-For a research app, a measurement often needs more than one value.
-
-For example:
-
-```kotlin
-data class Measurement(
+class Measurement(
     val sampleId: String,
     val repetition: Int,
     val value: Double,
@@ -1182,26 +1036,7 @@ data class Measurement(
 )
 ```
 
-Then:
-
-```kotlin
-val measurement = Measurement(
-    sampleId = "D1-ETO-W0-U1-S1",
-    repetition = 3,
-    value = 2.47,
-    timestamp = System.currentTimeMillis()
-)
-```
-
-`System.currentTimeMillis()` gives the current Unix timestamp in milliseconds.
-
-You do not need to worry about timestamps deeply yet.
-
-## 17. Lists of objects
-
-Now combine Lesson 2 with Lesson 3.
-
-Using the `Measurement` data class from the previous section:
+Now create a list:
 
 ```kotlin
 val measurements = listOf(
@@ -1259,7 +1094,7 @@ calculates the average.
 
 This style becomes very common in the research app.
 
-## 18. Null safety
+## 12. Null safety
 
 Now we get to one of the most important Kotlin concepts.
 
@@ -1295,7 +1130,7 @@ The `?` means:
 This variable may contain either a String or null.
 ```
 
-## 19. Why null safety matters in Android
+## 13. Why null safety matters in Android
 
 Android code constantly deals with things that might not exist yet:
 
@@ -1327,7 +1162,7 @@ After a measurement:
 latestReading = 2.45
 ```
 
-## 20. Kotlin protects you from null errors
+## 14. Kotlin protects you from null errors
 
 Suppose:
 
@@ -1353,7 +1188,7 @@ You must explicitly handle that possibility.
 
 This is a major reason Kotlin is safer than Java.
 
-## 21. Safe-call operator ?.
+## 15. Safe-call operator ?.
 
 You can write:
 
@@ -1405,7 +1240,7 @@ null
 
 rather than crashing.
 
-## 22. A very common Android pattern
+## 16. A very common Android pattern
 
 Suppose:
 
@@ -1435,7 +1270,7 @@ This is safe, but usually you do not want to display `null` to the user.
 
 That is where the Elvis operator helps.
 
-## 23. Elvis operator ?:
+## 17. Elvis operator ?:
 
 Usually you do not want to display `null`.
 
@@ -1476,7 +1311,7 @@ Unknown device
 
 You will see this operator frequently.
 
-## 24. Combining ?. and ?:
+## 18. Combining ?. and ?:
 
 This is very common:
 
@@ -1501,7 +1336,7 @@ val displayValue = latestReading?.toString() ?: "No data"
 
 Very useful.
 
-## 25. Standard if null check
+## 19. Standard if null check
 
 You can also do:
 
@@ -1527,7 +1362,7 @@ to:
 String
 ```
 
-## 26. !! - non-null assertion
+## 20. !! - non-null assertion
 
 You will also encounter:
 
@@ -1585,7 +1420,7 @@ over:
 val deviceName = name!!
 ```
 
-## 27. A practical nullable measurement example
+## 21. A practical nullable measurement example
 
 Suppose:
 
@@ -1624,7 +1459,7 @@ Do not worry too much about `let` yet. We will encounter lambdas and scope funct
 
 The first `if` version is perfectly good while learning.
 
-## 28. enum class
+## 22. enum class
 
 Sometimes a value should only be one of a small fixed set of options.
 
@@ -1676,7 +1511,7 @@ state = DeviceState.CONNECTED
 
 Note: Each enum entry is an object instance. An enum class automatically creates a fixed instance for each listed entry. You can access these entries directly through the enum class, without needing to instantiate an object first.
 
-## 29. Enum constants are not strings
+## 23. Enum constants are not strings
 
 The items in an enum class are enum constants of type `DeviceState`, not `String` values.
 
@@ -1803,7 +1638,7 @@ That object already has navLabel and shortcut values.
 
 This is useful when each fixed option needs extra information for the UI.
 
-## 30. when + enum
+## 24. when + enum
 
 Enums work beautifully with `when`.
 
@@ -1830,9 +1665,9 @@ Because Kotlin knows you have handled every possible value of `DeviceState`.
 
 That is safer than using arbitrary strings.
 
-## 31. Research example
+## 25. Research example
 
-Now we can combine data classes, null safety, and enums.
+Now we can combine the data-class idea from [Lesson 3 Notes - Data Classes](lesson-03-notes-data-classes.md) with null safety and enums.
 
 ```kotlin
 enum class MeasurementStatus {
@@ -1889,7 +1724,7 @@ val statusMessage = when (measurement.status) {
 
 This looks much more like real Android application code.
 
-## 32. A complete example
+## 26. A complete example
 
 ```kotlin
 enum class DeviceState {
@@ -1941,23 +1776,16 @@ Repetition: 1
 Value: 2.43
 ```
 
-## 33. What you need to remember from Lesson 3
+## 27. What you need to remember from Lesson 3
 
 If you remember only these patterns, you are doing well.
+
+The `data class` and `copy()` patterns are summarized separately in [Lesson 3 Notes - Data Classes](lesson-03-notes-data-classes.md).
 
 Class:
 
 ```kotlin
 class Measurement(
-    val sampleId: String,
-    val value: Double
-)
-```
-
-Data class:
-
-```kotlin
-data class Measurement(
     val sampleId: String,
     val value: Double
 )
@@ -2017,14 +1845,6 @@ Call a companion object function:
 
 ```kotlin
 val valid = MeasurementRules.isValid(2.45)
-```
-
-Copy with one changed field:
-
-```kotlin
-val corrected = measurement.copy(
-    value = 2.50
-)
 ```
 
 Nullable value:
@@ -2089,7 +1909,7 @@ val message = when (state) {
 }
 ```
 
-## 34. One mental model for ?, ?., ?:, !!
+## 28. One mental model for ?, ?., ?:, !!
 
 This is worth memorizing:
 

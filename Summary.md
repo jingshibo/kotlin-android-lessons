@@ -200,6 +200,8 @@ Covered:
 
 This lesson introduces structured research data, for example `Measurement(sampleId, value, timestamp)`, and explains why null safety is important in Android because devices, readings, files, and database results may not exist yet.
 
+The dedicated data-class explanations and examples are collected in [Lesson 3 Notes - Data Classes](lesson-03-notes-data-classes.md).
+
 ### Lesson 4 - First Android app with Jetpack Compose
 
 Short summary:
