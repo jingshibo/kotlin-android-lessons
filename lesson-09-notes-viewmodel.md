@@ -25,6 +25,44 @@ This note is organized in this order:
 - 所有的状态更新过程（改变state的操作）都放入ViewModel，而UI只负责对当前state进行显示，而不进行任何状态修改操作。只有ViewModel的函数可以对状态量进行更新。
    - 当UI上发生了一个event（比如onClick），这个event会自动调用ViewModel中的函数，这个函数会实现状态量的更新。此时UI会探测到状态量的变化，然后重刷UI界面，自动显示最新的状态值。
 
+## Quick decision guide
+
+```text
+Is this variable being created?
+              |
+              +------------------------------------------------+
+              |                                                |
+              v                                                v
+Does it represent screen data,                    Is it only local visual state?
+trigger repository/database work,                 Examples:
+or participate in business logic?                 - opening a local dialog
+              |                                   - toggling an animation
+             YES                                  - tracking local scroll position
+              |                                                |
+              v                                               YES
+Put it in VIEWMODEL UI STATE                                  |
+for example: StateFlow<UiState>                               v
+                                                  Keep it in COMPOSABLE STATE
+                                                  for example:
+                                                  remember { mutableStateOf(...) }
+                                                  or rememberSaveable
+```
+
+Also ask whether several composables need the same value or whether the ViewModel must read or change it. If so, it usually belongs in ViewModel UI state. A value used only for one composable's temporary visual behavior can usually remain local to that composable.
+
+Important lifecycle detail:
+
+```text
+ViewModel
+    -> survives ordinary recomposition
+    -> survives configuration changes such as screen rotation
+    -> does not automatically survive process death
+
+For process-death restoration
+    -> use SavedStateHandle for small restorable screen state
+    -> use Room, DataStore, or files for persistent application data
+```
+
 The goal is not to memorize a rule like:
 
 ```text
