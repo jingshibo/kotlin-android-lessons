@@ -145,6 +145,45 @@ connect to a paired or discovered Bluetooth device
 
 `BLUETOOTH_ADVERTISE` is mainly needed if your tablet/app advertises itself as a Bluetooth device, which may not be needed for your first version.
 
+### Permission belongs to the app, not to one Bluetooth device
+
+The Bluetooth permission is granted to your installed app on the Android phone or tablet.
+
+It is **not** granted separately for every sensor or Bluetooth device.
+
+For example:
+
+```text
+User grants this app permission to use nearby Bluetooth devices
+ ↓
+App may scan for or connect to devices, depending on the granted permissions
+ ↓
+App does not request the same permission again for every connection
+```
+
+The app should still check the current permission before every protected Bluetooth operation. It should open the permission request only when the required permission is missing.
+
+This matters because permission can later be removed when:
+
+- the user revokes it in Android Settings
+- Android resets permissions for an app that has not been used for a long time
+- the app is reinstalled
+- the app's data is cleared
+
+So the practical rule is:
+
+```text
+Check every time
+Request only when permission is missing
+```
+
+Bluetooth permission and Bluetooth pairing are different:
+
+- **App permission** allows the app to use Bluetooth and is normally requested once.
+- **Pairing or bonding** identifies and trusts a particular remote device. A PIN or confirmation dialog may appear the first time each new device is paired.
+- A previously paired device normally reconnects without another pairing dialog.
+- Some Bluetooth Low Energy devices do not require pairing at all.
+
 ---
 
 ## 4. Bluetooth permissions in the manifest
@@ -307,15 +346,17 @@ For a real device app, the user flow should be something like:
 ```text
 Open Measurement Screen
  ↓
-Check permission
+Check whether permission is already granted
  ↓
-If needed, request permission
+If missing, request permission
  ↓
 User grants permission
  ↓
 Connect Device button becomes available
  ↓
-User connects device
+User selects and connects a device
+ ↓
+If that device requires pairing, Android may show a separate pairing dialog
  ↓
 Start Acquisition becomes available
 ```
@@ -380,14 +421,27 @@ It should report the result to the ViewModel.
 
 ## 9. Decide which Bluetooth permissions to request
 
-For Android 12+:
+Your code must choose the runtime permissions for the Android version currently running. Android does not add this version check to your app automatically.
+
+For an app that scans for and connects to devices, a beginner-compatible version is:
 
 ```kotlin
-val bluetoothPermissions = arrayOf(
-    android.Manifest.permission.BLUETOOTH_SCAN,
-    android.Manifest.permission.BLUETOOTH_CONNECT
-)
+val bluetoothPermissions =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT
+        )
+    } else {
+        arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION
+        )
+    }
 ```
+
+`Build.VERSION_CODES.S` means Android 12, API level 31. Android evaluates the condition at runtime and uses the appropriate branch.
+
+On Android 11 and lower, the legacy `BLUETOOTH` and `BLUETOOTH_ADMIN` permissions are declared in the manifest. They are normal install-time permissions, so they are not added to this runtime permission launcher. Location is included here because scanning on those Android versions can require runtime location permission.
 
 If you also advertise:
 
@@ -418,23 +472,39 @@ connect to selected device
 
 ## 10. Permission request button
 
-In the UI, add a button:
+Before launching the permission dialog, check whether every required permission is already granted:
 
 ```kotlin
+val context = LocalContext.current
+
+fun areBluetoothPermissionsGranted(): Boolean {
+    return bluetoothPermissions.all { permission ->
+        ContextCompat.checkSelfPermission(
+            context,
+            permission
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+}
+
 Button(
     onClick = {
-        bluetoothPermissionLauncher.launch(bluetoothPermissions)
+        if (areBluetoothPermissionsGranted()) {
+            // Permission was granted earlier, so no system dialog is needed.
+            viewModel.onBluetoothPermissionGranted()
+        } else {
+            bluetoothPermissionLauncher.launch(bluetoothPermissions)
+        }
     }
 ) {
-    Text("Request Bluetooth Permission")
+    Text("Check / Request Bluetooth Permission")
 }
 ```
 
-This is the simplest beginner version.
+The permission remains attached to this installed app, not to one selected Bluetooth device. Connecting to Sensor A and then Sensor B does not normally require the app permission dialog twice.
 
-Later, we can make the app automatically check whether permission is already granted.
+However, pairing is separate. Android may show a pairing confirmation or PIN dialog the first time the app connects to each device that requires pairing.
 
-But for learning, a visible button is clearer.
+For learning, a visible check/request button is clearer. A later version could perform the same check automatically when the screen opens or resumes.
 
 ---
 
@@ -535,6 +605,26 @@ Permission granted
 can attempt connection
 ```
 
+This permission check does not approve one particular sensor. It confirms that the app currently has permission to perform the Bluetooth operation.
+
+When real Bluetooth code is added, keep the two flows separate:
+
+```text
+App permission missing
+ ↓
+show Android permission request
+
+App permission granted, but selected device is not paired
+ ↓
+Android may show device pairing confirmation or PIN
+
+App permission granted and device already paired
+ ↓
+connect normally without showing either dialog again
+```
+
+The app should check the real system permission before connecting, even if the ViewModel previously stored `PermissionState.GRANTED`, because the user can revoke permission while the app is not active.
+
 ---
 
 ## 13. Update button enable logic
@@ -619,10 +709,28 @@ fun MeasurementScreen(
     uiState: ResearchUiState,
     viewModel: ResearchViewModel
 ) {
-    val bluetoothPermissions = arrayOf(
-        android.Manifest.permission.BLUETOOTH_SCAN,
-        android.Manifest.permission.BLUETOOTH_CONNECT
-    )
+    val context = LocalContext.current
+
+    val bluetoothPermissions =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        }
+
+    fun areBluetoothPermissionsGranted(): Boolean {
+        return bluetoothPermissions.all { permission ->
+            ContextCompat.checkSelfPermission(
+                context,
+                permission
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
 
     val bluetoothPermissionLauncher =
         rememberLauncherForActivityResult(
@@ -650,17 +758,26 @@ fun MeasurementScreen(
 
         Button(
             onClick = {
-                bluetoothPermissionLauncher.launch(bluetoothPermissions)
+                if (areBluetoothPermissionsGranted()) {
+                    viewModel.onBluetoothPermissionGranted()
+                } else {
+                    bluetoothPermissionLauncher.launch(bluetoothPermissions)
+                }
             }
         ) {
-            Text("Request Bluetooth Permission")
+            Text("Check / Request Bluetooth Permission")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = {
-                viewModel.connectDevice()
+                if (areBluetoothPermissionsGranted()) {
+                    viewModel.connectDevice()
+                } else {
+                    // Permission may have been revoked after it was first granted.
+                    viewModel.onBluetoothPermissionDenied()
+                }
             },
             enabled =
                 uiState.bluetoothPermissionState == PermissionState.GRANTED &&
@@ -677,6 +794,7 @@ Important imports:
 ```kotlin
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -685,23 +803,27 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 ```
 
 ---
 
 ## 16. Important limitation of the simple version
 
-The simple version above requests:
+The Android 12+ branch requests:
 
 ```kotlin
 BLUETOOTH_SCAN
 BLUETOOTH_CONNECT
 ```
 
-This is appropriate for the Android 12+ permission model.
+This is appropriate for the Android 12+ permission model. The version check in the full example also selects `ACCESS_FINE_LOCATION` when the app runs on Android 11 or lower.
 
-But if you need to support older Android versions, you may need version-specific permission logic.
+This version-specific logic matters only when the app supports those older Android versions:
 
 For example:
 
@@ -716,7 +838,7 @@ legacy Bluetooth permissions
 possibly ACCESS_FINE_LOCATION for scanning
 ```
 
-For this tutorial path, I would keep development focused on a modern Android tablet first, then add older-device compatibility only if needed.
+If the research app will run only on a known modern Android tablet, you can keep development focused on that device first. Keep the older-device branch when the app must support both generations.
 
 That keeps the learning manageable.
 
