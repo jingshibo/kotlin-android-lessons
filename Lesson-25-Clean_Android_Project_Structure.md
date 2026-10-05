@@ -14,6 +14,10 @@ So Lesson 25 is not about adding a new feature yet.
 
 It is about turning the architecture into a real project structure.
 
+The detailed discussion of layer responsibilities and Bluetooth boundaries is collected in the companion note:
+
+[Lesson 25 Notes - ViewModel, Use Case, Repository, and Bluetooth Architecture](Lesson-25-Notes-ViewModel_UseCase_Repository_Bluetooth_Architecture.md)
+
 ---
 
 ## 1. Where we are now

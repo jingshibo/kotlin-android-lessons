@@ -790,6 +790,8 @@ Covered:
 
 This lesson starts Direction A by turning the architecture into a concrete Android project layout.
 
+The companion note [Lesson 25 Notes - ViewModel, Use Case, Repository, and Bluetooth Architecture](Lesson-25-Notes-ViewModel_UseCase_Repository_Bluetooth_Architecture.md) explains how ViewModels, optional use cases, repositories, live-device gateways, and Android Bluetooth APIs fit into that structure. It also explains when a ViewModel may call a repository directly and why the custom Bluetooth interface should not be duplicated by another connection repository.
+
 ### Lesson 26 - Creating the core data model files
 
 Short summary:

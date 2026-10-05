@@ -15,8 +15,7 @@ The most important design rule was:
 
 ```text
 Do not put hardware communication directly inside the UI.
-## 22. Real Data May Need Parsing
-
+```
 
 The UI should not directly talk to Bluetooth, Wi-Fi, USB, or sensors.
 
@@ -65,7 +64,6 @@ external acquisition system
 The problem is that we do not want to rewrite the whole app when we switch from fake data to real data.
 
 Bad structure:
-## 24. Where Should the Parser Live?
 
 ```text
 UI directly generates fake data
@@ -116,6 +114,44 @@ interface DeviceDataSource {
     suspend fun readValue(): Double
 }
 ```
+
+### Read the interface declaration
+
+Let us read the Kotlin grammar before using it:
+
+```text
+interface DeviceDataSource
+│         └── name of the new type
+└── declares a contract rather than a concrete object
+```
+
+The functions inside the braces describe what every device data source must provide:
+
+```kotlin
+suspend fun connect()
+```
+
+- `fun` declares a function.
+- `connect` is the function name.
+- `()` means it takes no arguments.
+- `suspend` means it may pause without blocking its thread and must be called from a coroutine or another `suspend` function.
+
+The return type appears after `:`:
+
+```kotlin
+suspend fun readValue(): Double
+//                       └── return type
+```
+
+These declarations do not have function bodies. The interface requires the operations, but it does not yet say how connection or reading works.
+
+For that reason, we cannot construct the interface directly:
+
+```kotlin
+val deviceDataSource = DeviceDataSource() // Compile error
+```
+
+We need a class that implements the interface and supplies the missing function bodies.
 
 This interface means:
 
@@ -189,6 +225,20 @@ WifiDeviceDataSource
 ```
 
 The rest of the app can use the same interface.
+
+### Interface compared with a normal class
+
+An interface mainly describes **what must be possible**. A normal concrete class describes **how it is done** and can hold the object's state.
+
+| Interface | Concrete class |
+|---|---|
+| Defines a contract | Creates usable objects |
+| Usually declares required operations | Implements the operations |
+| Cannot be constructed directly | Can normally be constructed with `ClassName()` |
+| Does not hold ordinary per-object state with backing fields | Can hold state such as `connected` |
+| A class can implement several interfaces | A class can inherit from only one parent class |
+
+In conversation, people sometimes say that a class “inherits from an interface.” The more precise term is that the class **implements** the interface.
 
 ---
 
@@ -265,6 +315,34 @@ class FakeDeviceDataSource : DeviceDataSource {
 }
 ```
 
+### Read the implementation declaration
+
+Read the class header from left to right:
+
+```kotlin
+class FakeDeviceDataSource : DeviceDataSource
+//    │                    │ └── interface being implemented
+//    │                    └── implements / is usable as
+//    └── concrete class being declared
+```
+
+Kotlin uses `:` both for class inheritance and interface implementation. `DeviceDataSource` has no parentheses here because an interface has no constructor to call.
+
+The class promises to provide every required interface function. Each implementation therefore uses `override`:
+
+```kotlin
+override suspend fun connect() {
+    delay(1000)
+    connected = true
+}
+```
+
+`override` tells Kotlin:
+
+> This function supplies the implementation of a function required by a parent type.
+
+The name, parameters, suspend status, and return type must match the interface declaration. If `FakeDeviceDataSource` omits a required function or uses an incompatible signature, Kotlin reports a compile error.
+
 Let us understand this.
 
 ---
@@ -278,6 +356,10 @@ private var connected: Boolean = false
 ```
 
 This stores whether the fake device is connected.
+
+The interface does not contain this particular state. It only requires the connection operations. The concrete class decides what data it needs in order to perform them.
+
+For the fake implementation, that state is one Boolean. A future Bluetooth implementation might instead store a socket and an input stream.
 
 At first:
 
@@ -455,6 +537,49 @@ class MeasurementRepository(
 }
 ```
 
+The second constructor parameter contains several important Kotlin ideas:
+
+```kotlin
+private val deviceDataSource: DeviceDataSource = FakeDeviceDataSource()
+//          │                 │                  └── create the concrete object
+//          │                 └── default implementation
+//          └── variable uses the interface type
+```
+
+- `private val` stores one read-only reference inside the repository.
+- `deviceDataSource` is the property name.
+- `: DeviceDataSource` means the property accepts any object whose class implements that interface.
+- `FakeDeviceDataSource()` calls the concrete class constructor and creates the usable object.
+- Because it is a default argument, Kotlin uses the fake implementation when the caller does not supply another one.
+
+The interface itself is not being initialized. The object on the right side is a `FakeDeviceDataSource`; the variable on the left deliberately views it through the `DeviceDataSource` contract.
+
+Because the property type is `DeviceDataSource`, the repository depends only on members declared by that interface. It does not depend on fake-only helper functions. This is what allows another implementation to fit into the same place.
+
+We could create and pass it explicitly instead:
+
+```kotlin
+val fakeDataSource: DeviceDataSource = FakeDeviceDataSource()
+
+val repository = MeasurementRepository(
+    context = context,
+    deviceDataSource = fakeDataSource
+)
+```
+
+This pattern is called **constructor injection**: a class receives the dependency it needs through its constructor. It also makes replacement straightforward:
+
+```kotlin
+val realDataSource: DeviceDataSource = BluetoothDeviceDataSource()
+
+val repository = MeasurementRepository(
+    context = context,
+    deviceDataSource = realDataSource
+)
+```
+
+Create the selected data-source object once when building the repository and reuse it. Do not construct a new data source for every measurement, because connection state belongs to that object.
+
 This means:
 
 ```text
@@ -490,6 +615,20 @@ suspend fun disconnectDevice() {
     deviceDataSource.disconnect()
 }
 ```
+
+The repository calls functions through the interface type, but Kotlin runs the implementation belonging to the actual object:
+
+```text
+deviceDataSource contains FakeDeviceDataSource
+ ↓
+deviceDataSource.connect() runs FakeDeviceDataSource.connect()
+
+deviceDataSource contains BluetoothDeviceDataSource
+ ↓
+deviceDataSource.connect() runs BluetoothDeviceDataSource.connect()
+```
+
+The repository does not need an `if` statement to choose the function body. The object supplied during initialization determines which implementation runs. This behavior is called **polymorphism**.
 
 So the ViewModel does not call the data source directly.
 
@@ -1072,6 +1211,21 @@ class BluetoothDeviceDataSource : DeviceDataSource {
 }
 ```
 
+This class implements the same three-function contract as the fake class. Only the function bodies are different.
+
+When the real implementation is ready, initialize it and pass it to the repository:
+
+```kotlin
+val deviceDataSource: DeviceDataSource = BluetoothDeviceDataSource()
+
+val measurementRepository = MeasurementRepository(
+    context = context,
+    deviceDataSource = deviceDataSource
+)
+```
+
+No repository call needs to change. For example, `deviceDataSource.readValue()` now runs `BluetoothDeviceDataSource.readValue()` because that is the concrete object stored in the interface-typed property.
+
 Do not implement this yet.
 The point of Lesson 20 is to prepare the app so that this class can be added later.
 The rest of the app should not need to know the Bluetooth details.
@@ -1241,6 +1395,10 @@ class BluetoothDeviceDataSource(
 }
 ```
 
+This constructor uses the same dependency pattern on a smaller scale. `BluetoothDeviceDataSource` receives a parser object and stores it in `private val parser`. If no parser is supplied, `SensorMessageParser()` creates the default one.
+
+This is **composition**, not interface implementation: the Bluetooth data source *has a* parser and delegates parsing work to it. Meanwhile, `: DeviceDataSource` says the Bluetooth class *implements* the device contract.
+
 Again, not for now.
 But this shows where things will go.
 
@@ -1331,6 +1489,25 @@ The fake implementation is:
 class FakeDeviceDataSource : DeviceDataSource {
     ...
 }
+```
+
+The grammar and object setup are:
+
+```text
+interface DeviceDataSource
+ ↓ defines what every device source must do
+
+class FakeDeviceDataSource : DeviceDataSource
+ ↓ implements how the fake source does it
+
+val source: DeviceDataSource = FakeDeviceDataSource()
+ ↓ constructs the concrete object and stores it using the interface type
+
+MeasurementRepository(context, source)
+ ↓ passes that implementation to the code that will use it
+
+source.readValue()
+ ↓ runs the concrete implementation's function
 ```
 
 The repository now asks:
