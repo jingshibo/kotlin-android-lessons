@@ -155,9 +155,9 @@ The relationship will become:
 
 ```text
 SessionCompletionRepository interface
-        ↑ implemented by
+        ↓ implemented by
 RoomSessionCompletionRepository
-        ↑ supplied to
+        ↓ supplied to
 CompleteSessionUseCase
 ```
 
@@ -173,11 +173,12 @@ For several high-level DAO write operations, use the database's `withWriteTransa
 import androidx.room3.withWriteTransaction
 
 class RoomSessionCompletionRepository(
-    private val database: ResearchDatabase,
-    private val sessionDao: SessionDao,
-    private val measurementDao: MeasurementDao,
-    private val resultDao: ResultDao
+    private val database: ResearchDatabase
 ) : SessionCompletionRepository {
+
+    private val sessionDao = database.sessionDao()
+    private val measurementDao = database.measurementDao()
+    private val resultDao = database.resultDao()
 
     override suspend fun saveCompletedSession(
         session: SessionRecord,
@@ -242,6 +243,127 @@ database.withWriteTransaction {
 ```
 
 If a later insert fails, the newly generated session row is also rolled back.
+
+## 2. Choosing the Narrowest Constructor Dependency
+
+It is not generally better to inject `ResearchDatabase` into every repository for flexibility. A class should normally receive the smallest dependency that provides everything it legitimately needs.
+
+For an ordinary repository that works with one table, inject the corresponding DAO:
+
+```kotlin
+class RoomSessionRepository(
+    private val sessionDao: SessionDao
+) : SessionRepository {
+    // Ordinary session operations that use SessionDao.
+}
+```
+
+This constructor immediately communicates the class's responsibility:
+
+```text
+RoomSessionRepository can perform SessionDao operations
+RoomSessionRepository does not have unrestricted access to every table
+```
+
+This design provides several benefits:
+
+- the dependency is easy to understand
+- the repository cannot accidentally start using unrelated DAOs
+- the class is easier to test with a fake DAO
+- unrelated database changes are less likely to affect it
+- the compiler helps preserve the repository's boundary
+
+Giving every repository the complete database may look more flexible:
+
+```kotlin
+class RoomSessionRepository(
+    private val database: ResearchDatabase
+) : SessionRepository
+```
+
+However, that class can now reach every DAO exposed by the database:
+
+```kotlin
+database.sessionDao()
+database.patientDao()
+database.measurementDao()
+database.resultDao()
+```
+
+That is broader access, not necessarily better design. It makes it easier for a small repository to accumulate unrelated responsibilities.
+
+The multi-table transaction implementation is different. It must establish one transaction boundary shared by several DAOs, so receiving `ResearchDatabase` is appropriate:
+
+```kotlin
+class RoomSessionCompletionRepository(
+    private val database: ResearchDatabase
+) : SessionCompletionRepository {
+
+    private val sessionDao = database.sessionDao()
+    private val measurementDao = database.measurementDao()
+    private val resultDao = database.resultDao()
+
+    override suspend fun saveCompletedSession(
+        session: SessionRecord,
+        measurements: List<MeasurementRecord>,
+        result: ResultRecord
+    ) {
+        database.withWriteTransaction {
+            sessionDao.insertSession(session.toEntity())
+            measurementDao.insertMeasurements(
+                measurements.map { it.toEntity() }
+            )
+            resultDao.insertResult(result.toEntity())
+            sessionDao.markSessionComplete(session.id)
+        }
+    }
+}
+```
+
+All three DAOs are obtained from the same database instance, and that database controls their shared transaction.
+
+It is usually unnecessary to inject both the database and every DAO into this class:
+
+```kotlin
+// Usually unnecessarily repetitive.
+class RoomSessionCompletionRepository(
+    private val database: ResearchDatabase,
+    private val sessionDao: SessionDao,
+    private val measurementDao: MeasurementDao,
+    private val resultDao: ResultDao
+)
+```
+
+The database is already required to open the transaction and can supply its own DAOs. Using it as the single constructor dependency also makes it clear that all participating DAOs belong to the same Room database.
+
+Use this decision rule:
+
+```text
+One DAO is sufficient
+    -> inject that specific DAO
+
+Several specific DAOs are needed, but the class does not control a transaction
+    -> inject those specific DAOs
+
+The class must control one transaction across several DAOs
+    -> inject ResearchDatabase and obtain its DAOs from it
+```
+
+For the running example, the dependencies would therefore be:
+
+| Implementation | Constructor dependency |
+|---|---|
+| `RoomSessionRepository` | `SessionDao` |
+| `RoomPatientRepository` | `PatientDao` |
+| `RoomMeasurementRepository` | `MeasurementDao` |
+| `RoomResultRepository` | `ResultDao` |
+| `RoomSessionCompletionRepository` | `ResearchDatabase` |
+
+The guiding principle is:
+
+> Inject the narrowest dependency that provides everything the class needs. Inject the database when the class genuinely owns a multi-DAO Room transaction boundary.
+
+## 3. Applying the Transaction Across the Application
 
 ### Room 2 compatibility note
 
@@ -430,10 +552,7 @@ The interface, implementation, and use case must be connected when the applicati
 ```kotlin
 val completionRepository: SessionCompletionRepository =
     RoomSessionCompletionRepository(
-        database = database,
-        sessionDao = database.sessionDao(),
-        measurementDao = database.measurementDao(),
-        resultDao = database.resultDao()
+        database = database
     )
 
 val completeSessionUseCase =
@@ -495,13 +614,13 @@ A stricter Clean Architecture package structure can separate the contract from i
 ```text
 domain/
 ├── repository/
-│   └── SessionCompletionRepository.kt
+│   └── SessionCompletionRepository.kt // interface
 └── usecase/
     └── CompleteSessionUseCase.kt
 
 data/
 ├── repository/
-│   └── RoomSessionCompletionRepository.kt
+│   └── RoomSessionCompletionRepository.kt // implementation
 └── local/
     ├── ResearchDatabase.kt
     └── dao/
@@ -509,6 +628,8 @@ data/
         ├── MeasurementDao.kt
         └── ResultDao.kt
 ```
+
+`RoomSessionCompletionRepository` is the implementation of the `SessionCompletionRepository` interface. They have closely related names because they represent the implementation and contract for the same capability.
 
 In this structure:
 
@@ -551,7 +672,7 @@ interface SessionRepository {
 }
 ```
 
-Its Room implementation can depend on all DAOs required by the transaction. Create a separate `SessionCompletionRepository` only when completion is a sufficiently distinct data responsibility.
+Its Room implementation can receive `ResearchDatabase`, obtain the required DAOs from that database, and control their shared transaction. Create a separate `SessionCompletionRepository` only when completion is a sufficiently distinct data responsibility.
 
 ### Let exceptions escape the transaction block
 
