@@ -22,8 +22,9 @@ This note is organized in this order:
 - 具体怎么区分这两种state应该放在viewModel还是UI中：
    1. **Put in ViewModel State**: Any data that represents business/database records or needs to be processed by ViewModel methods.
    2. **Keep as Local Composable State** (remember { mutableStateOf(...) }): Temporary visual dialog pop-ups or local animations that are short-lived and don't involve ViewModel business logic.
-- 所有的状态更新过程（改变state的操作）都放入ViewModel，而UI只负责对当前state进行显示，而不进行任何状态修改操作。只有ViewModel的函数可以对状态量进行更新。
+- 所有涉及屏幕显示的状态更新过程（改变state的操作）都放入ViewModel，而UI只负责对当前state进行显示，而不进行任何状态修改操作。
    - 当UI上发生了一个event（比如onClick），这个event会自动调用ViewModel中的函数，这个函数会实现状态量的更新。此时UI会探测到状态量的变化，然后重刷UI界面，自动显示最新的状态值。
+   - 注意：ViewModel中的函数主要是负责对屏幕状态量进行更新，如果涉及更复杂的business logic操作，比如涉及调用多个repository实现的函数功能，则往往应该用单独的usecase层进行实现，然后用ViewModel进行调用。那些复杂的业务逻辑不应该直接写在ViewModel里，除非比较简单。
 
 ## Quick decision guide
 

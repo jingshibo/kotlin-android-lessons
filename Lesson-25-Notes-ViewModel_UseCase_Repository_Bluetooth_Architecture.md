@@ -2,9 +2,9 @@
 
 Lesson 25 turns the app's conceptual architecture into a clean Android project structure.
 
-This companion note goes deeper into how the presentation, domain/application, data, device, and Android platform parts should depend on one another.
+This companion note goes deeper into how the presentation, domain/application, data, and device-boundary parts should depend on one another.
 
-This companion note answers the larger architecture questions that appear when the fake data source becomes a real Bluetooth implementation:
+This companion note answers the larger architecture questions that appear when the app grows beyond one ViewModel and one repository:
 
 ```text
 Where does the ViewModel belong?
@@ -12,8 +12,8 @@ Where does a use case belong?
 Can a ViewModel call a repository directly?
 When should a use case coordinate multiple repositories?
 Is BluetoothManager a repository?
-Where does Android's BluetoothManager belong?
 What is the difference between saved device data and a live connection?
+Where should a device gateway contract and its implementation live?
 ```
 
 The short mental model is:
@@ -27,7 +27,7 @@ Use case coordinates a complex business operation, when one is needed
  ↓
 Repositories expose application data
  ↓
-Data sources and Android APIs perform the low-level work
+Data sources and platform implementations perform the low-level work
 ```
 
 A use case is optional. A ViewModel may call a repository directly when the operation is simple.
@@ -356,72 +356,27 @@ A repository may use:
 
 Splitting repositories by patient, session, and result may be sensible for this app, but do not turn `one table = one repository` into an absolute rule.
 
-### Think about atomic database work
-
-If several database changes must either all succeed or all fail, simply calling several repositories in sequence may not provide one database transaction.
-
-For example:
-
-```text
-save session
-save 100 measurements
-save result
-mark session complete
-```
-
-If those writes must be atomic, expose a data-layer operation that performs them inside a Room transaction. The domain use case can request the operation, but the Room transaction boundary belongs in the data layer.
-
 ---
 
-## 6. Evaluate `DataTransmissionManager` by responsibility
+## 6. Atomic Room Work
 
-The word `Manager` does not determine a layer.
+When several related Room writes must succeed or fail together, the data layer should perform them inside one short Room transaction.
 
-`DataTransmissionManager` belongs to the domain/application layer only if it coordinates a business workflow such as:
+The complete explanation, Room 3 and Room 2 examples, rollback rules, live-acquisition guidance, and testing strategy are in:
 
-```text
-find patient
-validate session
-start sensor
-receive dataset
-save measurements
-save result
-complete session
-```
+[Lesson 17 Notes - Atomic Room Transactions](lesson-17-notes-atomic-room-transactions.md)
 
-In that case, use an action-focused name:
-
-```kotlin
-class TransferDatasetUseCase(...)
-```
-
-or:
-
-```kotlin
-class RecordMeasurementSessionUseCase(...)
-```
-
-These names explain what operation the class performs.
-
-`DataTransmissionManager` does **not** belong to the domain layer if it mainly performs low-level work such as:
-
-- calling Android Bluetooth APIs
-- managing `BluetoothGatt`
-- opening and closing sockets
-- decoding characteristic notifications
-- maintaining scan callbacks
-- handling platform permissions
-
-That work belongs to a Bluetooth data-source or gateway implementation.
-
-If one class currently performs both business coordination and Bluetooth operations, split it:
+The architecture rule retained here is:
 
 ```text
-RecordMeasurementSessionUseCase
-    business workflow
+Use case
+    decides which business operation must happen
 
-BluetoothSensorDeviceGateway
-    Android Bluetooth communication
+data-layer Room operation
+    decides which database writes must commit together
+
+Room transaction
+    provides the all-or-nothing guarantee
 ```
 
 ---
@@ -488,7 +443,7 @@ You can either keep the existing interface or rename it to clarify its role.
 
 ---
 
-## 8. A clearer name for the custom Bluetooth interface
+### A clearer name for the custom Bluetooth interface
 
 Android already provides a class named:
 
@@ -543,172 +498,13 @@ If the interface remains Bluetooth-specific, names such as `BluetoothSensorDevic
 
 If the interface is intended to support several transports, prefer general names such as `SensorDevice` and `deviceId`. The Bluetooth implementation can internally translate that identifier into a Bluetooth address.
 
----
+The concrete Android Bluetooth classes and connection code are implementation details rather than architecture concepts. They are explained separately in:
 
-## 9. Relationship to Android's `BluetoothManager`
-
-The custom gateway and Android's platform manager have different jobs:
-
-```text
-SensorDeviceGateway
-    app-facing contract
- ↓ implemented by
-BluetoothSensorDeviceGateway
-    app's Bluetooth implementation
- ↓ uses
-android.bluetooth.BluetoothManager
-    Android system service
- ↓ provides
-BluetoothAdapter
- ↓ finds
-BluetoothDevice
- ↓ connects through
-BluetoothGatt for BLE
-or BluetoothSocket for Bluetooth Classic
-```
-
-Android's `BluetoothManager` is obtained from `Context`:
-
-```kotlin
-val platformBluetoothManager =
-    context.getSystemService(
-        android.bluetooth.BluetoothManager::class.java
-    )
-
-val bluetoothAdapter =
-    platformBluetoothManager.adapter
-```
-
-It provides access to the tablet's Bluetooth adapter and overall Bluetooth state. It normally does not perform the final client connection itself.
-
-For Bluetooth Low Energy, the connection is normally created from a `BluetoothDevice`:
-
-```kotlin
-bluetoothGatt = device.connectGatt(
-    context,
-    false,
-    bluetoothGattCallback
-)
-```
-
-For Bluetooth Classic, the connection normally uses a `BluetoothSocket`:
-
-```kotlin
-val socket =
-    device.createRfcommSocketToServiceRecord(serviceUuid)
-
-socket.connect()
-```
-
-The Android platform types should stay inside the concrete Bluetooth implementation rather than appearing in the ViewModel or use case.
+[Lesson 20 Notes - Android Bluetooth Data Source Implementation](lesson-20-notes-android-bluetooth-data-source.md)
 
 ---
 
-## 10. Example Bluetooth implementation boundary
-
-The concrete implementation can use Android APIs while exposing only app models through the interface:
-
-```kotlin
-class BluetoothSensorDeviceGateway(
-    private val context: Context
-) : SensorDeviceGateway {
-
-    private val platformBluetoothManager =
-        context.getSystemService(
-            android.bluetooth.BluetoothManager::class.java
-        )
-
-    private val bluetoothAdapter =
-        platformBluetoothManager.adapter
-
-    private var bluetoothGatt: BluetoothGatt? = null
-
-    private val _connectionState =
-        MutableStateFlow(DeviceConnectionState.DISCONNECTED)
-
-    override val connectionState:
-        StateFlow<DeviceConnectionState> =
-        _connectionState.asStateFlow()
-
-    private val gattCallback =
-        object : BluetoothGattCallback() {
-
-            override fun onConnectionStateChange(
-                gatt: BluetoothGatt,
-                status: Int,
-                newState: Int
-            ) {
-                _connectionState.value =
-                    when (newState) {
-                        BluetoothProfile.STATE_CONNECTED ->
-                            DeviceConnectionState.CONNECTED
-
-                        else ->
-                            DeviceConnectionState.DISCONNECTED
-                    }
-            }
-        }
-
-    override fun connect(deviceId: String) {
-        // Check BLUETOOTH_CONNECT before using protected APIs.
-        val device = bluetoothAdapter.getRemoteDevice(deviceId)
-
-        bluetoothGatt = device.connectGatt(
-            context,
-            false,
-            gattCallback
-        )
-    }
-
-    // Implement the remaining SensorDeviceGateway members.
-}
-```
-
-This is a structural example, not the complete production BLE implementation. A real version also needs permission checks, scan handling, GATT service discovery, characteristic subscriptions, error handling, cleanup, and thread-safe state updates.
-
-The important boundary is:
-
-```text
-ViewModel and use case know SensorDeviceGateway
-
-Only BluetoothSensorDeviceGateway knows
-android.bluetooth.BluetoothManager and BluetoothGatt
-```
-
----
-
-## 11. Where Bluetooth permissions belong
-
-Android does not request Bluetooth permissions automatically when the platform `BluetoothManager` is obtained.
-
-The responsibilities are divided like this:
-
-```text
-Compose screen
-    launches the Android permission dialog
-
-ViewModel
-    represents permission status in UI state
-
-Bluetooth gateway implementation
-    checks permission before protected Bluetooth operations
-```
-
-On Android 12 and above:
-
-```text
-scan
- → BLUETOOTH_SCAN
-
-connect or communicate
- → BLUETOOTH_CONNECT
-```
-
-The UI may remember that permission was previously granted, but the real Bluetooth implementation must still protect operations because permission can later be revoked.
-
----
-
-## 12. Should the live-device interface be split?
+## 8. Should the live-device interface be split?
 
 The current interface covers:
 
@@ -767,7 +563,7 @@ Use this separation only when it improves clarity, testing, or reuse.
 
 ---
 
-## 13. Recommended dependency structure
+## 9. Recommended dependency structure
 
 For the research app, a clear structure is:
 
@@ -821,7 +617,7 @@ SensorDeviceGateway
 
 ---
 
-## 14. Suggested package structure
+## 10. Suggested package structure
 
 One possible project structure is:
 
@@ -870,7 +666,7 @@ This is an example, not a rule. A small app can use fewer packages while preserv
 
 ---
 
-## 15. Common mistakes
+## 11. Common mistakes
 
 ### Mistake 1: use case for every repository function
 
@@ -943,7 +739,7 @@ Parser
 
 ---
 
-## 16. Decision guide
+## 12. Decision guide
 
 Ask these questions when placing a class:
 
@@ -985,7 +781,7 @@ Yes → introduce a use case
 
 ---
 
-## 17. Final mental model
+## 13. Final mental model
 
 ```text
 ViewModel
@@ -1001,10 +797,10 @@ SensorDeviceGateway
     exposes live sensor communication to the app
 
 BluetoothSensorDeviceGateway
-    implements that gateway using Android Bluetooth APIs
+    is one data-layer implementation of that gateway
 
-android.bluetooth.BluetoothManager
-    gives the implementation access to the device's BluetoothAdapter
+Platform device APIs
+    remain behind the concrete data-layer implementation
 ```
 
 The most important rules are:
@@ -1022,7 +818,7 @@ Your custom Bluetooth interface already acts as the live-device gateway.
 
 Do not add another interface that duplicates it.
 
-Keep Android Bluetooth classes inside the concrete Bluetooth implementation.
+Keep platform-specific device classes inside the concrete device implementation.
 ```
 
 ## Further reading
@@ -1030,6 +826,5 @@ Keep Android Bluetooth classes inside the concrete Bluetooth implementation.
 - [Android domain layer](https://developer.android.com/topic/architecture/domain-layer)
 - [Android data layer](https://developer.android.com/topic/architecture/data-layer)
 - [Android architecture recommendations](https://developer.android.com/topic/architecture/recommendations)
-- [Set up Bluetooth](https://developer.android.com/develop/connectivity/bluetooth/setup)
-- [Connect to a BLE GATT server](https://developer.android.com/develop/connectivity/bluetooth/ble/connect-gatt-server)
+- [Lesson 20 Notes - Android Bluetooth Data Source Implementation](lesson-20-notes-android-bluetooth-data-source.md)
 

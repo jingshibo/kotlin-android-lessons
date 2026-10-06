@@ -597,6 +597,7 @@ This lesson turns the app from a simple measurement logger into a more realistic
 Related note:
 
 - `lesson-17-notes-room-database-thinking-map.md` explains the developer thinking flow from entity design, to DAO operations, to database class wiring, to repository usage, and finally to multi-table ID relationships.
+- `lesson-17-notes-atomic-room-transactions.md` explains atomic multi-table writes, commit and rollback, Room 3 and Room 2 transaction APIs, short transaction boundaries, incremental acquisition saves, and rollback testing.
 
 ### Lesson 18 - Multi-screen app navigation
 
@@ -661,6 +662,8 @@ Covered:
 - letting the repository ask the data source for measurements
 
 This lesson creates the structure that lets fake data be replaced by real device input without rewriting the whole app.
+
+The companion note [Lesson 20 Notes - Android Bluetooth Data Source Implementation](lesson-20-notes-android-bluetooth-data-source.md) explains how the app-facing gateway is implemented with Android's `BluetoothManager`, `BluetoothAdapter`, BLE GATT or Classic sockets, and runtime permission checks.
 
 ### Lesson 21 - Signal processing pipeline
 
@@ -790,7 +793,7 @@ Covered:
 
 This lesson starts Direction A by turning the architecture into a concrete Android project layout.
 
-The companion note [Lesson 25 Notes - ViewModel, Use Case, Repository, and Bluetooth Architecture](Lesson-25-Notes-ViewModel_UseCase_Repository_Bluetooth_Architecture.md) explains how ViewModels, optional use cases, repositories, live-device gateways, and Android Bluetooth APIs fit into that structure. It also explains when a ViewModel may call a repository directly and why the custom Bluetooth interface should not be duplicated by another connection repository.
+The companion note [Lesson 25 Notes - ViewModel, Use Case, Repository, and Bluetooth Architecture](Lesson-25-Notes-ViewModel_UseCase_Repository_Bluetooth_Architecture.md) explains how ViewModels, optional use cases, repositories, and live-device gateway boundaries fit into that structure. It also explains when a ViewModel may call a repository directly and why the custom device interface should not be duplicated by another connection repository.
 
 ### Lesson 26 - Creating the core data model files
 

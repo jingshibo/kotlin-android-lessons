@@ -2,6 +2,10 @@
 
 In Lesson 16, we introduced **Room database**.
 
+The detailed explanation of multi-write transactions, commit, and rollback is collected in the companion note:
+
+[Lesson 17 Notes - Atomic Room Transactions](lesson-17-notes-atomic-room-transactions.md)
+
 The app moved from simple file-based storage toward structured local storage:
 
 ```text
