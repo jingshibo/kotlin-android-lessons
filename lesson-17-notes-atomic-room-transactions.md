@@ -334,7 +334,7 @@ class RoomSessionCompletionRepository(
 )
 ```
 
-The database is already required to open the transaction and can supply its own DAOs. Using it as the single constructor dependency also makes it clear that all participating DAOs belong to the same Room database.
+The database is already required to open the transaction and can supply its own DAOs. Using it as the single constructor dependency makes it clear that all participating DAOs belong to the same Room database.
 
 Use this decision rule:
 

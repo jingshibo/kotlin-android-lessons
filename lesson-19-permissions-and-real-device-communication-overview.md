@@ -177,7 +177,7 @@ Check every time
 Request only when permission is missing
 ```
 
-Bluetooth permission and Bluetooth pairing are different:
+Note: **Bluetooth permission and Bluetooth pairing are different**:
 
 - **App permission** allows the app to use Bluetooth and is normally requested once.
 - **Pairing or bonding** identifies and trusts a particular remote device. A PIN or confirmation dialog may appear the first time each new device is paired.
